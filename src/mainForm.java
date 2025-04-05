@@ -1,7 +1,6 @@
 import javax.swing.*;
 import java.awt.event.*;
 import java.util.*;
-import javax.swing.plaf.basic.BasicTabbedPaneUI;
 import javax.swing.table.DefaultTableModel;
 import java.text.SimpleDateFormat;
 import javax.swing.JTable;
@@ -150,6 +149,8 @@ public class mainForm extends JFrame {
     private JComboBox comboBoxCellCellSelectionIdss;
     private JButton CritDataMassEditButton;
     private JTextField CritDataMassEdit;
+    private JTextField SearchParamentInsert;
+    private JTable ParserDataTable;
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -2636,6 +2637,10 @@ public class mainForm extends JFrame {
         }
 
         new mainForm();
+    }
+
+    private void createUIComponents() {
+        // TODO: place custom component creation code here
     }
 }
 

@@ -7,6 +7,9 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="lib" level="project" />
+    <orderEntry type="library" exported="" name="lib" level="project" />
+    <orderEntry type="library" exported="" name="selenium-java-4.30.0" level="project" />
+    <orderEntry type="library" exported="" name="webdrivermanager-6.0.1" level="project" />
+    <orderEntry type="library" exported="" name="selenium-chrome-driver-4.3.0" level="project" />
   </component>
 </module>
