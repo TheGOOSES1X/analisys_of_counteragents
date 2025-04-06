@@ -1,15 +1,18 @@
 import javax.swing.*;
 import java.awt.event.*;
 import java.util.*;
-import javax.swing.table.DefaultTableModel;
+import javax.swing.table.*;
 import java.text.SimpleDateFormat;
 import javax.swing.JTable;
-import javax.swing.table.TableModel;
-import javax.swing.table.TableRowSorter;
 import java.util.Comparator;
 
-
+import Parser.implementations.*;
+import Parser.interfaces.DriverSetup;
+import Parser.interfaces.Parser;
+import Parser.interfaces.PurchaseItem;
+import Parser.interfaces.ResultsSaver;
 import com.toedter.calendar.JDateChooser;
+
 
 import java.awt.*;
 // для json
@@ -150,8 +153,13 @@ public class mainForm extends JFrame {
     private JButton CritDataMassEditButton;
     private JTextField CritDataMassEdit;
     private JTextField SearchParamentInsert;
-    private JTable ParserDataTable;
-
+    private JButton QueryButton;
+    private JTable HeadersTable;
+    private JLabel StatusLabel;
+    private JLabel CurrentRecords;
+    private JLabel TotalRecords;
+    private JPanel tablePanel;
+    private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
     private String CritString;
@@ -1794,6 +1802,18 @@ public class mainForm extends JFrame {
         setLocationRelativeTo(null);
         setVisible(true);
 
+        statusForm = new StatusForm();
+        statusForm.setStatusLabel(StatusLabel);
+        statusForm.setCurrentRecords(CurrentRecords);
+        statusForm.setTotalRecords(TotalRecords);
+        statusForm.setHeadersTable(HeadersTable);
+        QueryButton.addActionListener(e -> onQueryButtonClicked());
+
+        initHeadersTable();
+        customizeTableRenderers();
+        configureTableColumns();
+        initTableWithScroll();
+
     }
 
     private void updateTableContras(List<rowContras> rowsC) {
@@ -2132,6 +2152,98 @@ public class mainForm extends JFrame {
     }
 
 
+    private void initHeadersTable() {
+        // Создаем модель с правильными названиями столбцов
+        String[] columnNames = {"№", "Номер закупки", "Информация по закупке", "Выбор"};
+
+        DefaultTableModel model = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                return columnIndex == 3 ? Boolean.class : String.class;
+            }
+
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return column == 3;
+            }
+        };
+
+        HeadersTable.setModel(model);
+        HeadersTable.setRowHeight(60); // Начальная высота строки
+    }
+    private void initTableWithScroll() {
+        tablePanel.setLayout(new BorderLayout());
+        JScrollPane scrollPane = new JScrollPane(HeadersTable);
+        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
+        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scrollPane.setViewportBorder(BorderFactory.createEmptyBorder());
+        JViewport viewport = scrollPane.getViewport();
+        viewport.setOpaque(false);
+        viewport.setBorder(null);
+        HeadersTable.setFillsViewportHeight(true);
+        tablePanel.removeAll();
+        tablePanel.add(scrollPane, BorderLayout.CENTER);
+        tablePanel.revalidate();
+        tablePanel.repaint();
+    }
+    private void configureTableColumns() {
+        // Устанавливаем режим автоматического изменения размера
+        HeadersTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        TableColumnModel columnModel = HeadersTable.getColumnModel();
+
+        // Настройка каждого столбца
+        columnModel.getColumn(0).setPreferredWidth(50);  // №
+        columnModel.getColumn(0).setMaxWidth(80);
+
+        columnModel.getColumn(1).setPreferredWidth(150); // Номер закупки
+        columnModel.getColumn(1).setMaxWidth(200);
+
+        // Основной столбец с информацией
+        columnModel.getColumn(2).setPreferredWidth(400);
+        columnModel.getColumn(2).setCellRenderer(new MultiLineCellRenderer());
+
+        // Чекбоксы
+        columnModel.getColumn(3).setPreferredWidth(60);
+        columnModel.getColumn(3).setMaxWidth(80);
+
+        // Включаем заполнение всего доступного пространства
+        HeadersTable.setFillsViewportHeight(true);
+    }
+    private void customizeTableRenderers() {
+        // Рендерер для столбца с разделенным текстом
+        HeadersTable.getColumnModel().getColumn(2).setCellRenderer(new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable table, Object value,
+                                                           boolean isSelected, boolean hasFocus, int row, int column) {
+
+                String text = value != null ? value.toString() : "";
+                String[] parts = splitTextInHalf(text);
+
+                // HTML для отображения в две строки
+                String htmlText = "<html><div style='text-align: center;'>" +
+                        parts[0] + "<br>" + parts[1] + "</div></html>";
+
+                return super.getTableCellRendererComponent(table, htmlText,
+                        isSelected, hasFocus, row, column);
+            }
+        });
+    }
+
+    // Метод для разделения текста пополам
+    private String[] splitTextInHalf(String text) {
+        if (text == null || text.isEmpty()) return new String[]{"", ""};
+
+        int mid = text.length() / 2;
+        while (mid < text.length() && !Character.isWhitespace(text.charAt(mid))) {
+            mid++;
+        }
+        return new String[]{
+                text.substring(0, mid).trim(),
+                text.substring(mid).trim()
+        };
+    }
     private double calcWeightDataPoints(double curV, List<rowCritValues> dataPoints) {
 
         if (!dataPoints.isEmpty()) {
@@ -2619,6 +2731,35 @@ public class mainForm extends JFrame {
         }
     }
 
+    private void initializeComponents() {
+        QueryButton.addActionListener(e -> onQueryButtonClicked());
+    }
+
+    private void onQueryButtonClicked() {
+        String searchText = SearchParamentInsert.getText().trim();
+        String searchQuery = searchText.isEmpty()
+                ? "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22"
+                : processSearchQuery(searchText);
+
+        // Очищаем предыдущие данные
+        TotalRecords.setText("Всего записей: 0");
+        CurrentRecords.setText("Обработано: 0");
+        StatusLabel.setText("Статус: запуск парсера...");
+
+        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
+        DriverSetup chromeSetup = new ChromeDriverSetup();
+        Parser parser = new PurchasesParser(chromeSetup, saver, searchQuery, statusForm);  // this = форма как listener
+        new Thread(parser::parse).start();  // Запускаем в отдельном потоке, чтобы UI не зависал
+    }
+
+    // Метод для обработки поискового запроса
+    private String processSearchQuery(String rawQuery) {
+        // Заменяем кавычки на %22
+        String processed = rawQuery.replace("\"", "%22");
+        // Заменяем пробелы на +
+        processed = processed.replace(" ", "+");
+        return processed;
+    }
 
     public static void main(String[] args) {
         try {

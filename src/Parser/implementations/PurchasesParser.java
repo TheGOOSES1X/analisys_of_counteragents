@@ -1,9 +1,6 @@
 package Parser.implementations;
 
-import Parser.interfaces.DriverSetup;
-import Parser.interfaces.Parser;
-import Parser.interfaces.PurchaseItem;
-import Parser.interfaces.ResultsSaver;
+import Parser.interfaces.*;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -20,20 +17,32 @@ public class PurchasesParser implements Parser {
     private final DriverSetup driverSetup;
     private final ResultsSaver<PurchaseItem> resultsSaver;
     private static final String BASE_URL = "https://zakupki.gov.ru/epz/order/extendedsearch/results.html";
-    private static final String SEARCH_QUERY = "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22";
+    private final String searchQuery;
+//    private static final String SEARCH_QUERY = "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22";
     private static final int ITEMS_PER_PAGE = 50;
     private static final int DEFAULT_PAGE_LOAD_TIMEOUT_SECONDS = 30;
     private static final int DEFAULT_PAGINATION_DELAY_MS = 3000;
     private static final String OUTPUT_FILENAME_PREFIX = "zakupki_results_";
+    private final ParserStatusListener statusListener;
 
     public PurchasesParser(DriverSetup driverSetup) {
-        this(driverSetup, null);  // По умолчанию без сохранения
+        this(driverSetup, null);
     }
 
+    // Существующий конструктор - использует значение по умолчанию
     public PurchasesParser(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver) {
+        this(driverSetup, resultsSaver,
+                "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22",null);
+    }
+
+    public PurchasesParser(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
+                           String searchQuery, ParserStatusListener statusListener) {
         this.driverSetup = driverSetup;
         this.resultsSaver = resultsSaver;
+        this.searchQuery = searchQuery;
+        this.statusListener = statusListener;
     }
+
     @Override
     public void parse() {
         WebDriver driver = driverSetup.setupDriver();
@@ -54,16 +63,15 @@ public class PurchasesParser implements Parser {
 
                 if (currentPage == 1) {
                     totalItems = extractTotalItems(driver);
-                    System.out.println("Всего найдено записей: " + totalItems);
+                    if (statusListener != null) {
+                        statusListener.updateTotalRecords(totalItems);
+                        statusListener.updateStatus("Найдено записей: " + totalItems);
+                    }
                     if (totalItems == 0) break;
                 }
 
-                // Получаем все контейнеры закупок
                 List<WebElement> itemContainers = driver.findElements(
                         By.cssSelector(".search-registry-entry-block"));
-
-                System.out.printf("Страница %d: найдено %d элементов%n",
-                        currentPage, itemContainers.size());
 
                 if (itemContainers.isEmpty()) {
                     hasNextPage = false;
@@ -74,9 +82,17 @@ public class PurchasesParser implements Parser {
                     try {
                         PurchaseItem item = extractPurchaseData(itemContainer);
                         allPurchases.add(item);
-                        System.out.println(item);
+
+                        if (statusListener != null) {
+                            statusListener.updateCurrentRecords(allPurchases.size());
+                            statusListener.addPurchaseToTable(item);
+                        }
                     } catch (Exception e) {
-                        System.err.println("Ошибка при обработке элемента: " + e.getMessage());
+                        String errorMsg = "Ошибка при обработке элемента: " + e.getMessage();
+                        if (statusListener != null) {
+                            statusListener.updateStatus(errorMsg);
+                        }
+                        System.err.println(errorMsg);
                     }
                 }
 
@@ -88,12 +104,18 @@ public class PurchasesParser implements Parser {
                 }
             }
 
-            System.out.println("Всего собрано записей: " + allPurchases.size());
-            if (resultsSaver != null) {  // Сохраняем только если передан saver
+            if (resultsSaver != null) {
                 resultsSaver.save(allPurchases);
             }
+            if (statusListener != null) {
+                statusListener.updateStatus("Парсинг завершен! Обработано: " + allPurchases.size());
+            }
         } catch (Exception e) {
-            System.err.println("Ошибка при парсинге: " + e.getMessage());
+            String errorMsg = "Ошибка при парсинге: " + e.getMessage();
+            if (statusListener != null) {
+                statusListener.updateStatus(errorMsg);
+            }
+            System.err.println(errorMsg);
             e.printStackTrace();
         } finally {
             if (driver != null) {
@@ -101,7 +123,11 @@ public class PurchasesParser implements Parser {
                     sleep(1000);
                     driver.quit();
                 } catch (Exception e) {
-                    System.err.println("Ошибка при закрытии драйвера: " + e.getMessage());
+                    String errorMsg = "Ошибка при закрытии драйвера: " + e.getMessage();
+                    if (statusListener != null) {
+                        statusListener.updateStatus(errorMsg);
+                    }
+                    System.err.println(errorMsg);
                 }
             }
         }
@@ -144,7 +170,7 @@ public class PurchasesParser implements Parser {
     }
 
     private String buildPaginatedUrl(int pageNumber) {
-        return BASE_URL + "?searchString=" + SEARCH_QUERY +
+        return BASE_URL + "?searchString=" + searchQuery +
                 "&pageNumber=" + pageNumber +
                 "&recordsPerPage=" + ITEMS_PER_PAGE;
     }
