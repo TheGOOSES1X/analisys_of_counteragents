@@ -12,35 +12,62 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
 public class PurchasesParser implements Parser {
     private final DriverSetup driverSetup;
     private final ResultsSaver<PurchaseItem> resultsSaver;
     private static final String BASE_URL = "https://zakupki.gov.ru/epz/order/extendedsearch/results.html";
-    private final String searchQuery;
-//    private static final String SEARCH_QUERY = "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22";
+
     private static final int ITEMS_PER_PAGE = 50;
+    private static final String RECORDS_PER_PAGE_VALUE = String.valueOf(ITEMS_PER_PAGE);
     private static final int DEFAULT_PAGE_LOAD_TIMEOUT_SECONDS = 30;
     private static final int DEFAULT_PAGINATION_DELAY_MS = 3000;
-    private static final String OUTPUT_FILENAME_PREFIX = "zakupki_results_";
     private final ParserStatusListener statusListener;
+    private final Map<String, String> queryParams;
 
     public PurchasesParser(DriverSetup driverSetup) {
         this(driverSetup, null);
     }
 
-    // Существующий конструктор - использует значение по умолчанию
+
     public PurchasesParser(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver) {
         this(driverSetup, resultsSaver,
-                "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22",null);
+                "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22", null);
     }
 
     public PurchasesParser(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
                            String searchQuery, ParserStatusListener statusListener) {
+        this(driverSetup, resultsSaver, createDefaultParams(searchQuery), statusListener);
+    }
+
+    public PurchasesParser(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
+                           Map<String, String> queryParams, ParserStatusListener statusListener) {
         this.driverSetup = driverSetup;
         this.resultsSaver = resultsSaver;
-        this.searchQuery = searchQuery;
+        this.queryParams = new LinkedHashMap<>(queryParams);
+
+        this.queryParams.put("recordsPerPage", RECORDS_PER_PAGE_VALUE);
         this.statusListener = statusListener;
+    }
+    private static Map<String, String> createDefaultParams(String searchQuery) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("searchString", searchQuery);
+        params.put("morphology", "on");
+        params.put("search-filter", "Дате размещения");
+        params.put("pageNumber", "1");
+        params.put("sortDirection", "false");
+        params.put("recordsPerPage", RECORDS_PER_PAGE_VALUE);
+        params.put("showLotsInfoHidden", "false");
+        params.put("sortBy", "UPDATE_DATE");
+        params.put("fz44", "on");
+        params.put("fz223", "on");
+        params.put("af", "on");
+        params.put("ca", "on");
+        params.put("pc", "on");
+        params.put("pa", "on");
+        return params;
     }
 
     @Override
@@ -49,132 +76,190 @@ public class PurchasesParser implements Parser {
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(DEFAULT_PAGE_LOAD_TIMEOUT_SECONDS));
 
         try {
-            List<PurchaseItem> allPurchases = new ArrayList<>();
-            int currentPage = 1;
-            int totalItems = 0;
-            boolean hasNextPage = true;
-
-            while (hasNextPage) {
-                String paginatedUrl = buildPaginatedUrl(currentPage);
-                driver.get(paginatedUrl);
-
-                wait.until(ExpectedConditions.presenceOfElementLocated(
-                        By.cssSelector(".registry-entry__header-mid__number")));
-
-                if (currentPage == 1) {
-                    totalItems = extractTotalItems(driver);
-                    if (statusListener != null) {
-                        statusListener.updateTotalRecords(totalItems);
-                        statusListener.updateStatus("Найдено записей: " + totalItems);
-                    }
-                    if (totalItems == 0) break;
-                }
-
-                List<WebElement> itemContainers = driver.findElements(
-                        By.cssSelector(".search-registry-entry-block"));
-
-                if (itemContainers.isEmpty()) {
-                    hasNextPage = false;
-                    continue;
-                }
-
-                for (WebElement itemContainer : itemContainers) {
-                    try {
-                        PurchaseItem item = extractPurchaseData(itemContainer);
-                        allPurchases.add(item);
-
-                        if (statusListener != null) {
-                            statusListener.updateCurrentRecords(allPurchases.size());
-                            statusListener.addPurchaseToTable(item);
-                        }
-                    } catch (Exception e) {
-                        String errorMsg = "Ошибка при обработке элемента: " + e.getMessage();
-                        if (statusListener != null) {
-                            statusListener.updateStatus(errorMsg);
-                        }
-                        System.err.println(errorMsg);
-                    }
-                }
-
-                if (currentPage * ITEMS_PER_PAGE >= totalItems) {
-                    hasNextPage = false;
-                } else {
-                    currentPage++;
-                    sleep(DEFAULT_PAGINATION_DELAY_MS);
-                }
-            }
-
-            if (resultsSaver != null) {
-                resultsSaver.save(allPurchases);
-            }
-            if (statusListener != null) {
-                statusListener.updateStatus("Парсинг завершен! Обработано: " + allPurchases.size());
-            }
+            List<PurchaseItem> allPurchases = parseAllPages(driver, wait);
+            saveResults(allPurchases);
+            notifyCompletion(allPurchases.size());
         } catch (Exception e) {
-            String errorMsg = "Ошибка при парсинге: " + e.getMessage();
-            if (statusListener != null) {
-                statusListener.updateStatus(errorMsg);
-            }
-            System.err.println(errorMsg);
-            e.printStackTrace();
+            handleError("Ошибка при парсинге: " + e.getMessage(), e);
         } finally {
-            if (driver != null) {
-                try {
-                    sleep(1000);
-                    driver.quit();
-                } catch (Exception e) {
-                    String errorMsg = "Ошибка при закрытии драйвера: " + e.getMessage();
-                    if (statusListener != null) {
-                        statusListener.updateStatus(errorMsg);
-                    }
-                    System.err.println(errorMsg);
-                }
+            closeDriver(driver);
+        }
+    }
+
+    private List<PurchaseItem> parseAllPages(WebDriver driver, WebDriverWait wait) {
+        List<PurchaseItem> allPurchases = new ArrayList<>();
+        int currentPage = 1;
+        int totalItems = 0;
+        boolean hasNextPage = true;
+
+        while (hasNextPage) {
+            navigateToPage(driver, wait, currentPage);
+
+            if (currentPage == 1) {
+                totalItems = getTotalItemsCount(driver);
+                if (totalItems == 0) break;
+            }
+
+            List<WebElement> itemContainers = getItemContainers(driver);
+            if (itemContainers.isEmpty()) {
+                hasNextPage = false;
+                continue;
+            }
+
+            processPageItems(itemContainers, allPurchases);
+            hasNextPage = shouldContinueToNextPage(currentPage, totalItems);
+            currentPage++;
+        }
+
+        return allPurchases;
+    }
+
+    private void navigateToPage(WebDriver driver, WebDriverWait wait, int pageNumber) {
+        driver.get(buildPaginatedUrl(pageNumber));
+        wait.until(ExpectedConditions.presenceOfElementLocated(
+                By.cssSelector(".registry-entry__header-mid__number")));
+    }
+
+    private int getTotalItemsCount(WebDriver driver) {
+        int totalItems = extractTotalItems(driver);
+        if (statusListener != null) {
+            statusListener.updateTotalRecords(totalItems);
+            statusListener.updateStatus("Найдено записей: " + totalItems);
+        }
+        return totalItems;
+    }
+
+    private List<WebElement> getItemContainers(WebDriver driver) {
+        return driver.findElements(By.cssSelector(".search-registry-entry-block"));
+    }
+
+    private void processPageItems(List<WebElement> itemContainers, List<PurchaseItem> allPurchases) {
+        for (WebElement itemContainer : itemContainers) {
+            try {
+                PurchaseItem item = extractPurchaseData(itemContainer);
+                allPurchases.add(item);
+                notifyItemProcessed(allPurchases.size(), item);
+            } catch (Exception e) {
+                handleItemError("Ошибка при обработке элемента: " + e.getMessage(), e);
+            }
+        }
+        sleep(DEFAULT_PAGINATION_DELAY_MS);
+    }
+
+    private boolean shouldContinueToNextPage(int currentPage, int totalItems) {
+        return currentPage * ITEMS_PER_PAGE < totalItems;
+    }
+
+    private void notifyItemProcessed(int processedCount, PurchaseItem item) {
+        if (statusListener != null) {
+            statusListener.updateCurrentRecords(processedCount);
+            statusListener.addPurchaseToTable(item);
+        }
+    }
+
+    private void saveResults(List<PurchaseItem> items) {
+        if (resultsSaver != null) {
+            resultsSaver.save(items);
+        }
+    }
+
+    private void notifyCompletion(int totalProcessed) {
+        if (statusListener != null) {
+            statusListener.updateStatus("Парсинг завершен! Обработано: " + totalProcessed);
+        }
+    }
+
+    private void handleError(String message, Exception e) {
+        if (statusListener != null) {
+            statusListener.updateStatus(message);
+        }
+        System.err.println(message);
+        e.printStackTrace();
+    }
+
+    private void handleItemError(String message, Exception e) {
+        if (statusListener != null) {
+            statusListener.updateStatus(message);
+        }
+        System.err.println(message);
+    }
+
+    private void closeDriver(WebDriver driver) {
+        if (driver != null) {
+            try {
+                sleep(1000);
+                driver.quit();
+            } catch (Exception e) {
+                handleError("Ошибка при закрытии драйвера: " + e.getMessage(), e);
             }
         }
     }
 
     private PurchaseItem extractPurchaseData(WebElement itemContainer) {
-        // Извлекаем номер и ссылку
-        WebElement numberElement = itemContainer.findElement(
-                By.cssSelector(".registry-entry__header-mid__number a"));
-        String number = numberElement.getText().trim();
-        String href = numberElement.getAttribute("href");
-
-        // Извлекаем объект закупки
-        String purchaseObject = "Не указан";
-        try {
-            purchaseObject = itemContainer.findElement(By.xpath(
-                    ".//div[contains(@class, 'registry-entry__body-block')]" +
-                            "[.//div[contains(@class, 'registry-entry__body-title')]" +
-                            "[contains(., 'Объект закупки')]]" +
-                            "/div[contains(@class, 'registry-entry__body-value')]"
-            )).getText().trim();
-        } catch (Exception e) {
-            System.err.println("Не удалось извлечь объект закупки: " + e.getMessage());
-        }
-
-        // Извлекаем заказчика
-        String customer = "Не указан";
-        try {
-            customer = itemContainer.findElement(By.xpath(
-                    ".//div[contains(@class, 'registry-entry__body-block')]" +
-                            "[.//div[contains(@class, 'registry-entry__body-title')]" +
-                            "[contains(., 'Заказчик')]]" +
-                            "//span[contains(@class, 'highlightColor')]"
-            )).getText().trim();
-        } catch (Exception e) {
-            System.err.println("Не удалось извлечь заказчика: " + e.getMessage());
-        }
+        String number = extractTextFromElement(itemContainer,
+                ".registry-entry__header-mid__number a", "Не указан");
+        String href = extractAttributeFromElement(itemContainer,
+                ".registry-entry__header-mid__number a", "href", "");
+        String purchaseObject = extractPurchaseObject(itemContainer);
+        String customer = extractCustomer(itemContainer);
 
         return new PurchaseItemImpl(number, href, purchaseObject, customer);
     }
 
-    private String buildPaginatedUrl(int pageNumber) {
-        return BASE_URL + "?searchString=" + searchQuery +
-                "&pageNumber=" + pageNumber +
-                "&recordsPerPage=" + ITEMS_PER_PAGE;
+    private String extractPurchaseObject(WebElement itemContainer) {
+        return extractTextFromXPath(itemContainer,
+                ".//div[contains(@class, 'registry-entry__body-block')]" +
+                        "[.//div[contains(@class, 'registry-entry__body-title')]" +
+                        "[contains(., 'Объект закупки')]]" +
+                        "/div[contains(@class, 'registry-entry__body-value')]",
+                "Не указан");
     }
 
+    private String extractCustomer(WebElement itemContainer) {
+        return extractTextFromXPath(itemContainer,
+                ".//div[contains(@class, 'registry-entry__body-block')]" +
+                        "[.//div[contains(@class, 'registry-entry__body-title')]" +
+                        "[contains(., 'Заказчик')]]" +
+                        "//span[contains(@class, 'highlightColor')]",
+                "Не указан");
+    }
+
+    private String extractTextFromElement(WebElement parent, String cssSelector, String defaultValue) {
+        try {
+            return parent.findElement(By.cssSelector(cssSelector)).getText().trim();
+        } catch (Exception e) {
+            System.err.println("Не удалось извлечь текст из элемента: " + e.getMessage());
+            return defaultValue;
+        }
+    }
+
+    private String extractAttributeFromElement(WebElement parent, String cssSelector,
+                                               String attribute, String defaultValue) {
+        try {
+            return parent.findElement(By.cssSelector(cssSelector)).getAttribute(attribute);
+        } catch (Exception e) {
+            System.err.println("Не удалось извлечь атрибут из элемента: " + e.getMessage());
+            return defaultValue;
+        }
+    }
+
+    private String extractTextFromXPath(WebElement parent, String xpath, String defaultValue) {
+        try {
+            return parent.findElement(By.xpath(xpath)).getText().trim();
+        } catch (Exception e) {
+            System.err.println("Не удалось извлечь текст по XPath: " + e.getMessage());
+            return defaultValue;
+        }
+    }
+
+    private String buildPaginatedUrl(int pageNumber) {
+        Map<String, String> params = new LinkedHashMap<>(this.queryParams);
+        params.put("pageNumber", String.valueOf(pageNumber));
+
+        return BASE_URL + "?" + params.entrySet().stream()
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .collect(Collectors.joining("&"));
+    }
 
     private int extractTotalItems(WebDriver driver) {
         try {
@@ -200,6 +285,4 @@ public class PurchasesParser implements Parser {
             throw new RuntimeException("Поток был прерван", e);
         }
     }
-
-
 }

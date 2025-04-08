@@ -159,6 +159,11 @@ public class mainForm extends JFrame {
     private JLabel CurrentRecords;
     private JLabel TotalRecords;
     private JPanel tablePanel;
+    private JCheckBox PurchaseCancelled;
+    private JCheckBox PurchaseCompleted;
+    private JCheckBox SubmissionOfApplications;
+    private JCheckBox CommissionWork;
+    private JButton StopParser;
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -1811,8 +1816,9 @@ public class mainForm extends JFrame {
 
         initHeadersTable();
         customizeTableRenderers();
-        configureTableColumns();
-        initTableWithScroll();
+//        Эти методы для стилей таблицы, не трогать без необходимости
+//        configureTableColumns();
+//        initTableWithScroll();
 
     }
 
@@ -2735,11 +2741,51 @@ public class mainForm extends JFrame {
         QueryButton.addActionListener(e -> onQueryButtonClicked());
     }
 
-    private void onQueryButtonClicked() {
+
+    private Map<String, String> createQueryParams(String searchQuery, boolean hasAnyFilter) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("searchString", searchQuery);
+
+        // Добавляем стандартные параметры только если есть хотя бы один фильтр
+        if (hasAnyFilter) {
+            params.put("morphology", "on");
+            params.put("pageNumber", "1");
+            params.put("sortDirection", "false");
+            params.put("showLotsInfoHidden", "false");
+            params.put("sortBy", "UPDATE_DATE");
+        }
+
+        return params;
+    }
+
+    private Map<String, String> buildFinalParams() {
         String searchText = SearchParamentInsert.getText().trim();
         String searchQuery = searchText.isEmpty()
                 ? "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22"
                 : processSearchQuery(searchText);
+
+        // Проверяем, есть ли хотя бы один активный фильтр
+        boolean hasAnyFilter = PurchaseCancelled.isSelected() ||
+                PurchaseCompleted.isSelected() ||
+                SubmissionOfApplications.isSelected() ||
+                CommissionWork.isSelected();
+
+        Map<String, String> params = createQueryParams(searchQuery, hasAnyFilter);
+
+        // Добавляем параметры чекбоксов
+        if (PurchaseCancelled.isSelected()) params.put("pa", "on");
+        if (PurchaseCompleted.isSelected()) params.put("pc", "on");
+        if (SubmissionOfApplications.isSelected()) params.put("af", "on");
+        if (CommissionWork.isSelected()) params.put("ca", "on");
+
+        // Добавляем другие фильтры по необходимости
+        // if (someOtherFilter.isSelected()) params.put("param", "value");
+
+        return params;
+    }
+    private void onQueryButtonClicked() {
+        Map<String, String> params = buildFinalParams();
+        clearTable(HeadersTable);
 
         // Очищаем предыдущие данные
         TotalRecords.setText("Всего записей: 0");
@@ -2748,8 +2794,8 @@ public class mainForm extends JFrame {
 
         ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
         DriverSetup chromeSetup = new ChromeDriverSetup();
-        Parser parser = new PurchasesParser(chromeSetup, saver, searchQuery, statusForm);  // this = форма как listener
-        new Thread(parser::parse).start();  // Запускаем в отдельном потоке, чтобы UI не зависал
+        Parser parser = new PurchasesParser(chromeSetup, saver, params, statusForm);
+        new Thread(parser::parse).start();
     }
 
     // Метод для обработки поискового запроса
