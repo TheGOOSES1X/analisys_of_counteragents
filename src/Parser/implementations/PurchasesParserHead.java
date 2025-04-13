@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
-public class PurchasesParser implements Parser {
+public class PurchasesParserHead implements Parser {
     private final DriverSetup driverSetup;
     private final ResultsSaver<PurchaseItem> resultsSaver;
     private static final String BASE_URL = "https://zakupki.gov.ru/epz/order/extendedsearch/results.html";
@@ -27,23 +27,23 @@ public class PurchasesParser implements Parser {
     private final ParserStatusListener statusListener;
     private final Map<String, String> queryParams;
 
-    public PurchasesParser(DriverSetup driverSetup) {
+    public PurchasesParserHead(DriverSetup driverSetup) {
         this(driverSetup, null);
     }
 
 
-    public PurchasesParser(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver) {
+    public PurchasesParserHead(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver) {
         this(driverSetup, resultsSaver,
                 "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22", null);
     }
 
-    public PurchasesParser(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
-                           String searchQuery, ParserStatusListener statusListener) {
+    public PurchasesParserHead(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
+                               String searchQuery, ParserStatusListener statusListener) {
         this(driverSetup, resultsSaver, createDefaultParams(searchQuery), statusListener);
     }
 
-    public PurchasesParser(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
-                           Map<String, String> queryParams, ParserStatusListener statusListener) {
+    public PurchasesParserHead(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
+                               Map<String, String> queryParams, ParserStatusListener statusListener) {
         this.driverSetup = driverSetup;
         this.resultsSaver = resultsSaver;
         this.queryParams = new LinkedHashMap<>(queryParams);

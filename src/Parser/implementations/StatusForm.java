@@ -8,12 +8,16 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class StatusForm implements ParserStatusListener {
     private JTable headersTable;
     private JLabel StatusLabel;
     private JLabel CurrentRecords;
     private JLabel TotalRecords;
+    public List<PurchaseItem> allItems = new ArrayList<>();
+    public List<String> selectedUrls = new ArrayList<>();
 
     // Методы для установки JLabel'ов
     public void setStatusLabel(JLabel statusLabel) {
@@ -30,6 +34,7 @@ public class StatusForm implements ParserStatusListener {
     public void setHeadersTable(JTable table) {
         this.headersTable = table;
     }
+
 
 
     @Override
@@ -65,6 +70,7 @@ public class StatusForm implements ParserStatusListener {
             DefaultTableModel model = (DefaultTableModel) headersTable.getModel();
             int rowCount = model.getRowCount();
 
+            allItems.add(item);
             model.addRow(new Object[]{
                     rowCount + 1,
                     item.getNumber(),

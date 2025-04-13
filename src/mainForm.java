@@ -6,6 +6,7 @@ import java.text.SimpleDateFormat;
 import javax.swing.JTable;
 import java.util.Comparator;
 
+import Parser.Database.hooks.DatabaseConnector;
 import Parser.implementations.*;
 import Parser.interfaces.DriverSetup;
 import Parser.interfaces.Parser;
@@ -1832,6 +1833,14 @@ public class mainForm extends JFrame {
 //        Эти методы для стилей таблицы, не трогать без необходимости
 //        configureTableColumns();
 //        initTableWithScroll();
+        DatabaseConnector dbConnector = new DatabaseConnector("src/config.json");
+        if (dbConnector.testConnection()) {
+            System.out.println("✅ Подключение к PostgreSQL успешно!");
+        } else {
+            System.out.println("❌ Ошибка подключения!");
+
+        }
+
 
     }
 
@@ -2188,6 +2197,24 @@ public class mainForm extends JFrame {
         };
 
         HeadersTable.setModel(model);
+        // Добавляем слушатель изменений
+        HeadersTable.getModel().addTableModelListener(e -> {
+            if (e.getColumn() == 3) {
+                boolean isSelected = (boolean) HeadersTable.getModel().getValueAt(e.getFirstRow(), 3);
+                PurchaseItem item = statusForm.allItems.get(e.getFirstRow());
+
+                if (isSelected) {
+                    statusForm.selectedUrls.add(item.getUrl());
+                    System.out.println("Добавлена ссылка: " + item.getUrl());
+                    System.out.println("Полная информация: " + item.toString());
+                } else {
+                    statusForm.selectedUrls.remove(item.getUrl());
+                    System.out.println("Удалена ссылка: " + item.getUrl());
+                }
+
+                System.out.println("Текущий список выбранных ссылок: " + statusForm.selectedUrls);
+            }
+        });
         HeadersTable.setRowHeight(60); // Начальная высота строки
     }
     private void initTableWithScroll() {
@@ -2807,7 +2834,7 @@ public class mainForm extends JFrame {
 
         ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
         DriverSetup chromeSetup = new ChromeDriverSetup();
-        Parser parser = new PurchasesParser(chromeSetup, saver, params, statusForm);
+        Parser parser = new PurchasesParserHead(chromeSetup, saver, params, statusForm);
         new Thread(parser::parse).start();
     }
 

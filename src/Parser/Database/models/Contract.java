@@ -1,0 +1,55 @@
+package Parser.Database.models;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+public class Contract {
+    private Long id;
+    private String subject;
+    private String specialization;
+    private boolean isDefenseOrder;
+    private boolean isLifecycleContract;
+    private boolean isQuantityUndefined;
+    private ProcurementObject procurementObject;
+    private LocalDate startDate;
+    private LocalDate endDate;
+    private String executionStages;
+    private String country;
+    private String address;
+    private String additionalAddressInfo;
+    private boolean qualityGuaranteeRequired;
+    private String warrantyRequirements;
+    private String manufacturerWarrantyRequirements;
+    private String warrantyPeriod;
+    private boolean warrantyGuaranteeRequired;
+    private String guaranteeType;
+    private BigDecimal guaranteePercentage;
+    private BigDecimal guaranteeAmount;
+    private String guaranteeRequirements;
+    private boolean smpSubcontractorsRequired;
+    private boolean smpSubcontractorsExempt;
+    private BigDecimal smpSubcontractorsPercentage;
+    private boolean smpSubcontractorsLiability;
+    private boolean unilateralTerminationAllowed;
+    private String budgetName;
+    private String budgetType;
+    private String municipalityCode;
+    private boolean isSelfFunded;
+    private String bankingSupportInfo;
+    private String priceIndicationMethod;
+    private BigDecimal contractPrice;
+    private BigDecimal includingVat;
+    private BigDecimal treasuryGuaranteeAmount;
+    private String priceFormula;
+    private String currency;
+    private BigDecimal contractRightPrice;
+    private boolean advancePaymentAvailable;
+    private BigDecimal advancePercentage;
+    private BigDecimal advanceAmount;
+    private boolean taxDeductionApplied;
+    private boolean penaltyDeductionApplied;
+    private BigDecimal totalAmount;
+    private BigDecimal advancePayment;
+    private Purchase purchase;
+    private Supplier supplier;
+
+}
