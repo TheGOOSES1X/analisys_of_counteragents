@@ -15,6 +15,7 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
+
 public class DatabaseManager {
     private String __URL;
     private String __USER;
