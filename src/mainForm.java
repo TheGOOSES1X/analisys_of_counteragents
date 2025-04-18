@@ -6,7 +6,7 @@ import java.text.SimpleDateFormat;
 import javax.swing.JTable;
 import java.util.Comparator;
 
-import Parser.Database.hooks.DatabaseConnector;
+
 import Parser.implementations.*;
 import Parser.interfaces.DriverSetup;
 import Parser.interfaces.Parser;
@@ -178,6 +178,7 @@ public class mainForm extends JFrame {
     private JLabel DateLabel;
     private JLabel PlacementLabel;
     private JLabel PlacementEndLabel;
+    private JButton StartParsing;
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -185,6 +186,8 @@ public class mainForm extends JFrame {
     private String CritShort;
     private long CritId;
     private String CritName;
+    private final DriverSetup driverSetup;
+
 
     // List<rowGoodsOrders> rowTableCritIntervalEdit;
 
@@ -243,7 +246,7 @@ public class mainForm extends JFrame {
     }
 
     public mainForm() {
-
+        this.driverSetup = new ChromeDriverSetup();
         String __URL = "";
         String __USER = "";
         String __PASSWORD = "";
@@ -1827,19 +1830,14 @@ public class mainForm extends JFrame {
         statusForm.setTotalRecords(TotalRecords);
         statusForm.setHeadersTable(HeadersTable);
         QueryButton.addActionListener(e -> onQueryButtonClicked());
+        StartParsing.addActionListener(e -> initStartParsingButton());
 
         initHeadersTable();
         customizeTableRenderers();
 //        Эти методы для стилей таблицы, не трогать без необходимости
 //        configureTableColumns();
 //        initTableWithScroll();
-        DatabaseConnector dbConnector = new DatabaseConnector("src/config.json");
-        if (dbConnector.testConnection()) {
-            System.out.println("✅ Подключение к PostgreSQL успешно!");
-        } else {
-            System.out.println("❌ Ошибка подключения!");
 
-        }
 
 
     }
@@ -2764,6 +2762,66 @@ public class mainForm extends JFrame {
     }
 
 
+    private void initStartParsingButton() {
+
+        StartParsing.addActionListener(e -> {
+            // Проверяем, есть ли выбранные URL для парсинга
+            if (statusForm.selectedUrls.isEmpty()) {
+                JOptionPane.showMessageDialog(this,
+                        "Не выбрано ни одной закупки для парсинга",
+                        "Ошибка",
+                        JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // Создаем экземпляр парсера
+
+            PurchaseParser44 parser = new PurchaseParser44(driverSetup); // driverSetup должен быть определен где-то в вашем коде
+
+            // Меняем текст кнопки на "Парсинг..."
+            StartParsing.setText("Парсинг...");
+            StartParsing.setEnabled(false);
+
+            // Запускаем парсинг в отдельном потоке, чтобы не блокировать UI
+            new Thread(() -> {
+                parser.parseUrlsParallel(
+                        new ArrayList<>(statusForm.selectedUrls), // Копируем список для thread-safety
+                        this::handleParseResult, // Метод обработки результатов
+                        3 // Количество потоков (можно настроить)
+                );
+
+                // После завершения парсинга возвращаем UI в исходное состояние
+                SwingUtilities.invokeLater(() -> {
+                    StartParsing.setText("Начать парсинг");
+                    StartParsing.setEnabled(true);
+                });
+            }).start();
+        });
+    }
+
+    // Метод для обработки результатов парсинга
+    private void handleParseResult(PurchaseParser44.ParseResult result) {
+        SwingUtilities.invokeLater(() -> {
+            if (result.error != null) {
+                // Обработка ошибки
+                System.err.println("Ошибка при парсинге URL: " + result.url);
+                result.error.printStackTrace();
+
+                // Можно показать уведомление в UI
+                JOptionPane.showMessageDialog(this,
+                        "Ошибка при парсинге: " + result.error.getMessage(),
+                        "Ошибка",
+                        JOptionPane.ERROR_MESSAGE);
+            } else if (result.purchaseData != null) {
+                // Обработка успешного результата
+                System.out.println("Успешно распарсено: " + result.purchaseData);
+
+                // Здесь можно обновить UI или сохранить данные в базу
+                // Например, добавить в таблицу результатов
+            }
+        });
+    }
+
     private void transferTableDataToMatrix() {
         // Регулярные выражения для проверки форматов
         String numberPattern = "^-?\\d+(.\\d+)?$";
@@ -2833,8 +2891,7 @@ public class mainForm extends JFrame {
         StatusLabel.setText("Статус: запуск парсера...");
 
         ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
-        DriverSetup chromeSetup = new ChromeDriverSetup();
-        Parser parser = new PurchasesParserHead(chromeSetup, saver, params, statusForm);
+        Parser parser = new PurchasesParserHead(driverSetup, saver, params, statusForm);
         new Thread(parser::parse).start();
     }
 

@@ -1,18 +1,48 @@
 package Parser.Database.models;
 
-public class Supplier {
-    private Long id;
-    private String type;
-    private String name;
-    private String countryName;
-    private String countryCode;
-    private String address;
-    private String postalAddress;
-    private String ogrn;
-    private String inn;
-    private String kpp;
-    private String status;
-    private String email;
-    private String phone;
+import jakarta.persistence.*;
 
+@Entity
+@Table(name = "suppliers")
+public class Supplier {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "type")
+    private String type;
+
+    @Column(name = "name", nullable = false)
+
+    private String name;
+
+    @Column(name = "country_name")
+    private String countryName;
+
+    @Column(name = "country_code", length = 3)
+    private String countryCode;
+
+    @Column(name = "address", columnDefinition = "TEXT")
+    private String address;
+
+    @Column(name = "postal_address", columnDefinition = "TEXT")
+    private String postalAddress;
+
+    @Column(name = "ogrn", length = 13)
+    private String ogrn;
+
+    @Column(name = "inn", length = 12)
+    private String inn;
+
+    @Column(name = "kpp", length = 9)
+    private String kpp;
+
+    @Column(name = "status")
+    private String status;
+
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "phone")
+    private String phone;
 }
