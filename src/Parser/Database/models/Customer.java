@@ -1,8 +1,11 @@
 package Parser.Database.models;
 
 import jakarta.persistence.*;
+
+import javax.swing.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -104,6 +107,9 @@ public class Customer {
 
     @Column(name = "time_zone")
     private String timeZone;
+
+    @OneToMany(mappedBy = "customer", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Purchase> purchases = new ArrayList<>();
 
     // Геттеры и сеттеры
 
@@ -361,5 +367,17 @@ public class Customer {
 
     public void setTimeZone(String timeZone) {
         this.timeZone = timeZone;
+    }
+    public List<Purchase> getPurchases() {
+        return new ArrayList<>(purchases); // Возвращает копию
+    }
+    public void setPurchases(List<Purchase> purchases) {
+        if (purchases == null) {
+            this.purchases.clear();
+        } else {
+            this.purchases = new ArrayList<>(purchases);
+            // Обновляем обратные ссылки
+            this.purchases.forEach(p -> p.setCustomer(this));
+        }
     }
 }

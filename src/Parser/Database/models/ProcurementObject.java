@@ -8,7 +8,7 @@ public class ProcurementObject {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "name", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "name",  columnDefinition = "TEXT")
 
     private String name;
 
@@ -31,7 +31,7 @@ public class ProcurementObject {
 
     @Column(name = "vat_rate", precision = 5, scale = 2)
 
-    private BigDecimal vatRate;
+    private String vatRate;
 
     @Column(name = "country_of_origin", length = 100)
     private String countryOfOrigin;
@@ -39,5 +39,45 @@ public class ProcurementObject {
     @Column(name = "total_amount", precision = 19, scale = 2)
 
     private BigDecimal totalAmount;
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setKtruOkpd2Codes(String ktruOkpd2Codes) {
+        this.ktruOkpd2Codes = ktruOkpd2Codes;
+    }
+
+    public void setQuantity(BigDecimal quantity) {
+        this.quantity = quantity;
+    }
+
+    public void setUnit(String unit) {
+        this.unit = unit;
+    }
+
+    public void setPricePerUnit(BigDecimal pricePerUnit) {
+        this.pricePerUnit = pricePerUnit;
+    }
+
+    public void setVatRate(String vatRate) {
+        this.vatRate = vatRate;
+    }
+
+    public void setCountryOfOrigin(String countryOfOrigin) {
+        this.countryOfOrigin = countryOfOrigin;
+    }
+
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
+    }
 
 }

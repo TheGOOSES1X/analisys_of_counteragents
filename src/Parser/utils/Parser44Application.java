@@ -20,7 +20,7 @@ public class Parser44Application {
 
     public static void main(String[] args) {
         List<String> selectedUrls = new ArrayList<>(Arrays.asList(
-                "https://zakupki.gov.ru/epz/order/notice/ok20/view/common-info.html?regNumber=1200700002725000001"
+                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000034"
         ));
 
 //        try {

@@ -179,6 +179,7 @@ public class mainForm extends JFrame {
     private JLabel PlacementLabel;
     private JLabel PlacementEndLabel;
     private JButton StartParsing;
+    private JButton ChooseAllElements;
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -1831,7 +1832,7 @@ public class mainForm extends JFrame {
         statusForm.setHeadersTable(HeadersTable);
         QueryButton.addActionListener(e -> onQueryButtonClicked());
         StartParsing.addActionListener(e -> initStartParsingButton());
-
+        ChooseAllElements.addActionListener(e -> initChooseAllElementsButton());
         initHeadersTable();
         customizeTableRenderers();
 //        Эти методы для стилей таблицы, не трогать без необходимости
@@ -2787,7 +2788,7 @@ public class mainForm extends JFrame {
                 parser.parseUrlsParallel(
                         new ArrayList<>(statusForm.selectedUrls), // Копируем список для thread-safety
                         this::handleParseResult, // Метод обработки результатов
-                        3 // Количество потоков (можно настроить)
+                        6 // Количество потоков (можно настроить)
                 );
 
                 // После завершения парсинга возвращаем UI в исходное состояние
@@ -2866,7 +2867,8 @@ public class mainForm extends JFrame {
         boolean hasAnyFilter = PurchaseCancelled.isSelected() ||
                 PurchaseCompleted.isSelected() ||
                 SubmissionOfApplications.isSelected() ||
-                CommissionWork.isSelected();
+                CommissionWork.isSelected() ||
+                fz44.isSelected(); // Добавляем проверку для нового чекбокса
 
         Map<String, String> params = createQueryParams(searchQuery, hasAnyFilter);
 
@@ -2875,9 +2877,7 @@ public class mainForm extends JFrame {
         if (PurchaseCompleted.isSelected()) params.put("pc", "on");
         if (SubmissionOfApplications.isSelected()) params.put("af", "on");
         if (CommissionWork.isSelected()) params.put("ca", "on");
-
-        // Добавляем другие фильтры по необходимости
-        // if (someOtherFilter.isSelected()) params.put("param", "value");
+        if (fz44.isSelected()) params.put("fz44", "on"); // Добавляем параметр для fz44
 
         return params;
     }
@@ -2904,6 +2904,26 @@ public class mainForm extends JFrame {
         return processed;
     }
 
+    private void initChooseAllElementsButton() {
+        ChooseAllElements.addActionListener(e -> {
+            DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
+            // Получаем количество строк в таблице
+            int rowCount = model.getRowCount();
+
+            // Проходим по всем строкам и устанавливаем чекбоксы в true
+            for (int i = 0; i < rowCount; i++) {
+                model.setValueAt(true, i, 3); // 3 - индекс столбца с чекбоксами
+
+                // Также обновляем selectedUrls
+                PurchaseItem item = statusForm.allItems.get(i);
+                if (!statusForm.selectedUrls.contains(item.getUrl())) {
+                    statusForm.selectedUrls.add(item.getUrl());
+                }
+            }
+
+            System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
+        });
+    }
     public static void main(String[] args) {
         try {
             for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {

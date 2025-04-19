@@ -33,7 +33,7 @@ public class Purchase {
     @Column(name = "ikz")
     private String ikz;
 
-    @OneToOne
+    @ManyToOne
     @JoinColumn(name = "customer_id", nullable = true) // Разрешаем null, если customer неизвестен
     private Customer customer;
 
