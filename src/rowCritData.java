@@ -44,4 +44,10 @@ public class rowCritData {
     public String getJsonDataPoints() {
         return jsonDataPoints;
     }
+
+    @Override
+    public String toString() {
+        return critName; // это то, что будет отображаться в ComboBox
+    }
+
 }

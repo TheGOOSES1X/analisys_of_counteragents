@@ -12,7 +12,7 @@ public class RatingCalculator {
     private final DatabaseManager dbExtractor;
 
     /**
-     * Конструктор. Принимает ссылку на менеджер базы данных
+     * Конструктор. Принимает ссылку на DatabaseManager
      */
     public RatingCalculator(DatabaseManager dbExtractor) {
         this.dbExtractor = dbExtractor;
@@ -110,13 +110,13 @@ public class RatingCalculator {
      * Извлечение конкретного значения критерия из строки по его ID
      */
     private double getCriterionValue(rowContrasGoodsOrdersWithWeights row, int critId) {
-        switch (critId) {
-            case 0: return row.getDeliveryTime();
-            case 1: return row.getMinVolume();
-            case 2: return row.getGoodQuality();
-            case 3: return row.getContrasReputation();
-            default: return 0.0;
-        }
+        return switch (critId) {
+            case 0 -> row.getDeliveryTime();
+            case 1 -> row.getMinVolume();
+            case 2 -> row.getGoodQuality();
+            case 3 -> row.getContrasReputation();
+            default -> 0.0;
+        };
     }
 
     /**
@@ -130,6 +130,9 @@ public class RatingCalculator {
             case 3: row.setContrasReputationFinalWeight(weight); break;
         }
     }
+    // пользовательские критерии
+
+
 
     /**
      * Нормализация значения критерия по выбранной функции (0-3)
@@ -143,15 +146,15 @@ public class RatingCalculator {
                 return val < min ? 0 : (val > max ? 1 : norm);
             case 1: // Обратная — чем меньше значение, тем лучше
                 return val < min ? 1 : (val > max ? 0 : 1 - norm);
-            case 2: // S-функция — плавное увеличение до max
+            case 2: // S-функция
                 if (val < min) return 0;
                 if (val < (min + max) / 2) return 2 * Math.pow(norm, 2);
-                if (val < max) return 1 - 2 * Math.pow((val - max) / (max - min), 2);
+                if (val < max) return 1 - 2 * Math.pow(norm, 2);
                 return 1;
-            case 3: // Z-функция — лучшее значение посередине диапазона
+            case 3: // Z-функция
                 if (val < min) return 1;
                 if (val < (min + max) / 2) return 1 - 2 * Math.pow(norm, 2);
-                if (val < max) return 2 * Math.pow((val - max) / (max - min), 2);
+                if (val < max) return 2 * Math.pow(norm, 2);
                 return 0;
             default: return 0;
         }
