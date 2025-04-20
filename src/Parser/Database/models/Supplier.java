@@ -1,6 +1,10 @@
 package Parser.Database.models;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.NaturalId;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "suppliers")
@@ -12,8 +16,8 @@ public class Supplier {
     @Column(name = "type")
     private String type;
 
-    @Column(name = "name", nullable = false)
-
+    @NaturalId
+    @Column(name = "name", columnDefinition = "TEXT", unique = true)
     private String name;
 
     @Column(name = "country_name")
@@ -45,6 +49,9 @@ public class Supplier {
 
     @Column(name = "phone")
     private String phone;
+
+    @OneToMany(mappedBy = "supplier")
+    private List<Contract> contracts = new ArrayList<>();
 
     public void setId(Long id) {
         this.id = id;
@@ -95,5 +102,9 @@ public class Supplier {
     }
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public String getName() {
+        return name;
     }
 }

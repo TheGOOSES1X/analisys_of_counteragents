@@ -51,7 +51,7 @@ public class PurchaseParser44 implements Parser {
         this.driverSetup = driverSetup;
     }
 
-    public void parseUrlsParallel(List<String> urls, Consumer<ParseResult> callback, int threadCount) {
+    public void parseUrlsParallel(List<String> urls, Consumer<ParseResult> callback, int threadCount,Consumer<Integer> progressCallback) {
         // 1. Инициализация БД (создание таблиц если их нет)
         initializeDatabase();
 
@@ -76,6 +76,10 @@ public class PurchaseParser44 implements Parser {
                     saveToDatabase(result);
                 }
                 callback.accept(result);
+
+                if (progressCallback != null) {
+                    progressCallback.accept(i + 1); // +1 потому что i начинается с 0
+                }
             } catch (Exception e) {
                 callback.accept(new ParseResult(null, null, e));
             }
@@ -106,21 +110,41 @@ public class PurchaseParser44 implements Parser {
             try {
                 Purchase purchase = result.purchaseData;
                 Customer customer = purchase.getCustomer();
-
-                // 1. Сохраняем Customer (если есть) и его purchases
+                Contract contract = purchase.getContract();
+                // 1. Обработка заказчика
                 if (customer != null) {
-                    // Если customer новый (еще не сохранен в БД)
-                    if (customer.getId() == null) {
-                        session.persist(customer);
+                    // Пытаемся найти существующего заказчика по fullName
+                    Customer existingCustomer = session.createQuery(
+                                    "FROM Customer WHERE fullName = :fullName", Customer.class)
+                            .setParameter("fullName", customer.getFullName())
+                            .uniqueResult();
+
+                    if (existingCustomer != null) {
+                        // Используем существующего заказчика
+                        purchase.setCustomer(existingCustomer);
+                        existingCustomer.getPurchases().add(purchase);
                     } else {
-                        // Если customer уже существует, обновляем его purchases
-                        customer = session.merge(customer);
+                        // Сохраняем нового заказчика
+                        session.persist(customer);
+                        customer.getPurchases().add(purchase);
+                    }
+                }
+
+                if (contract != null && contract.getSupplier() != null) {
+                    Supplier supplier = contract.getSupplier();
+                    Supplier existingSupplier = session.byNaturalId(Supplier.class)
+                            .using("name", supplier.getName())
+                            .load();
+
+                    if (existingSupplier != null) {
+                        contract.setSupplier(existingSupplier);
+                    } else {
+                        session.persist(supplier);
                     }
                 }
 
                 // 2. Сохраняем связанные с Contract сущности
                 if (purchase.getContract() != null) {
-                    Contract contract = purchase.getContract();
                     contract.setPurchase(purchase);
 
                     // Сохраняем Supplier (если есть)
@@ -367,7 +391,8 @@ public class PurchaseParser44 implements Parser {
             procurementObject.setName("Не указано");
         }
     }
-    private String findPartialKey(Map<String, String> map, String partialKey) {
+    private String findPartialKey(Map<String, ?> map, String partialKey) {
+        if (map == null) return null;
         for (String key : map.keySet()) {
             if (key.contains(partialKey)) {
                 return key;
@@ -444,6 +469,12 @@ public class PurchaseParser44 implements Parser {
         try {
             driver.get(contractDraftUrl);
             wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("div.block")));
+
+
+            String stateContractId = parseStateContractId(driver);
+            if (stateContractId != null) {
+                contractData.put("state_contract_id", stateContractId);
+            }
 
             List<WebElement> blocks = driver.findElements(By.cssSelector("div.block"));
             for (WebElement block : blocks) {
@@ -610,6 +641,26 @@ public class PurchaseParser44 implements Parser {
         }
         return tableData;
     }
+
+    private String parseStateContractId(WebDriver driver) {
+        try {
+            WebElement contractIdElement = driver.findElement(By.cssSelector("span.cardMainInfo__purchaseLink.distancedText a"));
+            String fullText = contractIdElement.getText().trim();
+            // Извлекаем часть после "№ " (номер контракта)
+            if (fullText.startsWith("№ ")) {
+                return fullText.substring(2).trim();
+            }
+            return fullText;
+        } catch (Exception e) {
+            System.out.println("Не удалось извлечь stateContractId: " + e.getMessage());
+            return null;
+        }
+    }
+    private String findAndGet(Map<String, String> map, String partialKey) {
+        if (map == null) return null;
+        String key = findPartialKey(map, partialKey);
+        return key != null ? map.get(key) : null;
+    }
     private void fillContractModel(Contract contract, Map<String, Object> contractData) {
         try {
             // 3. Предмет контракта
@@ -630,6 +681,31 @@ public class PurchaseParser44 implements Parser {
                     contract.setQuantityUndefined(quantityKey != null ? mainSubject.get(quantityKey) : null);
                 }
             }
+            contract.setStateContractId((String) contractData.get("state_contract_id"));
+
+            // 1. Номер контракта
+            String contractNumberKey = findPartialKey(contractData, "Номер контракта");
+            if (contractNumberKey != null) {
+                Object contractNumberValue = contractData.get(contractNumberKey);
+
+                if (contractNumberValue instanceof Map) {
+                    // Если значение - Map (старая логика)
+                    Map<String, Object> contractNumberSection = (Map<String, Object>) contractNumberValue;
+                    if (!contractNumberSection.isEmpty()) {
+                        Object firstValue = contractNumberSection.values().iterator().next();
+                        if (firstValue instanceof Map) {
+                            Map<String, String> contractNumberData = (Map<String, String>) firstValue;
+                            contract.setContractNumber(contractNumberData.get("Номер контракта"));
+                        }
+                    }
+                } else if (contractNumberValue instanceof String) {
+                    // Если значение - просто строка (новая логика)
+                    contract.setContractNumber((String) contractNumberValue);
+                } else if (contractNumberValue != null) {
+                    // Другие случаи - преобразуем в строку
+                    contract.setContractNumber(contractNumberValue.toString());
+                }
+            }
 
             // 4. Условия контракта
             Map<String, Object> conditionsData = (Map<String, Object>) contractData.get("4. Условия контракта");
@@ -644,6 +720,17 @@ public class PurchaseParser44 implements Parser {
                             parseDate(executionTerms.get(startDateKey)) : null);
                     contract.setEndDate(endDateKey != null ?
                             parseDate(executionTerms.get(endDateKey)) : null);
+                }
+                // 4.2. Этапы исполнения контракта
+                String executionStagesKey = findPartialKey(conditionsData, "Этапы исполнения");
+                if (executionStagesKey != null) {
+                    Map<String, String> executionStages = (Map<String, String>) conditionsData.get(executionStagesKey);
+                    if (executionStages != null && !executionStages.isEmpty()) {
+                        // Если мапа не пустая, значит есть этапы, иначе - "Контракт не разделен на этапы"
+                        contract.setExecutionStages(executionStages.isEmpty() ?
+                                "Контракт не разделен на этапы исполнения контракта" :
+                                String.join(", ", executionStages.values()));
+                    }
                 }
 
                 // 4.3. Место поставки
@@ -684,6 +771,7 @@ public class PurchaseParser44 implements Parser {
 
                     contract.setSmpSubcontractorsRequired(smpReqKey != null ? subcontractors.get(smpReqKey) : null);
                     contract.setSmpSubcontractorsExempt(smpExemptKey != null ? subcontractors.get(smpExemptKey) : null);
+                    contract.setSmpSubcontractorsLiability(smpPrecentKey != null ? subcontractors.get(smpExemptKey) : null);
 
                 }
 
@@ -712,6 +800,15 @@ public class PurchaseParser44 implements Parser {
                     contract.setMunicipalityCode(municipKey != null ? fundingSources.get(municipKey) : null);
                     contract.setSelfFunded(selfFundKey != null ? fundingSources.get(selfFundKey) : null);
                     contract.setBankingSupportInfo(bankSupportKey != null ? fundingSources.get(bankSupportKey) : null);
+                }
+                // 5.2. Цена контракта
+                String contractPriceKey = findPartialKey(financingData, "Цена контракта");
+                if (contractPriceKey != null) {
+                    Map<String, String> contractPrice = (Map<String, String>) financingData.get(contractPriceKey);
+                    if (contractPrice != null) {
+                        contract.setContractRightPrice(
+                                parseBigDecimal(findAndGet(contractPrice, "Цена за право заключения")));
+                    }
                 }
 
                 // 5.2. Цена контракта

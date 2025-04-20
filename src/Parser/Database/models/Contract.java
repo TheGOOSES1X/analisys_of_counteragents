@@ -6,8 +6,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import jakarta.persistence.*;
 
-
-import java.math.BigDecimal;
 @Entity
 @Table(name = "contracts")
 public class Contract {

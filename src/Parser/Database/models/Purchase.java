@@ -12,25 +12,25 @@ public class Purchase {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "purchase_number", unique = true)
+    @Column(name = "purchase_number", unique = true, columnDefinition = "text")
     private String purchaseNumber;
 
-    @Column(name = "law")
+    @Column(name = "law", columnDefinition = "text")
     private String law;
 
     @Column(name = "initial_max_price", precision = 19, scale = 2)
     private BigDecimal initialMaxPrice;
 
-    @Column(name = "currency")
+    @Column(name = "currency", columnDefinition = "text")
     private String currency;
 
-    @Column(name = "purchase_object")
+    @Column(name = "purchase_object", columnDefinition = "text")
     private String purchaseObject;
 
-    @Column(name = "procurement_method")
+    @Column(name = "procurement_method", columnDefinition = "text")
     private String procurementMethod;
 
-    @Column(name = "ikz")
+    @Column(name = "ikz", columnDefinition = "text")
     private String ikz;
 
     @ManyToOne
@@ -41,7 +41,7 @@ public class Purchase {
     @JoinColumn(name = "contract_id") // внешний ключ в таблице purchases
     private Contract contract;
 
-    @Column(name = "executor")
+    @Column(name = "executor", columnDefinition = "text")
     private String executor;
 
     @Column(name = "publication_date")
@@ -56,9 +56,8 @@ public class Purchase {
     @Column(name = "auction_date")
     private LocalDate auctionDate;
 
-    @Column(name = "procurement_stage")
+    @Column(name = "procurement_stage", columnDefinition = "text")
     private String procurementStage;
-
 
 
 

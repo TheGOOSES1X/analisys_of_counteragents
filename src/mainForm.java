@@ -180,6 +180,7 @@ public class mainForm extends JFrame {
     private JLabel PlacementEndLabel;
     private JButton StartParsing;
     private JButton ChooseAllElements;
+    private JProgressBar ParserProgressBar;
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -2765,39 +2766,39 @@ public class mainForm extends JFrame {
 
     private void initStartParsingButton() {
 
-        StartParsing.addActionListener(e -> {
-            // Проверяем, есть ли выбранные URL для парсинга
-            if (statusForm.selectedUrls.isEmpty()) {
-                JOptionPane.showMessageDialog(this,
-                        "Не выбрано ни одной закупки для парсинга",
-                        "Ошибка",
-                        JOptionPane.WARNING_MESSAGE);
-                return;
-            }
+        // Проверяем, есть ли выбранные URL для парсинга
+        if (statusForm.selectedUrls.isEmpty()) {
+            JOptionPane.showMessageDialog(this,
+                    "Не выбрано ни одной закупки для парсинга",
+                    "Ошибка",
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        ParserProgressBar.setMinimum(0);
+        ParserProgressBar.setMaximum(statusForm.selectedUrls.size());
+        ParserProgressBar.setValue(0);
+        ParserProgressBar.setStringPainted(true);
+        // Создаем экземпляр парсера
+        PurchaseParser44 parser = new PurchaseParser44(driverSetup);
 
-            // Создаем экземпляр парсера
+        // Меняем текст кнопки на "Парсинг..."
+        StartParsing.setText("Парсинг...");
+        StartParsing.setEnabled(false);
 
-            PurchaseParser44 parser = new PurchaseParser44(driverSetup); // driverSetup должен быть определен где-то в вашем коде
+        // Запускаем парсинг в отдельном потоке
+        new Thread(() -> {
+            parser.parseUrlsParallel(
+                    new ArrayList<>(statusForm.selectedUrls),
+                    this::handleParseResult,
+                    6,
+                    progress -> SwingUtilities.invokeLater(() -> ParserProgressBar.setValue(progress))
+            );
 
-            // Меняем текст кнопки на "Парсинг..."
-            StartParsing.setText("Парсинг...");
-            StartParsing.setEnabled(false);
-
-            // Запускаем парсинг в отдельном потоке, чтобы не блокировать UI
-            new Thread(() -> {
-                parser.parseUrlsParallel(
-                        new ArrayList<>(statusForm.selectedUrls), // Копируем список для thread-safety
-                        this::handleParseResult, // Метод обработки результатов
-                        6 // Количество потоков (можно настроить)
-                );
-
-                // После завершения парсинга возвращаем UI в исходное состояние
-                SwingUtilities.invokeLater(() -> {
-                    StartParsing.setText("Начать парсинг");
-                    StartParsing.setEnabled(true);
-                });
-            }).start();
-        });
+            SwingUtilities.invokeLater(() -> {
+                StartParsing.setText("Начать парсинг");
+                StartParsing.setEnabled(true);
+            });
+        }).start();
     }
 
     // Метод для обработки результатов парсинга
@@ -2905,24 +2906,18 @@ public class mainForm extends JFrame {
     }
 
     private void initChooseAllElementsButton() {
-        ChooseAllElements.addActionListener(e -> {
-            DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
-            // Получаем количество строк в таблице
-            int rowCount = model.getRowCount();
+        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
+        int rowCount = model.getRowCount();
 
-            // Проходим по всем строкам и устанавливаем чекбоксы в true
-            for (int i = 0; i < rowCount; i++) {
-                model.setValueAt(true, i, 3); // 3 - индекс столбца с чекбоксами
-
-                // Также обновляем selectedUrls
-                PurchaseItem item = statusForm.allItems.get(i);
-                if (!statusForm.selectedUrls.contains(item.getUrl())) {
-                    statusForm.selectedUrls.add(item.getUrl());
-                }
+        for (int i = 0; i < rowCount; i++) {
+            model.setValueAt(true, i, 3);
+            PurchaseItem item = statusForm.allItems.get(i);
+            if (!statusForm.selectedUrls.contains(item.getUrl())) {
+                statusForm.selectedUrls.add(item.getUrl());
             }
+        }
 
-            System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
-        });
+        System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
     }
     public static void main(String[] args) {
         try {
