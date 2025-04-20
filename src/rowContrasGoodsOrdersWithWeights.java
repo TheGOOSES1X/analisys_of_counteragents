@@ -1,4 +1,6 @@
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 public class rowContrasGoodsOrdersWithWeights {
     private long idContras;
@@ -17,6 +19,8 @@ public class rowContrasGoodsOrdersWithWeights {
     private double contrasReputationFinalWeight;
     private List<Pair> userCrits;
     private double ratingComplete;
+    private Map<Long, Double> userCritValues = new HashMap<>(); // Хранит значения пользовательских критериев
+    private Map<Long, Double> userCritWeights = new HashMap<>(); // Хранит веса пользовательских критериев
 
     public rowContrasGoodsOrdersWithWeights(long idContras, String contrasName, long idGood, String goodName, long idOrder, String orderName, int deliveryTime, double deliveryTimeFinalWeight, double minVolume, double minVolumeFinalWeight, double goodQuality, double goodQualityFinalWeight, double contrasReputation, double contrasReputationFinalWeight, List<Pair> userCrits, double ratingComplete) {
         this.idContras = idContras;
@@ -119,5 +123,25 @@ public class rowContrasGoodsOrdersWithWeights {
 
     public void setRatingComplete(double ratingComplete) {
         this.ratingComplete = ratingComplete;
+    }
+
+    public void setUserCritValue(long critId, double value) {
+        userCritValues.put(critId, value);
+    }
+
+    public double getUserCritValue(long critId) {
+        return userCritValues.getOrDefault(critId, 0.0);
+    }
+
+    public void setUserCritWeight(long critId, double weight) {
+        userCritWeights.put(critId, weight);
+    }
+
+    public double getUserCritWeight(long critId) {
+        return userCritWeights.getOrDefault(critId, 0.0);
+    }
+
+    public Map<Long, Double> getAllUserCritWeights() {
+        return new HashMap<>(userCritWeights);
     }
 }

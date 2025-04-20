@@ -728,14 +728,16 @@ public class mainForm extends JFrame {
 
         // Получаем все критерии с id > 3 из базы данных
         List<rowCritData> crits = dbExtractor.getAllCritData(false);
-// Создаем модель для ComboBox
+        // Создаем модель для ComboBox
         DefaultComboBoxModel<rowCritData> model = new DefaultComboBoxModel<>();
-// Добавляем все критерии в модель
+        // Добавляем все критерии в модель
         for (rowCritData row : crits) {
             model.addElement(row);  // Добавляем каждый элемент в модель
         }
-// Устанавливаем модель для ComboBox
+        // Устанавливаем модель для ComboBox
         comboBoxUserCrit.setModel(model);
+
+
 
         buttonUserCritShow.addActionListener(new ActionListener() {
             @Override
@@ -753,10 +755,9 @@ public class mainForm extends JFrame {
                     String inputName = ((String) selectedObj).trim();
 
                     if (!inputName.isEmpty()) {
-                        dbExtractor.setCritData(false);
-                        List<rowCritData> rowsCrData = dbExtractor.getCritData(false, -1);
+                        List<rowCritData> rowsCrData = dbExtractor.getAllCritData(false);
 
-                        // Проверка: уже есть критерий с таким названием?
+                        // Проверяем существование критерия
                         for (rowCritData row : rowsCrData) {
                             if (row.getCritName().equalsIgnoreCase(inputName)) {
                                 selected = row;
@@ -765,55 +766,23 @@ public class mainForm extends JFrame {
                         }
 
                         if (selected == null) {
-                            // Добавляем новый критерий в базу данных
+                            // Добавляем новый критерий
                             dbExtractor.addCritData(false, inputName, "0", "0", "100", "1", "{}");
-
-                            // Получаем id нового критерия
                             long newCritId = dbExtractor.getMaxCritId(false);
                             String newColumn = "user_crit_" + newCritId;
-
-                            // Создаем столбец в таблице module_lotcriterion
                             dbExtractor.alterUserCritData(false, newColumn);
 
-                            // Перечитываем все критерии, включая новосозданный
-                            rowsCrData = dbExtractor.getCritData(false, -1);
-                            DefaultComboBoxModel<rowCritData> newModel = new DefaultComboBoxModel<>();
-                            for (rowCritData row : rowsCrData) {
-                                newModel.addElement(row);
-                                if (row.getCritName().equalsIgnoreCase(inputName)) {
-                                    selected = row;
-                                }
-                            }
+                            // Обновляем модель и выбираем новый элемент
+                            updateComboBoxModel();
+                            selectCritInComboBox(newCritId);
 
-                            // Устанавливаем новый список в комбобокс
-                            comboBoxUserCrit.setModel(newModel);
-                            comboBoxUserCrit.setSelectedItem(selected); // выбираем новый критерий
+                            selected = new rowCritData(newCritId, inputName, 0, 0, 100, 1, "{}");
                         }
                     }
                 }
 
                 if (selected != null) {
-                    long critId = selected.getIdCrit();
-                    String critName = selected.getCritName();
-                    String columnName = "user_crit_" + critId;
-
-                    dbExtractor.setCritData(false);
-
-                    // Проверка, что в таблице действительно есть запись
-                    List<rowCritData> rowsCrData = dbExtractor.getCritData(false, critId);
-                    if (rowsCrData.isEmpty()) {
-                        dbExtractor.addCritData(false, critName, "0", "0", "100", "1", "{}");
-                        dbExtractor.alterUserCritData(false, columnName); // Создаем новый столбец
-                    }
-
-                    dbExtractor.updateCGsUserCritValues(false);
-
-                    CritId = critId;
-                    CritString = columnName;
-                    CritShort = "uc_" + critId;
-                    CritName = critName;
-
-                    updateCritValues();
+                    processSelectedCrit(selected);
                 }
             }
         });
@@ -2492,6 +2461,62 @@ public class mainForm extends JFrame {
             JOptionPane.showMessageDialog(null, "Неправильный формат в поле коэффициента: " + selectedW, "Ошибка", JOptionPane.ERROR_MESSAGE);
             return; // Завершаем выполнение метода
         }
+    }
+
+    private void updateComboBoxModel() {
+        // Сохраняем текущий выбранный элемент
+        Object selectedItem = comboBoxUserCrit.getSelectedItem();
+
+        List<rowCritData> crits = dbExtractor.getAllCritData(false);
+        DefaultComboBoxModel<rowCritData> model = new DefaultComboBoxModel<>();
+        for (rowCritData row : crits) {
+            model.addElement(row);
+        }
+        comboBoxUserCrit.setModel(model);
+
+        // Восстанавливаем выбор, если элемент все еще существует в новой модели
+        if (selectedItem != null) {
+            for (int i = 0; i < model.getSize(); i++) {
+                if (model.getElementAt(i).equals(selectedItem)) {
+                    comboBoxUserCrit.setSelectedIndex(i);
+                    break;
+                }
+            }
+        } else if (model.getSize() > 0) {
+            comboBoxUserCrit.setSelectedIndex(0);
+        }
+    }
+
+    private void selectCritInComboBox(long critId) {
+        DefaultComboBoxModel<rowCritData> model = (DefaultComboBoxModel<rowCritData>) comboBoxUserCrit.getModel();
+        for (int i = 0; i < model.getSize(); i++) {
+            if (model.getElementAt(i).getIdCrit() == critId) {
+                comboBoxUserCrit.setSelectedIndex(i);
+                break;
+            }
+        }
+    }
+
+    private void processSelectedCrit(rowCritData selected) {
+        long critId = selected.getIdCrit();
+        String critName = selected.getCritName();
+        String columnName = "user_crit_" + critId;
+
+        // Проверка существования записи
+        List<rowCritData> rowsCrData = dbExtractor.getCritData(false, critId);
+        if (rowsCrData.isEmpty()) {
+            dbExtractor.addCritData(false, critName, "0", "0", "100", "1", "{}");
+            dbExtractor.alterUserCritData(false, columnName);
+        }
+
+        dbExtractor.updateCGsUserCritValues(false);
+
+        CritId = critId;
+        CritString = columnName;
+        CritShort = "uc_" + critId;
+        CritName = critName;
+
+        updateCritValues();
     }
 
 

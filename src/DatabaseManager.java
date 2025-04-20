@@ -3,6 +3,8 @@
 // (powered by FernFlower decompiler)
 //
 
+import org.json.JSONObject;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -1889,10 +1891,50 @@ public class DatabaseManager {
         return filteredCGOwes;
     }
 
-    public List<rowContrasGoodsOrdersWithWeights> getCGOwesAsUserCrit(boolean db_module, String filterContrasName, String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume) {
+    public List<Long> getAllCriteriaIds(boolean db_module) {
+        List<Long> criteriaIds = new ArrayList<>();
+        String query = "SELECT id FROM module_criterion";
+
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+            try {
+                while (resultSet.next()) {
+                    criteriaIds.add(resultSet.getLong("id"));
+                }
+            } catch (Throwable t) {
+                if (resultSet != null) {
+                    try {
+                        resultSet.close();
+                    } catch (Throwable t1) {
+                        t.addSuppressed(t1);
+                    }
+                }
+                throw t;
+            }
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return criteriaIds;
+    }
+
+    public List<rowContrasGoodsOrdersWithWeights> getCGOwesAsUserCrit(boolean db_module, String filterContrasName,
+                                                                      String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume) {
+
         List<rowContrasGoodsOrdersWithWeights> filteredCGOwes = new ArrayList<>();
 
-        // Базовый запрос
+        // Сначала получаем список всех пользовательских критериев
+        List<Long> userCriteriaIds = getAllUserCriteriaIds(db_module);
+
+        // Формируем часть запроса для пользовательских критериев
+        StringBuilder userCritsSelect = new StringBuilder();
+        for (Long critId : userCriteriaIds) {
+            userCritsSelect.append(", module_lotcriterion.user_crit_").append(critId).append(" AS user_crit_").append(critId);
+        }
+
         String query = "SELECT DISTINCT bs_order.id AS o_id, bs_order.scaption AS o_name, " +
                 "bs_contras.id AS c_id, bs_contras.scaption AS c_name, " +
                 "bs_goods.id AS g_id, bs_goods.sname AS g_name, " +
@@ -1900,6 +1942,7 @@ public class DatabaseManager {
                 "module_lotcriterion.nqty AS min_vol, " +
                 "module_lotcriterion.ngoodquality AS g_qual, " +
                 "bs_contras.ncontrasreliability AS c_rep " +
+                userCritsSelect.toString() + " " +
                 "FROM bs_order " +
                 "JOIN mes_workorder ON bs_order.id = mes_workorder.id_order " +
                 "JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id " +
@@ -1907,61 +1950,54 @@ public class DatabaseManager {
                 "JOIN bs_contras ON module_lotcriterion.id_contras = bs_contras.id " +
                 "WHERE 1=1";
 
-        // Добавляем фильтры
+        // Добавляем фильтры (остается без изменений)
         if (!filterContrasName.isEmpty()) {
             query += " AND bs_contras.scaption ILIKE '%" + filterContrasName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterGoodName.isEmpty()) {
             query += " AND bs_goods.sname ILIKE '%" + filterGoodName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterOrderName.isEmpty()) {
             query += " AND bs_order.scaption ILIKE '%" + filterOrderName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterCGDateSupply.isEmpty()) {
             query += " AND module_lotcriterion.ndeliverytime = " + filterCGDateSupply;
         }
-
         if (!filterCGMinVolume.isEmpty()) {
             query += " AND module_lotcriterion.nqty = " + filterCGMinVolume;
         }
 
-        // Выполняем запрос
         try {
             ResultSet resultSet = this.executeQuery(db_module, query);
+            while (resultSet.next()) {
+                long o_id = resultSet.getLong("o_id");
+                long c_id = resultSet.getLong("c_id");
+                long g_id = resultSet.getLong("g_id");
+                String o_name = resultSet.getString("o_name");
+                String c_name = resultSet.getString("c_name");
+                String g_name = resultSet.getString("g_name");
+                int deliveryTime = resultSet.getInt("date_supply");
+                double minQuantity = resultSet.getDouble("min_vol");
+                double g_quality = resultSet.getDouble("g_qual");
+                double c_rep = resultSet.getDouble("c_rep");
 
-            try {
-                while (resultSet.next()) {
-                    long o_id = resultSet.getLong("o_id");
-                    long c_id = resultSet.getLong("c_id");
-                    long g_id = resultSet.getLong("g_id");
-                    String o_name = resultSet.getString("o_name");
-                    String c_name = resultSet.getString("c_name");
-                    String g_name = resultSet.getString("g_name");
-                    int deliveryTime = resultSet.getInt("date_supply");
-                    double minQuantity = resultSet.getDouble("min_vol");
-                    double g_quality = resultSet.getDouble("g_qual");
-                    double c_rep = resultSet.getDouble("c_rep");
+                rowContrasGoodsOrdersWithWeights row = new rowContrasGoodsOrdersWithWeights(
+                        c_id, c_name, g_id, g_name, o_id, o_name,
+                        deliveryTime, 1.0, minQuantity, 1.0,
+                        g_quality, 1.0, c_rep, 1.0, null, 1.0
+                );
 
-                    filteredCGOwes.add(new rowContrasGoodsOrdersWithWeights(
-                            c_id, c_name, g_id, g_name, o_id, o_name,
-                            deliveryTime, 1.0, minQuantity, 1.0,
-                            g_quality, 1.0, c_rep, 1.0, null, 1.0
-                    ));
-                }
-            } catch (Throwable var27) {
-                if (resultSet != null) {
-                    try {
-                        resultSet.close();
-                    } catch (Throwable var26) {
-                        var27.addSuppressed(var26);
+                // Загружаем пользовательские критерии
+                for (Long critId : userCriteriaIds) {
+                    String columnName = "user_crit_" + critId;
+                    if (resultSet.getObject(columnName) != null) {
+                        double critValue = resultSet.getDouble(columnName);
+                        row.setUserCritValue(critId, critValue);
                     }
                 }
-                throw var27;
-            }
 
+                filteredCGOwes.add(row);
+            }
             if (resultSet != null) {
                 resultSet.close();
             }
@@ -1970,6 +2006,36 @@ public class DatabaseManager {
         }
 
         return filteredCGOwes;
+    }
+
+    private List<Long> getAllUserCriteriaIds(boolean db_module) {
+        List<Long> criteriaIds = new ArrayList<>();
+        String query = "SELECT id FROM module_criterion WHERE id > 3"; // ID > 3 считаем пользовательскими
+
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+            try {
+                while (resultSet.next()) {
+                    criteriaIds.add(resultSet.getLong("id"));
+                }
+            } catch (Throwable t) {
+                if (resultSet != null) {
+                    try {
+                        resultSet.close();
+                    } catch (Throwable t1) {
+                        t.addSuppressed(t1);
+                    }
+                }
+                throw t;
+            }
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return criteriaIds;
     }
 
 
