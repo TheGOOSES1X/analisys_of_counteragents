@@ -14,10 +14,10 @@ public class ParserApplication {
         // Простая версия парсера
         ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
 
-        DriverSetup chromeSetup = new ChromeDriverSetup();
-        Parser parser = new PurchasesParserHead(chromeSetup, saver);
+//        DriverSetup chromeSetup = new ChromeDriverSetup();
+//        Parser parser = new PurchasesParserHead(chromeSetup, saver);
 //        Parser parser = new PurchasesParser(chromeSetup);
-        parser.parse();
+//        parser.parse();
 
 
     }

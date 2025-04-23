@@ -1,6 +1,7 @@
 package Parser.implementations;
 
 import Parser.interfaces.*;
+import Parser.utils.Okpd2Converter;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -27,19 +28,19 @@ public class PurchasesParserHead implements Parser {
     private final ParserStatusListener statusListener;
     private final Map<String, String> queryParams;
 
-    public PurchasesParserHead(DriverSetup driverSetup) {
-        this(driverSetup, null);
-    }
+//    public PurchasesParserHead(DriverSetup driverSetup) {
+//        this(driverSetup, null);
+//    }
 
 
-    public PurchasesParserHead(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver) {
-        this(driverSetup, resultsSaver,
-                "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22", null);
-    }
+//    public PurchasesParserHead(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver) {
+//        this(driverSetup, resultsSaver,
+//                "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22", null);
+//    }
 
     public PurchasesParserHead(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
-                               String searchQuery, ParserStatusListener statusListener) {
-        this(driverSetup, resultsSaver, createDefaultParams(searchQuery), statusListener);
+                               String searchQuery, String okpd2Code, ParserStatusListener statusListener) {
+        this(driverSetup, resultsSaver, createDefaultParams(searchQuery, okpd2Code), statusListener);
     }
 
     public PurchasesParserHead(DriverSetup driverSetup, ResultsSaver<PurchaseItem> resultsSaver,
@@ -51,7 +52,7 @@ public class PurchasesParserHead implements Parser {
         this.queryParams.put("recordsPerPage", RECORDS_PER_PAGE_VALUE);
         this.statusListener = statusListener;
     }
-    private static Map<String, String> createDefaultParams(String searchQuery) {
+    private static Map<String, String> createDefaultParams(String searchQuery, String okpd2Code) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("searchString", searchQuery);
         params.put("morphology", "on");
@@ -67,8 +68,19 @@ public class PurchasesParserHead implements Parser {
         params.put("ca", "on");
         params.put("pc", "on");
         params.put("pa", "on");
+
+
+        if (okpd2Code != null && !okpd2Code.isEmpty()) {
+            String okpd2Id = Okpd2Converter.getOkpd2Id(okpd2Code); // Конвертер кодов
+            if (okpd2Id != null) {
+                params.put("okpd2Ids", okpd2Id);
+                params.put("okpd2IdsCodes", okpd2Code);
+            }
+        }
         return params;
     }
+
+
 
     @Override
     public void parse() {

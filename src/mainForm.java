@@ -4,6 +4,9 @@ import java.util.*;
 import javax.swing.table.*;
 import java.text.SimpleDateFormat;
 import javax.swing.JTable;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.PlainDocument;
 import java.util.Comparator;
 
 
@@ -12,6 +15,7 @@ import Parser.interfaces.DriverSetup;
 import Parser.interfaces.Parser;
 import Parser.interfaces.PurchaseItem;
 import Parser.interfaces.ResultsSaver;
+import Parser.utils.Okpd2Converter;
 import com.toedter.calendar.JDateChooser;
 
 
@@ -174,13 +178,15 @@ public class mainForm extends JFrame {
     private JLabel MinPrieceLabel;
     private JLabel CurrencyLable;
     private JComboBox comboBoxCurrency;
-    private JScrollPane CurrencyComboBox;
     private JLabel DateLabel;
     private JLabel PlacementLabel;
     private JLabel PlacementEndLabel;
     private JButton StartParsing;
     private JButton ChooseAllElements;
     private JProgressBar ParserProgressBar;
+    private JTextField OKPD2Field;
+    private JPanel PanelFieldDataStart;
+    private JPanel PanelFieldDataEnd;
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -189,6 +195,9 @@ public class mainForm extends JFrame {
     private long CritId;
     private String CritName;
     private final DriverSetup driverSetup;
+    private final JDateChooser dateChooseFilterStart = new JDateChooser();
+    private final JDateChooser dateChooserFilterEnd = new JDateChooser();
+
 
 
     // List<rowGoodsOrders> rowTableCritIntervalEdit;
@@ -254,6 +263,8 @@ public class mainForm extends JFrame {
         String __PASSWORD = "";
         String __DB_Main = "";
         String __DB_Module = "";
+
+
 
         // read from json start
         try {
@@ -1528,6 +1539,22 @@ public class mainForm extends JFrame {
         panelOptInfoEndDate.setLayout(new BorderLayout());
         panelOptInfoEndDate.add(dateChooserOptIntEnd, BorderLayout.CENTER);
 
+
+
+
+        MinPriceTextField.setToolTipText("Минимальная цена");
+        MaxPriceTextField.setToolTipText("Максимальная цена");
+        dateChooseFilterStart.setDateFormatString("dd.MM.yyyy");
+        dateChooserFilterEnd.setDateFormatString("dd.MM.yyyy");
+        PanelFieldDataStart.setLayout(new BorderLayout());
+        PanelFieldDataStart.add(dateChooseFilterStart, BorderLayout.CENTER);
+        PanelFieldDataEnd.setLayout(new BorderLayout());
+        PanelFieldDataEnd.add(dateChooserFilterEnd, BorderLayout.CENTER);
+
+        Date s_date_int = dateChooseFilterStart.getDate();
+        Date e_date_int = dateChooserFilterEnd.getDate();
+
+
         buttonOptOrderGoodsWithCrits.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -1557,6 +1584,10 @@ public class mainForm extends JFrame {
                 e_date_int.setHours(0);
                 e_date_int.setMinutes(0);
                 e_date_int.setSeconds(0);
+
+                System.out.println(s_date_int);
+                System.out.println(e_date_int);
+
 
                 List<rowGoodsOrders> rowGOdates = dbExtractor.getGOBetweenDates(false, textFieldOptOrderFilter.getText(), s_date_int, e_date_int);
                 tableOptVolumeInfoFiltered.setModel(modelCritDatesViews);
@@ -1826,6 +1857,19 @@ public class mainForm extends JFrame {
         setLocationRelativeTo(null);
         setVisible(true);
 
+
+        //Фильтры для парсинга
+
+//
+//        dateChooserFilterStart.setDateFormatString("dd.MM.yyyy");
+//        dateChooserFilterEnd.setDateFormatString("dd.MM.yyyy");
+//        PanelFildterDataStart.setLayout(new BorderLayout());
+//        PanelFildterDataStart.add(dateChooserFilterStart, BorderLayout.CENTER);
+//        PanelFildterDataEnd.setLayout(new BorderLayout());
+//        PanelFildterDataEnd.add(dateChooserFilterEnd, BorderLayout.CENTER);
+
+
+
         statusForm = new StatusForm();
         statusForm.setStatusLabel(StatusLabel);
         statusForm.setCurrentRecords(CurrentRecords);
@@ -1836,6 +1880,17 @@ public class mainForm extends JFrame {
         ChooseAllElements.addActionListener(e -> initChooseAllElementsButton());
         initHeadersTable();
         customizeTableRenderers();
+        try {
+            Okpd2Converter.loadFromJson("src/okpd2_full.json");
+        } catch (IOException e) {
+            System.err.println("Ошибка загрузки файла ОКПД2: " + e.getMessage());
+            e.printStackTrace();
+            // Можно показать диалоговое окно с ошибкой
+            JOptionPane.showMessageDialog(null,
+                    "Не удалось загрузить справочник ОКПД2",
+                    "Ошибка",
+                    JOptionPane.ERROR_MESSAGE);
+        }
 //        Эти методы для стилей таблицы, не трогать без необходимости
 //        configureTableColumns();
 //        initTableWithScroll();
@@ -2864,12 +2919,11 @@ public class mainForm extends JFrame {
                 ? "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22"
                 : processSearchQuery(searchText);
 
-        // Проверяем, есть ли хотя бы один активный фильтр
         boolean hasAnyFilter = PurchaseCancelled.isSelected() ||
                 PurchaseCompleted.isSelected() ||
                 SubmissionOfApplications.isSelected() ||
                 CommissionWork.isSelected() ||
-                fz44.isSelected(); // Добавляем проверку для нового чекбокса
+                fz44.isSelected();
 
         Map<String, String> params = createQueryParams(searchQuery, hasAnyFilter);
 
@@ -2878,9 +2932,92 @@ public class mainForm extends JFrame {
         if (PurchaseCompleted.isSelected()) params.put("pc", "on");
         if (SubmissionOfApplications.isSelected()) params.put("af", "on");
         if (CommissionWork.isSelected()) params.put("ca", "on");
-        if (fz44.isSelected()) params.put("fz44", "on"); // Добавляем параметр для fz44
+        if (fz44.isSelected()) params.put("fz44", "on");
+
+        // Обрабатываем ОКПД2
+        // Обработка ОКПД2
+        String okpd2Code = OKPD2Field.getText().trim();
+        if (!okpd2Code.isEmpty()) {
+            try {
+                String okpd2Id = Okpd2Converter.getOkpd2Id(okpd2Code);
+                if (okpd2Id != null) {
+                    params.put("okpd2Ids", okpd2Id);
+                    params.put("okpd2IdsCodes", okpd2Code);
+                    params.put("okpd2IdsWithNested", "on"); // Важный параметр!
+
+                    // Для отладки выведем в консоль
+                    System.out.println("Установлены параметры ОКПД2:");
+                    System.out.println("Код: " + okpd2Code);
+                    System.out.println("ID: " + okpd2Id);
+                } else {
+                    System.err.println("ОКПД2 код не найден: " + okpd2Code);
+                    // Можно показать сообщение пользователю
+                    JOptionPane.showMessageDialog(null,
+                            "Код ОКПД2 не найден в справочнике: " + okpd2Code,
+                            "Ошибка",
+                            JOptionPane.WARNING_MESSAGE);
+                }
+            } catch (Exception e) {
+                System.err.println("Ошибка обработки ОКПД2: " + e.getMessage());
+            }
+        }
+//         Добавляем параметры дат
+        SimpleDateFormat urlDateFormat = new SimpleDateFormat("dd.MM.yyyy");
+        Date s_date_int = dateChooseFilterStart.getDate();
+        Date e_date_int = dateChooserFilterEnd.getDate();
+
+
+        // Дата начала (публикации)
+        if (s_date_int != null) {
+            s_date_int = new Date();
+            s_date_int.setHours(0);
+            s_date_int.setMinutes(0);
+            s_date_int.setSeconds(0);
+            params.put("publishDateFrom", urlDateFormat.format(dateChooseFilterStart.getDate()));
+        }
+
+        // Дата окончания (закрытия подачи заявок)
+        if (e_date_int != null) {
+            e_date_int = new Date();
+            e_date_int.setHours(0);
+            e_date_int.setMinutes(0);
+            e_date_int.setSeconds(0);
+            params.put("applSubmissionCloseDateFrom", urlDateFormat.format(dateChooserFilterEnd.getDate()));
+        }
+//        System.out.println(s_date_int);
+//        System.out.println(e_date_int);
+
+        // Минимальная цена
+        String minPrice = MinPriceTextField.getText().trim();
+        if (!minPrice.isEmpty()) {
+            params.put("priceFromGeneral", minPrice);
+        }
+
+        // Максимальная цена
+        String maxPrice = MaxPriceTextField.getText().trim();
+        if (!maxPrice.isEmpty()) {
+            params.put("priceToGeneral", maxPrice);
+        }
+
+        // Валюта (рубли)
+        params.put("currencyIdGeneral", "-1");
+
+
 
         return params;
+    }
+
+    private static class NumericDocument extends PlainDocument {
+        @Override
+        public void insertString(int offs, String str, AttributeSet a)
+                throws BadLocationException {
+            if (str == null) return;
+
+            // Проверяем, что строка содержит только цифры
+            if (str.matches("\\d+")) {
+                super.insertString(offs, str, a);
+            }
+        }
     }
     private void onQueryButtonClicked() {
         Map<String, String> params = buildFinalParams();
