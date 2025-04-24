@@ -29,11 +29,26 @@ public class PurchaseParser44 implements Parser {
     private final DriverSetup driverSetup;
     private ExecutorService executor;
     private volatile boolean isStopped;
+    private volatile boolean isPaused;
+    @Override
+    public void pauseParser() {
+        isPaused = true;
+    }
+    @Override
+    public void resumeParser() {
+        isPaused = false;
+        synchronized(this) {
+            this.notifyAll(); // Разбудим все ожидающие потоки
+        }
+    }
+
 
     @Override
     public void parse() {
 
     }
+
+
 
     public static class ParseResult {
         public final String url;
@@ -51,7 +66,10 @@ public class PurchaseParser44 implements Parser {
         this.driverSetup = driverSetup;
     }
 
-    public void parseUrlsParallel(List<String> urls, Consumer<ParseResult> callback, int threadCount,Consumer<Integer> progressCallback) {
+
+
+    @Override
+    public void parseUrlsParallel(List<String> urls, Consumer<ParseResult> callback, int threadCount, Consumer<Integer> progressCallback) {
         // 1. Инициализация БД (создание таблиц если их нет)
         initializeDatabase();
 
@@ -65,7 +83,18 @@ public class PurchaseParser44 implements Parser {
 
         // 3. Обработка результатов и сохранение в БД
         for (int i = 0; i < urls.size(); i++) {
-            if (isStopped) break;
+            if (isStopped || Thread.currentThread().isInterrupted()) {
+                break;
+            }
+
+            while(isPaused && !isStopped) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
 
             try {
                 Future<ParseResult> future = completionService.take();
@@ -109,59 +138,68 @@ public class PurchaseParser44 implements Parser {
             Transaction transaction = session.beginTransaction();
             try {
                 Purchase purchase = result.purchaseData;
-                Customer customer = purchase.getCustomer();
-                Contract contract = purchase.getContract();
-                // 1. Обработка заказчика
-                if (customer != null) {
-                    // Пытаемся найти существующего заказчика по fullName
+
+                // 1. Обработка Customer (должен быть сохранен первым)
+                if (purchase.getCustomer() != null) {
+                    Customer customer = purchase.getCustomer();
                     Customer existingCustomer = session.createQuery(
                                     "FROM Customer WHERE fullName = :fullName", Customer.class)
                             .setParameter("fullName", customer.getFullName())
                             .uniqueResult();
 
                     if (existingCustomer != null) {
-                        // Используем существующего заказчика
+                        updateCustomer(existingCustomer, customer);
                         purchase.setCustomer(existingCustomer);
-                        existingCustomer.getPurchases().add(purchase);
                     } else {
-                        // Сохраняем нового заказчика
                         session.persist(customer);
-                        customer.getPurchases().add(purchase);
+                        session.flush(); // Гарантируем получение ID
                     }
                 }
 
-                if (contract != null && contract.getSupplier() != null) {
-                    Supplier supplier = contract.getSupplier();
-                    Supplier existingSupplier = session.byNaturalId(Supplier.class)
-                            .using("name", supplier.getName())
-                            .load();
+                // 2. Обработка Purchase
+                Purchase existingPurchase = session.createQuery(
+                                "FROM Purchase WHERE purchaseNumber = :purchaseNumber", Purchase.class)
+                        .setParameter("purchaseNumber", purchase.getPurchaseNumber())
+                        .uniqueResult();
 
-                    if (existingSupplier != null) {
-                        contract.setSupplier(existingSupplier);
-                    } else {
-                        session.persist(supplier);
-                    }
+                if (existingPurchase != null) {
+                    updatePurchase(existingPurchase, purchase);
+                    purchase = existingPurchase;
+                } else {
+                    session.persist(purchase);
                 }
 
-                // 2. Сохраняем связанные с Contract сущности
+                // 3. Обработка Contract и Supplier
                 if (purchase.getContract() != null) {
+                    Contract contract = purchase.getContract();
                     contract.setPurchase(purchase);
 
-                    // Сохраняем Supplier (если есть)
                     if (contract.getSupplier() != null) {
-                        session.persist(contract.getSupplier());
+                        Supplier supplier = contract.getSupplier();
+                        Supplier existingSupplier = session.byNaturalId(Supplier.class)
+                                .using("name", supplier.getName())
+                                .load();
+
+                        if (existingSupplier != null) {
+                            updateSupplier(existingSupplier, supplier);
+                            contract.setSupplier(existingSupplier);
+                        } else {
+                            session.persist(supplier);
+                            session.flush();
+                        }
                     }
 
-                    // Сохраняем ProcurementObject (если есть)
-                    if (contract.getProcurementObject() != null) {
-                        session.persist(contract.getProcurementObject());
+                    if (contract.getId() != null) {
+                        session.merge(contract);
+                    } else {
+                        session.persist(contract);
                     }
-
-                    session.persist(contract);
                 }
 
-                // 3. Сохраняем Purchase (после всех зависимостей)
-                session.persist(purchase);
+                // 4. Обработка ProcurementObjects
+                if (purchase.getProcurementObjects() != null && !purchase.getProcurementObjects().isEmpty()) {
+                    updateProcurementObjects(session, purchase);
+                }
 
                 transaction.commit();
             } catch (Exception e) {
@@ -173,11 +211,140 @@ public class PurchaseParser44 implements Parser {
         }
     }
 
+// Вспомогательные методы для обновления:
+
+    private void updatePurchase(Purchase existing, Purchase newData) {
+        existing.setLaw(newData.getLaw());
+        existing.setInitialMaxPrice(newData.getInitialMaxPrice());
+        existing.setCurrency(newData.getCurrency());
+        existing.setPurchaseObject(newData.getPurchaseObject());
+        existing.setProcurementMethod(newData.getProcurementMethod());
+        existing.setIkz(newData.getIkz());
+        existing.setExecutor(newData.getExecutor());
+        existing.setPublicationDate(newData.getPublicationDate());
+        existing.setUpdateDate(newData.getUpdateDate());
+        existing.setApplicationEndDate(newData.getApplicationEndDate());
+        existing.setAuctionDate(newData.getAuctionDate());
+        existing.setProcurementStage(newData.getProcurementStage());
+
+
+    }
+
+    private void updateCustomer(Customer existing, Customer newData) {
+        existing.setShortName(newData.getShortName());
+        existing.setConsolidatedRegisterCode(newData.getConsolidatedRegisterCode());
+        existing.setRegistrationDate(newData.getRegistrationDate());
+        existing.setLastUpdated(newData.getLastUpdated());
+        existing.setInn(newData.getInn());
+        existing.setKpp(newData.getKpp());
+        existing.setOgrn(newData.getOgrn());
+        existing.setOktmo(newData.getOktmo());
+        existing.setLocation(newData.getLocation());
+        existing.setIku(newData.getIku());
+        existing.setIkuAssignmentDate(newData.getIkuAssignmentDate());
+        existing.setOkfsCode(newData.getOkfsCode());
+        existing.setOwnershipFormName(newData.getOwnershipFormName());
+        existing.setOkopfCode(newData.getOkopfCode());
+        existing.setLegalFormName(newData.getLegalFormName());
+        existing.setOrganizationAuthorities(newData.getOrganizationAuthorities());
+        existing.setUniqueRegistrationNumber(newData.getUniqueRegistrationNumber());
+        existing.setTaxRegistrationDate(newData.getTaxRegistrationDate());
+        existing.setOrganizationType(newData.getOrganizationType());
+        existing.setOrganizationLevel(newData.getOrganizationLevel());
+        existing.setOkved(newData.getOkved());
+        existing.setConsolidatedRegisterCodeAlt(newData.getConsolidatedRegisterCodeAlt());
+        existing.setAuthorizedOrganizationName(newData.getAuthorizedOrganizationName());
+        existing.setPhone(newData.getPhone());
+        existing.setFax(newData.getFax());
+        existing.setPostalAddress(newData.getPostalAddress());
+        existing.setEmail(newData.getEmail());
+        existing.setWebsite(newData.getWebsite());
+        existing.setContactPerson(newData.getContactPerson());
+        existing.setTimeZone(newData.getTimeZone());
+
+    }
+
+    private void updateSupplier(Supplier existing, Supplier newData) {
+        existing.setType(newData.getType());
+        existing.setCountryName(newData.getCountryName());
+        existing.setCountryCode(newData.getCountryCode());
+        existing.setAddress(newData.getAddress());
+        existing.setPostalAddress(newData.getPostalAddress());
+        existing.setOgrn(newData.getOgrn());
+        existing.setInn(newData.getInn());
+        existing.setKpp(newData.getKpp());
+        existing.setStatus(newData.getStatus());
+        existing.setEmail(newData.getEmail());
+        existing.setPhone(newData.getPhone());
+
+
+    }
+
+    private void updateProcurementObjects(Session session, Purchase purchase) {
+        // Получаем существующие объекты закупки из БД
+        List<ProcurementObject> existingObjects = session.createQuery(
+                        "FROM ProcurementObject WHERE purchase.id = :purchaseId", ProcurementObject.class)
+                .setParameter("purchaseId", purchase.getId())
+                .list();
+
+
+
+        // Создаем мапу для быстрого поиска по ID (если объект уже сохранен) или по составному ключу
+        Map<String, ProcurementObject> existingObjectsMap = new HashMap<>();
+        for (ProcurementObject obj : existingObjects) {
+            // Используем составной ключ: name + ktruOkpd2Codes + unit
+            String key = obj.getName() + "|" + obj.getKtruOkpd2Codes() + "|" + obj.getUnit();
+            existingObjectsMap.put(key, obj);
+        }
+
+        // Обрабатываем новые объекты
+        for (ProcurementObject newObj : purchase.getProcurementObjects()) {
+            // Генерируем тот же составной ключ
+            String key = newObj.getName() + "|" + newObj.getKtruOkpd2Codes() + "|" + newObj.getUnit();
+
+            ProcurementObject existingObj = existingObjectsMap.get(key);
+
+            if (existingObj != null) {
+                // Обновляем существующий объект
+                existingObj.setType(newObj.getType());
+                existingObj.setQuantity(newObj.getQuantity());
+                existingObj.setPricePerUnit(newObj.getPricePerUnit());
+                existingObj.setVatRate(newObj.getVatRate());
+                existingObj.setCountryOfOrigin(newObj.getCountryOfOrigin());
+                existingObj.setTotalAmount(newObj.getTotalAmount());
+                session.merge(existingObj);
+            } else {
+                // Добавляем новый объект
+                newObj.setPurchase(purchase);
+                session.persist(newObj);
+            }
+        }
+
+        // Удаляем объекты, которых нет в новых данных (опционально)
+        Set<String> newKeys = purchase.getProcurementObjects().stream()
+                .map(obj -> obj.getName() + "|" + obj.getKtruOkpd2Codes() + "|" + obj.getUnit())
+                .collect(Collectors.toSet());
+
+        existingObjectsMap.keySet().removeAll(newKeys);
+        for (ProcurementObject obsoleteObj : existingObjectsMap.values()) {
+            session.remove(obsoleteObj);
+        }
+    }
+
     private ParseResult parseSingleUrl(String url) {
         WebDriver driver = null;
         try {
             if (isStopped) return new ParseResult(url, null, null);
-
+            while(isPaused && !isStopped) {
+                try {
+                    synchronized(this) {
+                        this.wait(100); // Кратковременная пауза
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return new ParseResult(url, null, e);
+                }
+            }
             driver = driverSetup.setupDriver();
             driver.get(url);
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
@@ -199,6 +366,7 @@ public class PurchaseParser44 implements Parser {
 
             // 2. Парсим закупку (до перехода на другие страницы)
             Purchase purchase = parsePurchasePage(url, driver, wait);
+//            ProcurementObject procurementObject = new ProcurementObject();
 
             // 3. Парсим заказчика (если есть)
             String customerUrl = extractCustomerUrl(driver);
@@ -227,20 +395,19 @@ public class PurchaseParser44 implements Parser {
 
                 Contract contract = new Contract();
                 Supplier supplier = new Supplier();
-                ProcurementObject procurementObject = new ProcurementObject();
+
 
                 // Переходим на страницу контракта
                 driver.get(contractDraftUrl);
                 Map<String, Object> contractDetails = parseContractDraft(contractDraftUrl, driver, wait);
-                for (Map.Entry<String, Object> entry : contractDetails.entrySet()) {
-                    System.out.println(entry.getKey() + ": " + entry.getValue());
-                }
+//                for (Map.Entry<String, Object> entry : contractDetails.entrySet()) {
+//                    System.out.println(entry.getKey() + ": " + entry.getValue());
+//                }
                 fillContractModel(contract, contractDetails);
                 fillSupplierModel(supplier, contractDetails);
-                fillProcurementObjectModel(procurementObject, contractDetails);
-
+//                fillProcurementObjectModel(procurementObject, contractDetails);
+//                purchase.setProcurementObject(procurementObject);
                 contract.setSupplier(supplier);
-                contract.setProcurementObject(procurementObject);
                 contract.setPurchase(purchase);
                 purchase.setContract(contract);
                 purchase.setCustomer(customer);
@@ -867,11 +1034,7 @@ public class PurchaseParser44 implements Parser {
         try {
             Purchase purchase = new Purchase();
 
-
-
-            // 1. Парсим основную информацию из верхней части карточки
             parseCardMainInfo(driver, wait, purchase);
-
             // 2. Собираем все данные со страницы
             Map<String, String> allData = collectAllSectionData(driver);
 
@@ -886,6 +1049,13 @@ public class PurchaseParser44 implements Parser {
 //            System.out.println("\n=== ДАННЫЕ О ДАТАХ ===");
 //            dateData.forEach((key, value) -> System.out.printf("%-50s: %s%n", key, value));
 //            System.out.println("=======================================\n");
+
+            // Парсим объекты закупки
+            List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
+            procurementObjects.forEach(purchase::addProcurementObject);
+
+            // Выводим информацию о количестве найденных объектов
+            System.out.println("Найдено объектов закупки: " + procurementObjects.size());
 
             // 4. Заполняем поля закупки из собранных данных
 
@@ -923,6 +1093,97 @@ public class PurchaseParser44 implements Parser {
             throw new RuntimeException("Ошибка парсинга страницы закупки: " + e.getMessage(), e);
         }
     }
+    private List<ProcurementObject> parseProcurementObjectsTable(WebDriver driver) {
+        List<ProcurementObject> procurementObjects = new ArrayList<>();
+
+        try {
+            // Находим контейнер с id="positionKTRU"
+            WebElement container = driver.findElement(By.id("positionKTRU"));
+
+            // Ищем таблицу внутри этого контейнера
+            WebElement table = container.findElement(By.cssSelector("table.blockInfo__table.tableBlock"));
+
+            // Остальной код парсинга остается таким же
+            List<WebElement> rows = table.findElements(By.cssSelector("tbody.tableBlock__body tr.tableBlock__row"));
+
+            for (WebElement row : rows) {
+                try {
+                    ProcurementObject obj = new ProcurementObject();
+                    List<WebElement> cells = row.findElements(By.tagName("td"));
+
+                    // Парсинг данных из ячеек
+                    if (cells.size() > 1) obj.setKtruOkpd2Codes(cells.get(1).getText().trim());
+                    if (cells.size() > 2) obj.setName(cells.get(2).getText().trim());
+                    if (cells.size() > 3) obj.setUnit(cells.get(3).getText().trim());
+
+                    if (cells.size() > 4) {
+                        String quantityStr = cells.get(4).getText().trim().replace(",", ".");
+                        try {
+                            obj.setQuantity(new BigDecimal(quantityStr));
+                        } catch (Exception e) {
+                            System.out.println("Ошибка парсинга количества: " + quantityStr);
+                        }
+                    }
+
+                    if (cells.size() > 5) {
+                        String priceStr = cells.get(5).getText()
+                                .replaceAll("[^\\d.]", "")
+                                .trim();
+                        try {
+                            obj.setPricePerUnit(new BigDecimal(priceStr));
+                        } catch (Exception e) {
+                            System.out.println("Ошибка парсинга цены: " + priceStr);
+                        }
+                    }
+
+                    if (cells.size() > 6) {
+                        String amountStr = cells.get(6).getText()
+                                .replaceAll("[^\\d.]", "")
+                                .trim();
+                        try {
+                            obj.setTotalAmount(new BigDecimal(amountStr));
+                        } catch (Exception e) {
+                            System.out.println("Ошибка парсинга суммы: " + amountStr);
+                        }
+                    }
+
+                    procurementObjects.add(obj);
+
+                    // Логирование для отладки
+//                    System.out.println("Добавлен объект закупки:");
+//                    System.out.println("Код: " + obj.getKtruOkpd2Codes());
+//                    System.out.println("Наименование: " + obj.getName());
+//                    System.out.println("Ед.изм: " + obj.getUnit());
+//                    System.out.println("Количество: " + obj.getQuantity());
+//                    System.out.println("Цена за ед.: " + obj.getPricePerUnit());
+//                    System.out.println("Стоимость: " + obj.getTotalAmount());
+//                    System.out.println("----------------------");
+
+                } catch (Exception e) {
+                    System.out.println("Ошибка при парсинге строки таблицы: " + e.getMessage());
+                }
+            }
+
+            // Парсим итоговую сумму
+            try {
+                WebElement footer = table.findElement(By.cssSelector("tfoot.tableBlock__foot"));
+                String totalAmountStr = footer.findElement(By.cssSelector("span.cost"))
+                        .getText()
+                        .replaceAll("[^\\d.]", "")
+                        .trim();
+//                System.out.println("Итоговая сумма: " + totalAmountStr);
+            } catch (Exception e) {
+                System.out.println("Не удалось распарсить итоговую сумму: " + e.getMessage());
+            }
+
+        } catch (NoSuchElementException e) {
+            System.out.println("Не найден контейнер с объектами закупки (positionKTRU)");
+        } catch (Exception e) {
+            System.out.println("Ошибка при парсинге таблицы объектов закупки: " + e.getMessage());
+        }
+
+        return procurementObjects;
+    }
 
     private Map<String, String> collectDateInfo(WebDriver driver) {
         Map<String, String> dateData = new LinkedHashMap<>();
@@ -937,7 +1198,7 @@ public class PurchaseParser44 implements Parser {
 
                     if (!title.isEmpty() && !value.isEmpty()) {
                         dateData.put(title, value);
-                        System.out.println("Добавлена дата: '" + title + "' = '" + value + "'");
+//                        System.out.println("Добавлена дата: '" + title + "' = '" + value + "'");
                     }
                 } catch (Exception e) {
                     System.out.println("Ошибка при обработке секции с датой: " + e.getMessage());
@@ -1267,7 +1528,8 @@ public class PurchaseParser44 implements Parser {
         }
     }
     /// END CUSTOMER
-    public void stopParsing() {
+    @Override
+    public void stopParser() {
         isStopped = true;
         shutdown();
     }

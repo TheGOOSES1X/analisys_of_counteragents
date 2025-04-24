@@ -151,9 +151,9 @@ public class Contract {
     @Column(name = "state_contract_id", columnDefinition = "TEXT")
     private String stateContractId;
 
-    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "procurement_object_id", nullable = true)
-    private ProcurementObject procurementObject;
+//    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
+//    @JoinColumn(name = "procurement_object_id", nullable = true)
+//    private ProcurementObject procurementObject;
 
     @ManyToOne
     @JoinColumn(name = "supplier_id", nullable = true)
@@ -353,9 +353,7 @@ public class Contract {
         this.advancePayment = advancePayment;
     }
 
-    public void setProcurementObject(ProcurementObject procurementObject) {
-        this.procurementObject = procurementObject;
-    }
+
 
     public void setSupplier(Supplier supplier) {
         this.supplier = supplier;
@@ -369,8 +367,12 @@ public class Contract {
         return supplier;
     }
 
-    public ProcurementObject getProcurementObject() {
-        return procurementObject;
+    public Long getId() {
+        return id;
     }
+
+//    public ProcurementObject getProcurementObject() {
+//        return procurementObject;
+//    }
 }
 

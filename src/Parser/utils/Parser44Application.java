@@ -20,7 +20,7 @@ public class Parser44Application {
 
     public static void main(String[] args) {
         List<String> selectedUrls = new ArrayList<>(Arrays.asList(
-                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000034",
+                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000031",
                 "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
                 "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000032"
         ));
@@ -37,14 +37,15 @@ public class Parser44Application {
 //            System.exit(1);
 //        }
         ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
-        DriverSetup chromeSetup = new ChromeDriverSetup();
+        String userAgent = RandomUserAgent.getRandomUserAgent();
+        DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
         PurchaseParser44 parser = new PurchaseParser44(chromeSetup);
-//        parser.parseUrlsParallel(
-//                new ArrayList<>(selectedUrls),
-//                result -> handleParseResult(result),
-//                3
-//        );
-//        parser.parse();
+        parser.parseUrlsParallel(
+                new ArrayList<>(selectedUrls),
+                result -> handleParseResult(result),
+                3,null
+        );
+        parser.parse();
 
 
 

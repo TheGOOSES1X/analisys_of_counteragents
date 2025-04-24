@@ -16,6 +16,7 @@ import Parser.interfaces.Parser;
 import Parser.interfaces.PurchaseItem;
 import Parser.interfaces.ResultsSaver;
 import Parser.utils.Okpd2Converter;
+import Parser.utils.RandomUserAgent;
 import com.toedter.calendar.JDateChooser;
 
 
@@ -168,7 +169,7 @@ public class mainForm extends JFrame {
     private JCheckBox PurchaseCompleted;
     private JCheckBox SubmissionOfApplications;
     private JCheckBox CommissionWork;
-    private JButton StopParser;
+    private JButton PauseParser;
     private JCheckBox fz44;
     private JCheckBox fz223;
     private JLabel PrieceLabel;
@@ -187,6 +188,9 @@ public class mainForm extends JFrame {
     private JTextField OKPD2Field;
     private JPanel PanelFieldDataStart;
     private JPanel PanelFieldDataEnd;
+    private JButton StopParser;
+    private JButton PauseParsingButton;
+    private JButton StopParseringButton;
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -197,7 +201,15 @@ public class mainForm extends JFrame {
     private final DriverSetup driverSetup;
     private final JDateChooser dateChooseFilterStart = new JDateChooser();
     private final JDateChooser dateChooserFilterEnd = new JDateChooser();
+    private volatile Parser currentParser;
 
+    private enum ParserState {
+        IDLE, RUNNING, PAUSED, STOPPED
+    }
+
+    private ParserState parserState = ParserState.IDLE;
+
+    private Thread parserThread;
 
 
     // List<rowGoodsOrders> rowTableCritIntervalEdit;
@@ -257,7 +269,8 @@ public class mainForm extends JFrame {
     }
 
     public mainForm() {
-        this.driverSetup = new ChromeDriverSetup();
+        String userAgent = RandomUserAgent.getRandomUserAgent();
+        this.driverSetup = new ChromeDriverSetup(userAgent);
         String __URL = "";
         String __USER = "";
         String __PASSWORD = "";
@@ -1878,6 +1891,26 @@ public class mainForm extends JFrame {
         QueryButton.addActionListener(e -> onQueryButtonClicked());
         StartParsing.addActionListener(e -> initStartParsingButton());
         ChooseAllElements.addActionListener(e -> initChooseAllElementsButton());
+        StopParser.addActionListener(e -> stopParser());
+        PauseParser.addActionListener(e -> togglePauseParser());
+        StopParseringButton.addActionListener(e -> {
+            stopParsing();
+        });
+
+        // Кнопка паузы/продолжения
+        PauseParsingButton.addActionListener(e -> {
+            switch (parserState) {
+                case RUNNING:
+                    pauseParsering();
+                    break;
+                case PAUSED:
+                    resumeParsing();
+                    break;
+                default:
+                    // Ничего не делаем для других состояний
+                    break;
+            }
+        });
         initHeadersTable();
         customizeTableRenderers();
         try {
@@ -1893,7 +1926,7 @@ public class mainForm extends JFrame {
         }
 //        Эти методы для стилей таблицы, не трогать без необходимости
 //        configureTableColumns();
-//        initTableWithScroll();
+        initTableWithScroll();
 
 
 
@@ -2260,14 +2293,14 @@ public class mainForm extends JFrame {
 
                 if (isSelected) {
                     statusForm.selectedUrls.add(item.getUrl());
-                    System.out.println("Добавлена ссылка: " + item.getUrl());
-                    System.out.println("Полная информация: " + item.toString());
+//                    System.out.println("Добавлена ссылка: " + item.getUrl());
+//                    System.out.println("Полная информация: " + item.toString());
                 } else {
                     statusForm.selectedUrls.remove(item.getUrl());
-                    System.out.println("Удалена ссылка: " + item.getUrl());
+//                    System.out.println("Удалена ссылка: " + item.getUrl());
                 }
 
-                System.out.println("Текущий список выбранных ссылок: " + statusForm.selectedUrls);
+//                System.out.println("Текущий список выбранных ссылок: " + statusForm.selectedUrls);
             }
         });
         HeadersTable.setRowHeight(60); // Начальная высота строки
@@ -2820,8 +2853,6 @@ public class mainForm extends JFrame {
 
 
     private void initStartParsingButton() {
-
-        // Проверяем, есть ли выбранные URL для парсинга
         if (statusForm.selectedUrls.isEmpty()) {
             JOptionPane.showMessageDialog(this,
                     "Не выбрано ни одной закупки для парсинга",
@@ -2829,31 +2860,61 @@ public class mainForm extends JFrame {
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
+
+        // Если парсер на паузе - возобновляем
+        if (parserState == ParserState.PAUSED) {
+            resumeParsing();
+            return;
+        }
+
+        // Если парсер уже работает, ничего не делаем
+        if (parserState == ParserState.RUNNING) {
+            return;
+        }
+
+        // Настройка UI
         ParserProgressBar.setMinimum(0);
         ParserProgressBar.setMaximum(statusForm.selectedUrls.size());
         ParserProgressBar.setValue(0);
         ParserProgressBar.setStringPainted(true);
-        // Создаем экземпляр парсера
-        PurchaseParser44 parser = new PurchaseParser44(driverSetup);
 
-        // Меняем текст кнопки на "Парсинг..."
+        currentParser = new PurchaseParser44(driverSetup);
+        parserState = ParserState.RUNNING;
+
         StartParsing.setText("Парсинг...");
         StartParsing.setEnabled(false);
+        PauseParsingButton.setText("Пауза");
+        PauseParsingButton.setEnabled(true);
+        StopParseringButton.setEnabled(true);
+        StatusLabel.setText("Парсинг запущен");
 
-        // Запускаем парсинг в отдельном потоке
-        new Thread(() -> {
-            parser.parseUrlsParallel(
-                    new ArrayList<>(statusForm.selectedUrls),
-                    this::handleParseResult,
-                    6,
-                    progress -> SwingUtilities.invokeLater(() -> ParserProgressBar.setValue(progress))
-            );
+        parserThread = new Thread(() -> {
+            try {
+                currentParser.parseUrlsParallel(
+                        new ArrayList<>(statusForm.selectedUrls),
+                        this::handleParseResult,
+                        6,
+                        progress -> SwingUtilities.invokeLater(() -> {
+                            ParserProgressBar.setValue(progress);
+                            StatusLabel.setText(String.format("Обработано %d из %d",
+                                    progress, statusForm.selectedUrls.size()));
+                        })
+                );
+            } finally {
+                SwingUtilities.invokeLater(() -> {
+                    if (parserState != ParserState.STOPPED) {
+                        StartParsing.setText("Начать парсинг");
+                        StartParsing.setEnabled(true);
+                        PauseParsingButton.setEnabled(false);
+                        StopParseringButton.setEnabled(false);
+                        parserState = ParserState.IDLE;
+                        StatusLabel.setText("Парсинг завершен");
+                    }
+                });
+            }
+        });
 
-            SwingUtilities.invokeLater(() -> {
-                StartParsing.setText("Начать парсинг");
-                StartParsing.setEnabled(true);
-            });
-        }).start();
+        parserThread.start();
     }
 
     // Метод для обработки результатов парсинга
@@ -2963,29 +3024,14 @@ public class mainForm extends JFrame {
         }
 //         Добавляем параметры дат
         SimpleDateFormat urlDateFormat = new SimpleDateFormat("dd.MM.yyyy");
-        Date s_date_int = dateChooseFilterStart.getDate();
-        Date e_date_int = dateChooserFilterEnd.getDate();
-
-
-        // Дата начала (публикации)
-        if (s_date_int != null) {
-            s_date_int = new Date();
-            s_date_int.setHours(0);
-            s_date_int.setMinutes(0);
-            s_date_int.setSeconds(0);
+       // Обработка даты публикации (основной фильтр даты)
+        if (dateChooseFilterStart.getDate() != null) {
             params.put("publishDateFrom", urlDateFormat.format(dateChooseFilterStart.getDate()));
         }
 
-        // Дата окончания (закрытия подачи заявок)
-        if (e_date_int != null) {
-            e_date_int = new Date();
-            e_date_int.setHours(0);
-            e_date_int.setMinutes(0);
-            e_date_int.setSeconds(0);
-            params.put("applSubmissionCloseDateFrom", urlDateFormat.format(dateChooserFilterEnd.getDate()));
+        if (dateChooserFilterEnd.getDate() != null) {
+            params.put("publishDateTo", urlDateFormat.format(dateChooserFilterEnd.getDate()));
         }
-//        System.out.println(s_date_int);
-//        System.out.println(e_date_int);
 
         // Минимальная цена
         String minPrice = MinPriceTextField.getText().trim();
@@ -3007,18 +3053,9 @@ public class mainForm extends JFrame {
         return params;
     }
 
-    private static class NumericDocument extends PlainDocument {
-        @Override
-        public void insertString(int offs, String str, AttributeSet a)
-                throws BadLocationException {
-            if (str == null) return;
 
-            // Проверяем, что строка содержит только цифры
-            if (str.matches("\\d+")) {
-                super.insertString(offs, str, a);
-            }
-        }
-    }
+
+
     private void onQueryButtonClicked() {
         Map<String, String> params = buildFinalParams();
         clearTable(HeadersTable);
@@ -3028,9 +3065,18 @@ public class mainForm extends JFrame {
         CurrentRecords.setText("Обработано: 0");
         StatusLabel.setText("Статус: запуск парсера...");
 
-        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
-        Parser parser = new PurchasesParserHead(driverSetup, saver, params, statusForm);
-        new Thread(parser::parse).start();
+//        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
+        currentParser = new PurchasesParserHead(driverSetup, null, params, statusForm);
+        PauseParser.setEnabled(true);
+        StopParser.setEnabled(true);
+
+        new Thread(() -> {
+            currentParser.parse();
+            SwingUtilities.invokeLater(() -> {
+                PauseParser.setEnabled(false);
+                StopParser.setEnabled(false);
+            });
+        }).start();
     }
 
     // Метод для обработки поискового запроса
@@ -3056,6 +3102,72 @@ public class mainForm extends JFrame {
 
         System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
     }
+
+    private void togglePauseParser() {
+        if (currentParser != null) {
+            PurchasesParserHead parser = (PurchasesParserHead) currentParser;
+            if (parser.isPaused) {
+                parser.resumeParser();
+                PauseParser.setText("Пауза");
+                StatusLabel.setText("Статус: парсинг продолжен");
+            } else {
+                parser.pauseParser();
+                PauseParser.setText("Продолжить");
+                StatusLabel.setText("Статус: парсинг на паузе");
+            }
+        }
+    }
+
+    private void stopParser() {
+        if (currentParser != null) {
+            PurchasesParserHead parser = (PurchasesParserHead) currentParser;
+            parser.stopParser();
+            StopParser.setEnabled(false);
+            PauseParser.setEnabled(false);
+            StatusLabel.setText("Статус: парсинг остановлен");
+        }
+    }
+
+    private void pauseParsering() {
+        if (currentParser != null && parserState == ParserState.RUNNING) {
+            currentParser.pauseParser();
+            parserState = ParserState.PAUSED;
+            PauseParsingButton.setText("Продолжить");
+            StatusLabel.setText("Парсинг на паузе");
+            StopParseringButton.setEnabled(true); // Разрешаем остановку во время паузы
+        }
+    }
+    private void resumeParsing() {
+        if (currentParser != null && parserState == ParserState.PAUSED) {
+            currentParser.resumeParser();
+            parserState = ParserState.RUNNING;
+            PauseParsingButton.setText("Пауза");
+            StatusLabel.setText("Парсинг возобновлен");
+        }
+    }
+
+    private void stopParsing() {
+        if (currentParser != null && (parserState == ParserState.RUNNING || parserState == ParserState.PAUSED)) {
+            currentParser.stopParser();
+            parserState = ParserState.STOPPED;
+
+            if (parserThread != null) {
+                parserThread.interrupt();
+            }
+
+            SwingUtilities.invokeLater(() -> {
+                StartParsing.setText("Начать парсинг");
+                StartParsing.setEnabled(true);
+                PauseParsingButton.setText("Пауза");
+                PauseParsingButton.setEnabled(false);
+                StopParseringButton.setEnabled(false);
+                StatusLabel.setText("Парсинг остановлен");
+                ParserProgressBar.setValue(0);
+            });
+        }
+    }
+
+
     public static void main(String[] args) {
         try {
             for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {

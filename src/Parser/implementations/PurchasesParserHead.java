@@ -11,12 +11,15 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
 public class PurchasesParserHead implements Parser {
+    public volatile boolean isPaused = false;
+    private volatile boolean isStopped = false;
     private final DriverSetup driverSetup;
     private final ResultsSaver<PurchaseItem> resultsSaver;
     private static final String BASE_URL = "https://zakupki.gov.ru/epz/order/extendedsearch/results.html";
@@ -28,6 +31,29 @@ public class PurchasesParserHead implements Parser {
     private final ParserStatusListener statusListener;
     private final Map<String, String> queryParams;
 
+    @Override
+    public void pauseParser() {
+        isPaused = true;
+    }
+    @Override
+    public void resumeParser() {
+        isPaused = false;
+    }
+    @Override
+    public void stopParser() {
+        isStopped = true;
+    }
+
+    private void checkPaused() {
+        while (isPaused && !isStopped) {
+            try {
+                Thread.sleep(500); // Проверяем каждые 500 мс
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
+    }
 //    public PurchasesParserHead(DriverSetup driverSetup) {
 //        this(driverSetup, null);
 //    }
@@ -68,6 +94,8 @@ public class PurchasesParserHead implements Parser {
         params.put("ca", "on");
         params.put("pc", "on");
         params.put("pa", "on");
+        params.put("publishDateFrom", "dd.MM.yyyy"); // Дата от
+        params.put("publishDateTo", "dd.MM.yyyy");
 
 
         if (okpd2Code != null && !okpd2Code.isEmpty()) {
@@ -78,6 +106,12 @@ public class PurchasesParserHead implements Parser {
             }
         }
         return params;
+    }
+
+
+    @Override
+    public void parseUrlsParallel(List<String> urls, Consumer<PurchaseParser44.ParseResult> callback, int threadCount, Consumer<Integer> progressCallback) {
+
     }
 
 
@@ -98,13 +132,15 @@ public class PurchasesParserHead implements Parser {
         }
     }
 
+
     private List<PurchaseItem> parseAllPages(WebDriver driver, WebDriverWait wait) {
         List<PurchaseItem> allPurchases = new ArrayList<>();
         int currentPage = 1;
         int totalItems = 0;
         boolean hasNextPage = true;
 
-        while (hasNextPage) {
+        while (hasNextPage && !isStopped) {
+            checkPaused();
             navigateToPage(driver, wait, currentPage);
 
             if (currentPage == 1) {

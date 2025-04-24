@@ -6,6 +6,12 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import io.github.bonigarcia.wdm.WebDriverManager;
 
 public class ChromeDriverSetup implements DriverSetup {
+    private final String userAgent;
+
+    public ChromeDriverSetup(String userAgent) {
+        this.userAgent = userAgent;
+    }
+
     @Override
     public WebDriver setupDriver() {
         System.setProperty("webdriver.chrome.silentOutput", "true");
@@ -20,9 +26,13 @@ public class ChromeDriverSetup implements DriverSetup {
         options.addArguments("--disable-gpu");
         options.addArguments("--headless");
         options.addArguments("--window-size=1920,1080");
-        options.addArguments("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
-        options.setExperimentalOption("excludeSwitches", new String[]{"enable-automation"});
 
+        // Добавляем динамически заданный user-agent
+        if (userAgent != null && !userAgent.isEmpty()) {
+            options.addArguments("user-agent=" + userAgent);
+        }
+
+        options.setExperimentalOption("excludeSwitches", new String[]{"enable-automation"});
         return new ChromeDriver(options);
     }
 }

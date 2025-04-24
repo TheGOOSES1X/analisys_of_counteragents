@@ -107,4 +107,58 @@ public class Supplier {
     public String getName() {
         return name;
     }
+    // Геттеры
+    public Long getId() {
+        return id;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+
+    public String getCountryName() {
+        return countryName;
+    }
+
+    public String getCountryCode() {
+        return countryCode;
+    }
+
+    public String getAddress() {
+        return address;
+    }
+
+    public String getPostalAddress() {
+        return postalAddress;
+    }
+
+    public String getOgrn() {
+        return ogrn;
+    }
+
+    public String getInn() {
+        return inn;
+    }
+
+    public String getKpp() {
+        return kpp;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public List<Contract> getContracts() {
+        return contracts;
+    }
+
 }

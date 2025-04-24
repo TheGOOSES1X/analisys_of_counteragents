@@ -2157,7 +2157,7 @@
               </grid>
             </children>
           </grid>
-          <grid id="556f4" layout-manager="GridLayoutManager" row-count="2" column-count="1" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+          <grid id="556f4" layout-manager="GridLayoutManager" row-count="1" column-count="1" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
             <margin top="0" left="0" bottom="0" right="0"/>
             <constraints>
               <tabbedpane title="Парсер"/>
@@ -2176,7 +2176,7 @@
                 <properties/>
                 <border type="none"/>
                 <children>
-                  <grid id="77fa8" layout-manager="GridLayoutManager" row-count="4" column-count="9" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+                  <grid id="77fa8" layout-manager="GridLayoutManager" row-count="4" column-count="11" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
                     <margin top="0" left="0" bottom="0" right="0"/>
                     <constraints>
                       <grid row="0" column="0" row-span="1" col-span="1" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
@@ -2194,25 +2194,25 @@
                           <grid row="2" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
                         </constraints>
                         <properties>
-                          <text value="Label"/>
+                          <text value="Обработано: 0"/>
                         </properties>
                       </component>
                       <component id="ed485" class="javax.swing.JLabel" binding="StatusLabel">
                         <constraints>
-                          <grid row="2" column="5" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
+                          <grid row="2" column="7" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
                         </constraints>
                         <properties>
-                          <text value="Label"/>
+                          <text value="Статус:"/>
                         </properties>
                       </component>
                       <hspacer id="bb7ae">
                         <constraints>
-                          <grid row="2" column="4" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                          <grid row="2" column="6" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
                         </constraints>
                       </hspacer>
                       <hspacer id="6622c">
                         <constraints>
-                          <grid row="2" column="6" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                          <grid row="2" column="8" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
                         </constraints>
                       </hspacer>
                       <component id="ea61f" class="javax.swing.JLabel" binding="TotalRecords">
@@ -2220,12 +2220,12 @@
                           <grid row="2" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
                         </constraints>
                         <properties>
-                          <text value="Label"/>
+                          <text value="Всего записей:"/>
                         </properties>
                       </component>
                       <component id="700df" class="javax.swing.JTextField" binding="SearchParamentInsert">
                         <constraints>
-                          <grid row="0" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="0" use-parent-layout="false">
+                          <grid row="0" column="6" row-span="1" col-span="3" vsize-policy="0" hsize-policy="6" anchor="8" fill="1" indent="0" use-parent-layout="false">
                             <preferred-size width="150" height="-1"/>
                           </grid>
                         </constraints>
@@ -2432,7 +2432,7 @@
                           </grid>
                         </children>
                       </grid>
-                      <component id="1346f" class="javax.swing.JButton" binding="StopParser">
+                      <component id="1346f" class="javax.swing.JButton" binding="PauseParser">
                         <constraints>
                           <grid row="0" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
                         </constraints>
@@ -2440,32 +2440,9 @@
                           <text value="Пауза"/>
                         </properties>
                       </component>
-                      <component id="b2fa9" class="javax.swing.JButton" binding="StartParsing">
-                        <constraints>
-                          <grid row="0" column="5" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
-                        </constraints>
-                        <properties>
-                          <text value="Парсить выбранные элементы"/>
-                        </properties>
-                      </component>
-                      <component id="b0b81" class="javax.swing.JButton" binding="ChooseAllElements">
-                        <constraints>
-                          <grid row="0" column="6" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
-                        </constraints>
-                        <properties>
-                          <text value="Выбрать все"/>
-                        </properties>
-                      </component>
-                      <hspacer id="fa687">
-                        <constraints>
-                          <grid row="0" column="7" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false">
-                            <preferred-size width="42" height="11"/>
-                          </grid>
-                        </constraints>
-                      </hspacer>
                       <component id="ac2d1" class="javax.swing.JProgressBar" binding="ParserProgressBar">
                         <constraints>
-                          <grid row="1" column="4" row-span="1" col-span="3" vsize-policy="0" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false">
+                          <grid row="1" column="6" row-span="1" col-span="3" vsize-policy="0" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false">
                             <preferred-size width="146" height="19"/>
                           </grid>
                         </constraints>
@@ -2482,7 +2459,7 @@
                       <grid id="a5714" binding="tablePanel" layout-manager="GridLayoutManager" row-count="1" column-count="1" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
                         <margin top="10" left="10" bottom="10" right="10"/>
                         <constraints>
-                          <grid row="3" column="2" row-span="1" col-span="6" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
+                          <grid row="3" column="2" row-span="1" col-span="8" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
                         </constraints>
                         <properties/>
                         <border type="none"/>
@@ -2497,15 +2474,50 @@
                           </component>
                         </children>
                       </grid>
+                      <component id="b0b81" class="javax.swing.JButton" binding="ChooseAllElements">
+                        <constraints>
+                          <grid row="1" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <text value="Выбрать все"/>
+                        </properties>
+                      </component>
+                      <component id="b2fa9" class="javax.swing.JButton" binding="StartParsing">
+                        <constraints>
+                          <grid row="1" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <text value="Парсить выбранные элементы"/>
+                        </properties>
+                      </component>
+                      <component id="c094b" class="javax.swing.JButton" binding="StopParser">
+                        <constraints>
+                          <grid row="0" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <text value="Стоп"/>
+                        </properties>
+                      </component>
+                      <component id="445ce" class="javax.swing.JButton" binding="PauseParsingButton">
+                        <constraints>
+                          <grid row="1" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <text value="Пауза"/>
+                        </properties>
+                      </component>
+                      <component id="6963f" class="javax.swing.JButton" binding="StopParseringButton">
+                        <constraints>
+                          <grid row="1" column="5" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <text value="Стоп"/>
+                        </properties>
+                      </component>
                     </children>
                   </grid>
                 </children>
               </grid>
-              <vspacer id="28212">
-                <constraints>
-                  <grid row="1" column="0" row-span="1" col-span="1" vsize-policy="6" hsize-policy="1" anchor="0" fill="2" indent="0" use-parent-layout="false"/>
-                </constraints>
-              </vspacer>
             </children>
           </grid>
         </children>

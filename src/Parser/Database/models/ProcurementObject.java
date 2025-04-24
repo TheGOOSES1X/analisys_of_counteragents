@@ -1,16 +1,16 @@
 package Parser.Database.models;
 import java.math.BigDecimal;
 import jakarta.persistence.*;
-@Entity
-@Table(name = "procurement_objects")
-public class ProcurementObject {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Entity
+    @Table(name = "procurement_objects")
+    public class ProcurementObject {
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
 
-    @Column(name = "name",  columnDefinition = "TEXT")
+        @Column(name = "name",  columnDefinition = "TEXT")
 
-    private String name;
+        private String name;
 
     @Column(name = "type")
     private String type;
@@ -39,6 +39,10 @@ public class ProcurementObject {
     @Column(name = "total_amount", precision = 19, scale = 2)
 
     private BigDecimal totalAmount;
+
+    @ManyToOne
+    @JoinColumn(name = "purchase_id") // Это должно соответствовать имени столбца в БД
+    private Purchase purchase;
 
     public void setId(Long id) {
         this.id = id;
@@ -79,5 +83,52 @@ public class ProcurementObject {
     public void setTotalAmount(BigDecimal totalAmount) {
         this.totalAmount = totalAmount;
     }
+        public Long getId() {
+            return id;
+        }
 
-}
+        public String getName() {
+            return name;
+        }
+
+        public String getType() {
+            return type;
+        }
+
+        public String getKtruOkpd2Codes() {
+            return ktruOkpd2Codes;
+        }
+
+        public BigDecimal getQuantity() {
+            return quantity;
+        }
+
+        public String getUnit() {
+            return unit;
+        }
+
+        public BigDecimal getPricePerUnit() {
+            return pricePerUnit;
+        }
+
+        public String getVatRate() {
+            return vatRate;
+        }
+
+        public String getCountryOfOrigin() {
+            return countryOfOrigin;
+        }
+
+        public BigDecimal getTotalAmount() {
+            return totalAmount;
+        }
+        public void setPurchase(Purchase purchase) {
+            this.purchase = purchase;
+        }
+
+        // И геттер (опционально, если будет нужен)
+        public Purchase getPurchase() {
+            return purchase;
+        }
+
+    }

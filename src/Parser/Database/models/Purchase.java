@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "purchases")
@@ -33,8 +35,8 @@ public class Purchase {
     @Column(name = "ikz", columnDefinition = "text")
     private String ikz;
 
-    @ManyToOne
-    @JoinColumn(name = "customer_id", nullable = true) // Разрешаем null, если customer неизвестен
+    @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "customer_id", nullable = true)
     private Customer customer;
 
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
@@ -58,6 +60,12 @@ public class Purchase {
 
     @Column(name = "procurement_stage", columnDefinition = "text")
     private String procurementStage;
+
+
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "purchase_id") // Это создаст столбец purchase_id в таблице procurement_objects
+    private List<ProcurementObject> procurementObjects = new ArrayList<>();
+
 
 
 
@@ -189,4 +197,13 @@ public class Purchase {
     public void setContract(Contract contract) {
         this.contract = contract;
     }
+    public void addProcurementObject(ProcurementObject procurementObject) {
+        procurementObjects.add(procurementObject);
+    }
+
+    public List<ProcurementObject> getProcurementObjects() {
+        return procurementObjects;
+    }
+
+
 }

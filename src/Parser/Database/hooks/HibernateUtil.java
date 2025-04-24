@@ -26,7 +26,7 @@ import org.json.JSONObject;
 public class HibernateUtil {
     private static SessionFactory sessionFactory;
     private static String configPath = "src/config.json"; // Укажите явно путь по умолчанию
-
+    private static boolean isDatabaseInitialized = false;
     public static void initialize(String path) {
         if (path != null) {
             configPath = path;
@@ -58,7 +58,13 @@ public class HibernateUtil {
                 settings.put(Environment.PASS, config.getString("PASSWORD"));
                 settings.put(Environment.DIALECT, "org.hibernate.dialect.PostgreSQLDialect");
                 settings.put(Environment.SHOW_SQL, "true");
-                settings.put(Environment.HBM2DDL_AUTO, "create");
+                // Только при первом запуске - создаем схему
+                if (!isDatabaseInitialized) {
+                    settings.put(Environment.HBM2DDL_AUTO, "create");
+                    isDatabaseInitialized = true;
+                } else {
+                    settings.put(Environment.HBM2DDL_AUTO, "validate");  // или "none"
+                }
 
                 registryBuilder.applySettings(settings);
 
