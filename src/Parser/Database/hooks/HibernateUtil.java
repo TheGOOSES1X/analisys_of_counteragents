@@ -60,7 +60,7 @@ public class HibernateUtil {
                 settings.put(Environment.SHOW_SQL, "true");
                 // Только при первом запуске - создаем схему
                 if (!isDatabaseInitialized) {
-                    settings.put(Environment.HBM2DDL_AUTO, "create");
+                    settings.put(Environment.HBM2DDL_AUTO, "update");
                     isDatabaseInitialized = true;
                 } else {
                     settings.put(Environment.HBM2DDL_AUTO, "validate");  // или "none"
