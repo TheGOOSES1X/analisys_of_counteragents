@@ -53,6 +53,11 @@ public class Supplier {
     @OneToMany(mappedBy = "supplier")
     private List<Contract> contracts = new ArrayList<>();
 
+
+    @OneToMany(mappedBy = "supplier", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<JudicialProceeding> judicialProceedings = new ArrayList<>();
+
+
     public void setId(Long id) {
         this.id = id;
     }
@@ -159,6 +164,13 @@ public class Supplier {
 
     public List<Contract> getContracts() {
         return contracts;
+    }
+    public List<JudicialProceeding> getJudicialProceedings() {
+        return judicialProceedings;
+    }
+
+    public void setJudicialProceedings(List<JudicialProceeding> judicialProceedings) {
+        this.judicialProceedings = judicialProceedings;
     }
 
 }

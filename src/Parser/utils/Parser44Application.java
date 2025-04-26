@@ -1,17 +1,15 @@
 package Parser.utils;
 
-import Parser.Database.hooks.HibernateUtil;
 import Parser.implementations.ChromeDriverSetup;
-import Parser.implementations.PurchaseParser44;
-import Parser.implementations.PurchasesParserHead;
+import Parser.implementations.Parser44.LitigationParser;
+import Parser.implementations.Parser44.PurchaseParser44;
 import Parser.implementations.TextFileResultsSaver;
 import Parser.interfaces.DriverSetup;
-import Parser.interfaces.Parser;
 import Parser.interfaces.PurchaseItem;
 import Parser.interfaces.ResultsSaver;
+import org.openqa.selenium.WebDriver;
 
 import javax.swing.*;
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -40,12 +38,14 @@ public class Parser44Application {
         String userAgent = RandomUserAgent.getRandomUserAgent();
         DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
         PurchaseParser44 parser = new PurchaseParser44(chromeSetup);
+
         parser.parseUrlsParallel(
                 new ArrayList<>(selectedUrls),
                 result -> handleParseResult(result),
                 3,null
         );
-        parser.parse();
+
+        parser.parseSupplierLitigations();
 
 
 

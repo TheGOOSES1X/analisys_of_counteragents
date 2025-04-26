@@ -1,5 +1,6 @@
 package Parser.implementations;
 
+import Parser.implementations.Parser44.PurchaseParser44;
 import Parser.interfaces.*;
 import Parser.utils.Okpd2Converter;
 import org.openqa.selenium.By;
@@ -39,6 +40,12 @@ public class PurchasesParserHead implements Parser {
     public void resumeParser() {
         isPaused = false;
     }
+
+    @Override
+    public void parseSupplierLitigations() {
+
+    }
+
     @Override
     public void stopParser() {
         isStopped = true;

@@ -50,7 +50,7 @@ public class Purchase {
     private LocalDate publicationDate;
 
     @Column(name = "update_date")
-    private LocalDateTime updateDate;
+    private LocalDate updateDate;
 
     @Column(name = "application_end_date")
     private LocalDate applicationEndDate;
@@ -158,11 +158,11 @@ public class Purchase {
         this.publicationDate = publicationDate;
     }
 
-    public LocalDateTime getUpdateDate() {
+    public LocalDate getUpdateDate() {
         return updateDate;
     }
 
-    public void setUpdateDate(LocalDateTime updateDate) {
+    public void setUpdateDate(LocalDate updateDate) {
         this.updateDate = updateDate;
     }
 

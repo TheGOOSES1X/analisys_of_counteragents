@@ -1,9 +1,8 @@
 package Parser.interfaces;
 
 import Parser.Database.models.Purchase;
-import Parser.implementations.PurchaseParser44;
+import Parser.implementations.Parser44.PurchaseParser44;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -19,6 +18,8 @@ public interface Parser {
     void parse();
 
     void resumeParser();
+
+    void parseSupplierLitigations();
 
 
     class ParseResult {

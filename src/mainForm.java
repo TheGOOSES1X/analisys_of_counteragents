@@ -4,17 +4,14 @@ import java.util.*;
 import javax.swing.table.*;
 import java.text.SimpleDateFormat;
 import javax.swing.JTable;
-import javax.swing.text.AttributeSet;
-import javax.swing.text.BadLocationException;
-import javax.swing.text.PlainDocument;
 import java.util.Comparator;
 
 
 import Parser.implementations.*;
+import Parser.implementations.Parser44.PurchaseParser44;
 import Parser.interfaces.DriverSetup;
 import Parser.interfaces.Parser;
 import Parser.interfaces.PurchaseItem;
-import Parser.interfaces.ResultsSaver;
 import Parser.utils.Okpd2Converter;
 import Parser.utils.RandomUserAgent;
 import com.toedter.calendar.JDateChooser;
@@ -2874,7 +2871,7 @@ public class mainForm extends JFrame {
 
         // Настройка UI
         ParserProgressBar.setMinimum(0);
-        ParserProgressBar.setMaximum(statusForm.selectedUrls.size());
+        ParserProgressBar.setMaximum(statusForm.selectedUrls.size() + 1); // +1 для этапа парсинга судебных дел
         ParserProgressBar.setValue(0);
         ParserProgressBar.setStringPainted(true);
 
@@ -2890,16 +2887,31 @@ public class mainForm extends JFrame {
 
         parserThread = new Thread(() -> {
             try {
+                // Этап 1: Парсинг закупок
                 currentParser.parseUrlsParallel(
                         new ArrayList<>(statusForm.selectedUrls),
                         this::handleParseResult,
                         6,
                         progress -> SwingUtilities.invokeLater(() -> {
                             ParserProgressBar.setValue(progress);
-                            StatusLabel.setText(String.format("Обработано %d из %d",
+                            StatusLabel.setText(String.format("Обработано %d из %d (парсинг закупок)",
                                     progress, statusForm.selectedUrls.size()));
                         })
                 );
+
+                // Проверяем, не была ли остановка
+                if (parserState == ParserState.STOPPED) {
+                    return;
+                }
+
+                // Этап 2: Парсинг судебных дел
+                SwingUtilities.invokeLater(() -> {
+                    StatusLabel.setText("Парсинг судебных дел поставщиков...");
+                    ParserProgressBar.setValue(statusForm.selectedUrls.size() + 1);
+                });
+
+                currentParser.parseSupplierLitigations();
+
             } finally {
                 SwingUtilities.invokeLater(() -> {
                     if (parserState != ParserState.STOPPED) {
@@ -3133,16 +3145,21 @@ public class mainForm extends JFrame {
             currentParser.pauseParser();
             parserState = ParserState.PAUSED;
             PauseParsingButton.setText("Продолжить");
-            StatusLabel.setText("Парсинг на паузе");
-            StopParseringButton.setEnabled(true); // Разрешаем остановку во время паузы
+            StatusLabel.setText("Парсинг на паузе" +
+                    (ParserProgressBar.getValue() >= statusForm.selectedUrls.size() ?
+                            " (парсинг судебных дел)" : ""));
+            StopParseringButton.setEnabled(true);
         }
     }
+
     private void resumeParsing() {
         if (currentParser != null && parserState == ParserState.PAUSED) {
             currentParser.resumeParser();
             parserState = ParserState.RUNNING;
             PauseParsingButton.setText("Пауза");
-            StatusLabel.setText("Парсинг возобновлен");
+            StatusLabel.setText("Парсинг возобновлен" +
+                    (ParserProgressBar.getValue() >= statusForm.selectedUrls.size() ?
+                            " (парсинг судебных дел)" : ""));
         }
     }
 
