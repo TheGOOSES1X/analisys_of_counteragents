@@ -75,7 +75,8 @@ public class HibernateUtil {
                         .addAnnotatedClass(Parser.Database.models.ProcurementObject.class)
                         .addAnnotatedClass(Parser.Database.models.Supplier.class)
                         .addAnnotatedClass(Parser.Database.models.Contract.class)
-                        .addAnnotatedClass(Parser.Database.models.JudicialProceeding.class);;
+                        .addAnnotatedClass(Parser.Database.models.JudicialProceeding.class)
+                        .addAnnotatedClass(Parser.Database.models.SupplierReliability.class);
 
                 Metadata metadata = sources.getMetadataBuilder().build();
                 sessionFactory = metadata.getSessionFactoryBuilder().build();

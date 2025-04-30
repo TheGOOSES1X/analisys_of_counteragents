@@ -21,6 +21,7 @@ public class PurchaseParser44 implements Parser {
     private final CustomerPageParser customerPageParser;
     private final ContractPageParser contractPageParser;
     private final DatabaseService databaseService;
+    private final SupplierStatusParser supplierStatusParser;
 
 
     public PurchaseParser44(DriverSetup driverSetup) {
@@ -30,6 +31,7 @@ public class PurchaseParser44 implements Parser {
         this.contractPageParser = new ContractPageParser();
         this.databaseService = new DatabaseService();
         this.litigationParser = new LitigationParser(driverSetup.setupDriver());
+        this.supplierStatusParser = new SupplierStatusParser(driverSetup.setupDriver());
     }
 
     @Override
@@ -194,6 +196,56 @@ public class PurchaseParser44 implements Parser {
             }
         }
     }
+
+    @Override
+    public void parseSupplierStatuses() {
+        List<String> supplierInns = getSupplierInnsFromDatabase();
+        DatabaseService dbService = new DatabaseService();
+        List<SupplierReliability> reliabilities = new ArrayList<>();
+
+        for (int i = 0; i < supplierInns.size(); i++) {
+            if (isStopped) break;
+
+            while(isPaused && !isStopped) {
+                try { Thread.sleep(100); }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+            }
+
+            try {
+                String inn = supplierInns.get(i);
+                List<String> dishonestyLinks = supplierStatusParser.parseSupplierStatuses(Collections.singletonList(inn));
+
+                // Обрабатываем каждую найденную ссылку
+                for (String link : dishonestyLinks) {
+                    try {
+                        SupplierReliability reliability = supplierStatusParser.parseAndPrintDetails(link);
+                        if (reliability != null) {
+                            reliability.setInn(inn); // Убедимся, что ИНН установлен
+                            reliabilities.add(reliability);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Ошибка при обработке ссылки " + link + " для ИНН " + inn + ": " + e.getMessage());
+                    }
+                }
+
+                // Периодически сохраняем данные в базу
+                if (reliabilities.size() >= 10 || i == supplierInns.size() - 1) {
+                    dbService.saveSupplierReliability(reliabilities);
+                    reliabilities.clear();
+                }
+
+                System.out.println("Processed " + (i + 1) + " of " + supplierInns.size() + " INNs");
+
+            } catch (Exception e) {
+                System.err.println("Ошибка при парсинге статусов для ИНН " + supplierInns.get(i) + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+
     public static class ParseResult {
         public final String url;
         public final Purchase purchaseData;

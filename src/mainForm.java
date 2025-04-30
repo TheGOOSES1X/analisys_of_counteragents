@@ -2911,6 +2911,7 @@ public class mainForm extends JFrame {
                 });
 
                 currentParser.parseSupplierLitigations();
+                currentParser.parseSupplierStatuses();
 
             } finally {
                 SwingUtilities.invokeLater(() -> {

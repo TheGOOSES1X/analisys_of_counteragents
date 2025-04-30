@@ -221,6 +221,66 @@ public class DatabaseService {
             throw new RuntimeException("Failed to fetch supplier INNs", e);
         }
     }
+
+    public void saveSupplierReliability(List<SupplierReliability> reliabilities) {
+        if (reliabilities == null || reliabilities.isEmpty()) return;
+
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+            try {
+                for (SupplierReliability reliability : reliabilities) {
+                    // Находим поставщика по ИНН
+                    Supplier supplier = session.createQuery(
+                                    "FROM Supplier WHERE inn = :inn", Supplier.class)
+                            .setParameter("inn", reliability.getInn())
+                            .uniqueResult();
+
+                    if (supplier != null) {
+                        reliability.setSupplier(supplier);
+                    }
+
+                    // Проверяем, существует ли уже запись для этого поставщика
+                    SupplierReliability existing = session.createQuery(
+                                    "FROM SupplierReliability WHERE inn = :inn", SupplierReliability.class)
+                            .setParameter("inn", reliability.getInn())
+                            .uniqueResult();
+
+                    if (existing != null) {
+                        // Обновляем существующую запись
+                        updateSupplierReliability(existing, reliability);
+                        session.merge(existing);
+                    } else {
+                        // Создаем новую запись
+                        session.persist(reliability);
+                    }
+                }
+                transaction.commit();
+            } catch (Exception e) {
+                if (transaction != null) {
+                    transaction.rollback();
+                }
+                throw new RuntimeException("Failed to save supplier reliability data", e);
+            }
+        }
+    }
+
+    private void updateSupplierReliability(SupplierReliability existing, SupplierReliability newData) {
+        existing.setName(newData.getName());
+        existing.setInn(newData.getInn());
+        existing.setAuthority(newData.getAuthority());
+        existing.setReason(newData.getReason());
+        existing.setRegistryNumber(newData.getRegistryNumber());
+        existing.setInclusionDate(newData.getInclusionDate());
+        existing.setStatus(newData.getStatus());
+        existing.setExclusionDate(newData.getExclusionDate());
+        existing.setEntityType(newData.getEntityType());
+        existing.setEruzNumber(newData.getEruzNumber());
+        existing.setPersonInn(newData.getPersonInn());
+        existing.setLaw(newData.getLaw());
+        existing.setRecordNumber(newData.getRecordNumber());
+        existing.setUpdateDate(newData.getUpdateDate());
+        existing.setPlannedExclusionDate(newData.getPlannedExclusionDate());
+    }
     public void saveJudicialProceedings(List<JudicialProceeding> proceedings, String supplierInn) {
         if (proceedings == null || proceedings.isEmpty()) return;
 

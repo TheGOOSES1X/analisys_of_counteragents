@@ -47,6 +47,11 @@ public class PurchasesParserHead implements Parser {
     }
 
     @Override
+    public void parseSupplierStatuses() {
+
+    }
+
+    @Override
     public void stopParser() {
         isStopped = true;
     }

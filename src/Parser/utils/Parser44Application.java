@@ -38,14 +38,15 @@ public class Parser44Application {
         String userAgent = RandomUserAgent.getRandomUserAgent();
         DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
         PurchaseParser44 parser = new PurchaseParser44(chromeSetup);
+        parser.parseSupplierStatuses();
+//        parser.parseUrlsParallel(
+//                new ArrayList<>(selectedUrls),
+//                result -> handleParseResult(result),
+//                3,null
+//        );
 
-        parser.parseUrlsParallel(
-                new ArrayList<>(selectedUrls),
-                result -> handleParseResult(result),
-                3,null
-        );
+//        parser.parseSupplierLitigations();
 
-        parser.parseSupplierLitigations();
 
 
 

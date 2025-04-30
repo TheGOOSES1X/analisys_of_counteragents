@@ -21,6 +21,10 @@ public interface Parser {
 
     void parseSupplierLitigations();
 
+    void parseSupplierStatuses();
+
+
+
 
     class ParseResult {
         public final String url;
