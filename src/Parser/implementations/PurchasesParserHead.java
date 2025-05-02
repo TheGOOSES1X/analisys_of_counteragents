@@ -323,18 +323,19 @@ public class PurchasesParserHead implements Parser {
 
     private int extractTotalItems(WebDriver driver) {
         try {
-            WebElement totalElement = driver.findElement(
-                    By.cssSelector(".search-results__total"));
-            String totalText = totalElement.getText();
-            Pattern pattern = Pattern.compile("(\\d+)");
-            Matcher matcher = pattern.matcher(totalText);
-            if (matcher.find()) {
-                return Integer.parseInt(matcher.group(1));
-            }
+            // Используем getAttribute("textContent") вместо getText()
+            String totalText = driver.findElement(By.cssSelector(".search-results__total"))
+                    .getAttribute("textContent")
+                    .trim();
+
+            // Удаляем всё, кроме цифр
+            String cleanText = totalText.replaceAll("\\D+", "");
+
+            return cleanText.isEmpty() ? 0 : Integer.parseInt(cleanText);
         } catch (Exception e) {
-            System.err.println("Не удалось извлечь общее количество записей: " + e.getMessage());
+            System.err.println("Ошибка при получении количества записей: " + e.getMessage());
+            return 0;
         }
-        return 0;
     }
 
     private void sleep(int millis) {

@@ -1,5 +1,7 @@
 import javax.swing.*;
 import java.awt.event.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import javax.swing.table.*;
 import java.text.SimpleDateFormat;
@@ -2990,7 +2992,7 @@ public class mainForm extends JFrame {
     private Map<String, String> buildFinalParams() {
         String searchText = SearchParamentInsert.getText().trim();
         String searchQuery = searchText.isEmpty()
-                ? "АКЦИОНЕРНОЕ+ОБЩЕСТВО+%22ОНЕЖСКИЙ+СУДОСТРОИТЕЛЬНО-СУДОРЕМОНТНЫЙ+ЗАВОД%22"
+                ? ""  // Пустая строка вместо пробела
                 : processSearchQuery(searchText);
 
         boolean hasAnyFilter = PurchaseCancelled.isSelected() ||
@@ -3007,6 +3009,7 @@ public class mainForm extends JFrame {
         if (SubmissionOfApplications.isSelected()) params.put("af", "on");
         if (CommissionWork.isSelected()) params.put("ca", "on");
         if (fz44.isSelected()) params.put("fz44", "on");
+        if (fz223.isSelected()) params.put("fz223", "on");
 
         // Обрабатываем ОКПД2
         // Обработка ОКПД2
@@ -3094,11 +3097,18 @@ public class mainForm extends JFrame {
 
     // Метод для обработки поискового запроса
     private String processSearchQuery(String rawQuery) {
-        // Заменяем кавычки на %22
-        String processed = rawQuery.replace("\"", "%22");
-        // Заменяем пробелы на +
-        processed = processed.replace(" ", "+");
-        return processed;
+        try {
+            // Кодируем всю строку, включая пробелы (%20) и специальные символы
+            String encoded = URLEncoder.encode(rawQuery, StandardCharsets.UTF_8.toString());
+
+            // Дополнительные замены для соответствия требованиям сайта
+            encoded = encoded.replace("+", "%20");  // Заменяем + на %20
+            encoded = encoded.replace("%27", "%22"); // Заменяем одинарные кавычки на двойные
+            return encoded;
+        } catch (Exception e) {
+            System.err.println("Ошибка кодирования запроса: " + e.getMessage());
+            return rawQuery.replace(" ", "%20"); // Фолбэк замена пробелов
+        }
     }
 
     private void initChooseAllElementsButton() {
