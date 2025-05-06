@@ -3,7 +3,6 @@ package Parser_EGRUL;
 import Parser.implementations.Parser44.DatabaseService;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
-import Parser_EGRUL.EGRUL_member;
 
 import java.io.IOException;
 import java.nio.file.Files;
