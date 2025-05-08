@@ -1,9 +1,17 @@
 package Parser.utils;
 
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import javax.swing.*;
 import java.io.File;
 import java.io.IOException;
 
@@ -45,6 +53,46 @@ public class Okpd2Converter {
 
         return null;
     }
+    public static void fillComboBoxWithCurrencies(JComboBox<String> comboBox, String jsonFilePath) {
+        try {
+            comboBox.removeAllItems();
+
+            String content = new String(Files.readAllBytes(Paths.get(jsonFilePath)));
+            JsonArray currencies = JsonParser.parseString(content).getAsJsonArray();
+
+            for (JsonElement element : currencies) {
+                JsonObject currency = element.getAsJsonObject();
+                String name = currency.get("name").getAsString();
+                comboBox.addItem(name);
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(null,
+                    "Ошибка при загрузке данных о валютах: " + e.getMessage(),
+                    "Ошибка",
+                    JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    public static String getCurrencyIdByName(String currencyName) {
+        try {
+            String content = new String(Files.readAllBytes(Paths.get("src/currency.json")));
+            JsonArray currencies = JsonParser.parseString(content).getAsJsonArray();
+
+            for (JsonElement element : currencies) {
+                JsonObject currency = element.getAsJsonObject();
+                if (currency.get("name").getAsString().equals(currencyName)) {
+                    return currency.get("id").getAsString();
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+
 
     // Получение полного названия по коду
     public static String getOkpd2Title(String code) {

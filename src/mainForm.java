@@ -30,6 +30,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 
+
+
 public class mainForm extends JFrame {
 
     private JPanel MainPanel;
@@ -1896,6 +1898,10 @@ public class mainForm extends JFrame {
             stopParsing();
         });
 
+        Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "src/currency.json");
+
+
+
         // Кнопка паузы/продолжения
         PauseParsingButton.addActionListener(e -> {
             switch (parserState) {
@@ -3062,7 +3068,18 @@ public class mainForm extends JFrame {
         }
 
         // Валюта (рубли)
-        params.put("currencyIdGeneral", "-1");
+
+
+        if (comboBoxCurrency.getSelectedItem() != null) {
+            String selectedCurrency = comboBoxCurrency.getSelectedItem().toString();
+            String currencyId = Okpd2Converter.getCurrencyIdByName(selectedCurrency);
+            params.put("currencyIdGeneral", currencyId != null ? currencyId : "-1"); // "-1" как fallback
+        } else {
+            params.put("currencyIdGeneral", "-1"); // значение по умолчанию
+        }
+
+
+
 
 
 
@@ -3194,6 +3211,8 @@ public class mainForm extends JFrame {
             });
         }
     }
+
+
 
 
     public static void main(String[] args) {

@@ -106,6 +106,7 @@ public class PurchasesParserHead implements Parser {
         params.put("ca", "on");
         params.put("pc", "on");
         params.put("pa", "on");
+//        params.put("currencyIdGeneral", "-1");
         params.put("publishDateFrom", "dd.MM.yyyy"); // Дата от
         params.put("publishDateTo", "dd.MM.yyyy");
 
