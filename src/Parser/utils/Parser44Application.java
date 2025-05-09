@@ -20,7 +20,10 @@ public class Parser44Application {
         List<String> selectedUrls = new ArrayList<>(Arrays.asList(
                 "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000031",
                 "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
-                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000032"
+                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000032",
+                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0172200002523000160",
+                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0122300017023000012"
+
         ));
 
 //        try {
@@ -34,18 +37,18 @@ public class Parser44Application {
 //            System.err.println("Database connection failed: " + e.getMessage());
 //            System.exit(1);
 //        }
-        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
+//        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
         String userAgent = RandomUserAgent.getRandomUserAgent();
         DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
         PurchaseParser44 parser = new PurchaseParser44(chromeSetup);
-        parser.parseSupplierStatuses();
-//        parser.parseUrlsParallel(
-//                new ArrayList<>(selectedUrls),
-//                result -> handleParseResult(result),
-//                3,null
-//        );
 
-//        parser.parseSupplierLitigations();
+        parser.parseUrlsParallel(
+                new ArrayList<>(selectedUrls),
+                result -> handleParseResult(result),
+                3,null
+        );
+        parser.parseSupplierStatuses();
+        parser.parseSupplierLitigations();
 
 
 

@@ -97,7 +97,7 @@ public class Contract {
     @Column(name = "municipality_code", columnDefinition = "TEXT")
     private String municipalityCode;
 
-    @Column(name = "is_self_funded", nullable = false, columnDefinition = "TEXT")
+    @Column(name = "is_self_funded",  columnDefinition = "TEXT")
     private String isSelfFunded;
 
     @Column(name = "banking_support_info", columnDefinition = "TEXT")

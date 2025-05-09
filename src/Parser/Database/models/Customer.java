@@ -18,7 +18,7 @@ public class Customer {
     @Column(name = "full_name", columnDefinition = "TEXT",unique = true)
     private String fullName;
 
-    @Column(name = "short_name")
+    @Column(name = "short_name", columnDefinition = "TEXT")
     private String shortName;
 
     @Column(name = "consolidated_register_code")
@@ -30,37 +30,37 @@ public class Customer {
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated;
 
-    @Column(name = "inn")
+    @Column(name = "inn", columnDefinition = "TEXT")
     private String inn;
 
-    @Column(name = "kpp")
+    @Column(name = "kpp", columnDefinition = "TEXT")
     private String kpp;
 
-    @Column(name = "ogrn")
+    @Column(name = "ogrn", columnDefinition = "TEXT")
     private String ogrn;
 
-    @Column(name = "oktmo")
+    @Column(name = "oktmo", columnDefinition = "TEXT")
     private String oktmo;
 
-    @Column(name = "location")
+    @Column(name = "location", columnDefinition = "TEXT")
     private String location;
 
-    @Column(name = "iku")
+    @Column(name = "iku", columnDefinition = "TEXT")
     private String iku;
 
-    @Column(name = "iku_assignment_date")
+    @Column(name = "iku_assignment_date", columnDefinition = "TEXT")
     private LocalDate ikuAssignmentDate;
 
-    @Column(name = "okfs_code")
+    @Column(name = "okfs_code", columnDefinition = "TEXT")
     private String okfsCode;
 
-    @Column(name = "ownership_form_name")
+    @Column(name = "ownership_form_name", columnDefinition = "TEXT")
     private String ownershipFormName;
 
-    @Column(name = "okopf_code")
+    @Column(name = "okopf_code", columnDefinition = "TEXT")
     private String okopfCode;
 
-    @Column(name = "legal_form_name")
+    @Column(name = "legal_form_name", columnDefinition = "TEXT")
     private String legalFormName;
 
     @Column(name = "organization_authorities", columnDefinition = "TEXT")
@@ -72,19 +72,19 @@ public class Customer {
     @Column(name = "tax_registration_date")
     private LocalDate taxRegistrationDate;
 
-    @Column(name = "organization_type")
+    @Column(name = "organization_type", columnDefinition = "TEXT")
     private String organizationType;
 
-    @Column(name = "organization_level")
+    @Column(name = "organization_level", columnDefinition = "TEXT")
     private String organizationLevel;
 
     @Column(name = "okved", columnDefinition = "TEXT")
     private String okved;
 
-    @Column(name = "consolidated_register_code_alt")
+    @Column(name = "consolidated_register_code_alt", columnDefinition = "TEXT")
     private String consolidatedRegisterCodeAlt;
 
-    @Column(name = "authorized_organization_name")
+    @Column(name = "authorized_organization_name", columnDefinition = "TEXT")
     private String authorizedOrganizationName;
 
     @Column(name = "phone")
@@ -93,16 +93,16 @@ public class Customer {
     @Column(name = "fax")
     private String fax;
 
-    @Column(name = "postal_address")
+    @Column(name = "postal_address", columnDefinition = "TEXT")
     private String postalAddress;
 
-    @Column(name = "email")
+    @Column(name = "email", columnDefinition = "TEXT")
     private String email;
 
-    @Column(name = "website")
+    @Column(name = "website", columnDefinition = "TEXT")
     private String website;
 
-    @Column(name = "contact_person")
+    @Column(name = "contact_person", columnDefinition = "TEXT")
     private String contactPerson;
 
     @Column(name = "time_zone")
