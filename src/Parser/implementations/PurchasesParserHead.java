@@ -52,6 +52,11 @@ public class PurchasesParserHead implements Parser {
     }
 
     @Override
+    public void cleanupDownloadDirectory() {
+
+    }
+
+    @Override
     public void stopParser() {
         isStopped = true;
     }

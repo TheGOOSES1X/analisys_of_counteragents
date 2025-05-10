@@ -14,7 +14,7 @@ public class DatabaseService {
         }
     }
 
-    public void saveToDatabase(PurchaseParser44.ParseResult result) {
+    public synchronized void saveToDatabase(PurchaseParser44.ParseResult result) {
         if (result.purchaseData == null) return;
 
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
@@ -94,7 +94,7 @@ public class DatabaseService {
         }
     }
 
-    private void updatePurchase(Purchase existing, Purchase newData) {
+    private synchronized void updatePurchase(Purchase existing, Purchase newData) {
         existing.setLaw(newData.getLaw());
         existing.setInitialMaxPrice(newData.getInitialMaxPrice());
         existing.setCurrency(newData.getCurrency());
@@ -111,7 +111,7 @@ public class DatabaseService {
 
     }
 
-    private void updateCustomer(Customer existing, Customer newData) {
+    private synchronized void updateCustomer(Customer existing, Customer newData) {
         existing.setShortName(newData.getShortName());
         existing.setConsolidatedRegisterCode(newData.getConsolidatedRegisterCode());
         existing.setRegistrationDate(newData.getRegistrationDate());
@@ -145,7 +145,7 @@ public class DatabaseService {
 
     }
 
-    private void updateSupplier(Supplier existing, Supplier newData) {
+    private synchronized void updateSupplier(Supplier existing, Supplier newData) {
         existing.setType(newData.getType());
         existing.setCountryName(newData.getCountryName());
         existing.setCountryCode(newData.getCountryCode());
@@ -161,7 +161,7 @@ public class DatabaseService {
 
     }
 
-    private void updateProcurementObjects(Session session, Purchase purchase) {
+    private synchronized void updateProcurementObjects(Session session, Purchase purchase) {
         // Получаем существующие объекты закупки из БД
         List<ProcurementObject> existingObjects = session.createQuery(
                         "FROM ProcurementObject WHERE purchase.id = :purchaseId", ProcurementObject.class)
@@ -221,8 +221,55 @@ public class DatabaseService {
             throw new RuntimeException("Failed to fetch supplier INNs", e);
         }
     }
+    public synchronized void saveSuppliers(List<Supplier> suppliers) {
+        if (suppliers == null || suppliers.isEmpty()) return;
 
-    public void saveSupplierReliability(List<SupplierReliability> reliabilities) {
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+            try {
+                int batchSize = 50;
+                for (int i = 0; i < suppliers.size(); i++) {
+                    Supplier supplier = suppliers.get(i);
+
+                    // Ищем существующего поставщика по ИНН (если он есть)
+                    Supplier existingSupplier = null;
+                    if (supplier.getInn() != null && !supplier.getInn().isEmpty()) {
+                        existingSupplier = session.byNaturalId(Supplier.class)
+                                .using("inn", supplier.getInn())
+                                .load();
+                    }
+
+                    // Если не нашли по ИНН, пробуем найти по имени
+                    if (existingSupplier == null && supplier.getName() != null) {
+                        existingSupplier = session.createQuery(
+                                        "FROM Supplier WHERE name = :name", Supplier.class)
+                                .setParameter("name", supplier.getName())
+                                .uniqueResult();
+                    }
+
+                    if (existingSupplier != null) {
+                        updateSupplier(existingSupplier, supplier);
+                        session.merge(existingSupplier);
+                    } else {
+                        session.persist(supplier);
+                    }
+
+                    if (i % batchSize == 0 && i > 0) {
+                        session.flush();
+                        session.clear();
+                    }
+                }
+
+                transaction.commit();
+            } catch (Exception e) {
+                if (transaction != null) {
+                    transaction.rollback();
+                }
+                throw new RuntimeException("Failed to save suppliers", e);
+            }
+        }
+    }
+    public synchronized  void saveSupplierReliability(List<SupplierReliability> reliabilities) {
         if (reliabilities == null || reliabilities.isEmpty()) return;
 
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
@@ -264,7 +311,7 @@ public class DatabaseService {
         }
     }
 
-    private void updateSupplierReliability(SupplierReliability existing, SupplierReliability newData) {
+    private synchronized void updateSupplierReliability(SupplierReliability existing, SupplierReliability newData) {
         existing.setName(newData.getName());
         existing.setInn(newData.getInn());
         existing.setAuthority(newData.getAuthority());
@@ -281,7 +328,7 @@ public class DatabaseService {
         existing.setUpdateDate(newData.getUpdateDate());
         existing.setPlannedExclusionDate(newData.getPlannedExclusionDate());
     }
-    public void saveJudicialProceedings(List<JudicialProceeding> proceedings, String supplierInn) {
+    public synchronized void saveJudicialProceedings(List<JudicialProceeding> proceedings, String supplierInn) {
         if (proceedings == null || proceedings.isEmpty()) return;
 
         try (Session session = HibernateUtil.getSessionFactory().openSession()) {
@@ -329,7 +376,7 @@ public class DatabaseService {
         }
     }
 
-    private void updateJudicialProceeding(JudicialProceeding existing, JudicialProceeding newData) {
+    private synchronized void updateJudicialProceeding(JudicialProceeding existing, JudicialProceeding newData) {
         existing.setCaseNumber(newData.getCaseNumber());
         existing.setJudge(newData.getJudge());
         existing.setCurrentInstance(newData.getCurrentInstance());

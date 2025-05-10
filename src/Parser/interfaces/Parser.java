@@ -23,7 +23,7 @@ public interface Parser {
 
     void parseSupplierStatuses();
 
-
+    void cleanupDownloadDirectory();
 
 
     class ParseResult {

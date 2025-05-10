@@ -288,7 +288,7 @@ public class ContractModelFiller {
     public void fillSupplierModelFromCommonInfo(Supplier supplier, Map<String, Object> contractData) {
         try {
             // Получаем блок с основной информацией
-            Map<String, String> commonInfo = (Map<String, String>) contractData.get("Информация о заказчике");
+            Map<String, String> commonInfo = (Map<String, String>) contractData.get("Информация о поставщике");
             if (commonInfo == null) {
                 System.out.println("Не найден блок 'Информация о контракте'");
                 return;

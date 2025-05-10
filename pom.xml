@@ -15,6 +15,13 @@
     </properties>
 
     <dependencies>
+
+        <!-- Для работы с DOCX (Word) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.3</version> <!-- Актуальная версия (можно проверить на Maven Central) -->
+        </dependency>
         <dependency>
             <groupId>org.reflections</groupId>
             <artifactId>reflections</artifactId>

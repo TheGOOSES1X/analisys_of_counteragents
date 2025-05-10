@@ -54,7 +54,8 @@ public class ContractPageParser {
                 if (contractDraftUrl.contains("contract-draft.html")) {
                     modelFiller.fillContractModel(contract, contractDetails);
                     modelFiller.fillSupplierModel(supplier, contractDetails);
-                } else if (contractDraftUrl.contains("common-info.html")) {
+                }
+                if (contractDraftUrl.contains("common-info.html")) {
                     modelFiller.fillContractModelFromCommonInfo(contract, contractDetails);
                     modelFiller.fillSupplierModelFromCommonInfo(supplier, contractDetails);
                 }

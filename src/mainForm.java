@@ -2920,6 +2920,7 @@ public class mainForm extends JFrame {
 
                 currentParser.parseSupplierLitigations();
                 currentParser.parseSupplierStatuses();
+                currentParser.cleanupDownloadDirectory();
 
             } finally {
                 SwingUtilities.invokeLater(() -> {
@@ -3078,16 +3079,8 @@ public class mainForm extends JFrame {
             params.put("currencyIdGeneral", "-1"); // значение по умолчанию
         }
 
-
-
-
-
-
         return params;
     }
-
-
-
 
     private void onQueryButtonClicked() {
         Map<String, String> params = buildFinalParams();

@@ -2,10 +2,14 @@ package Parser.implementations.Parser44;
 
 import Parser.Database.hooks.HibernateUtil;
 import Parser.Database.models.*;
+import Parser.implementations.Parser223.DocumentParser;
 import Parser.interfaces.*;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -13,6 +17,7 @@ import java.util.function.Consumer;
 
 public class PurchaseParser44 implements Parser {
     private final DriverSetup driverSetup;
+    private final DocumentParser documentParser;
     private ExecutorService executor;
     private volatile boolean isStopped;
     private volatile boolean isPaused;
@@ -32,6 +37,7 @@ public class PurchaseParser44 implements Parser {
         this.databaseService = new DatabaseService();
         this.litigationParser = new LitigationParser(driverSetup.setupDriver());
         this.supplierStatusParser = new SupplierStatusParser(driverSetup.setupDriver());
+        this.documentParser = new DocumentParser();
     }
 
     @Override
@@ -119,6 +125,13 @@ public class PurchaseParser44 implements Parser {
 
     private ParseResult parsePurchaseUrl(String url, WebDriver driver, WebDriverWait wait) {
         try {
+            // Если URL содержит "notice223", обрабатываем только через documentParser
+            if (url.contains("notice223")) {
+                documentParser.parseDocumentInfo(url, driver, wait);
+                return new ParseResult(url, null, null); // Возвращаем пустой результат, так как данные о закупке не парсятся
+            }
+
+            // Если URL не содержит "notice223", обрабатываем стандартными методами
             Purchase purchase = purchasePageParser.parsePurchasePage(url, driver, wait);
             Customer customer = customerPageParser.parseCustomerInfo(driver);
             Contract contract = contractPageParser.parseContractInfo(url, driver, wait);
@@ -242,6 +255,31 @@ public class PurchaseParser44 implements Parser {
             } catch (Exception e) {
                 System.err.println("Ошибка при парсинге статусов для ИНН " + supplierInns.get(i) + ": " + e.getMessage());
                 e.printStackTrace();
+            }
+        }
+    }
+    @Override
+    public void cleanupDownloadDirectory() {
+        Path downloadDir = Paths.get("downloads");
+
+        if (Files.exists(downloadDir)) {
+            try {
+                Files.walkFileTree(downloadDir, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                        Files.delete(file);
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                        // Не удаляем саму папку downloads, только файлы внутри
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
+                System.out.println("Download directory cleaned up successfully");
+            } catch (IOException e) {
+                System.err.println("Failed to clean up download directory: " + e.getMessage());
             }
         }
     }
