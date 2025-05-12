@@ -1,5 +1,7 @@
 import javax.swing.*;
 import java.awt.event.*;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import javax.swing.table.*;
 import java.text.SimpleDateFormat;
