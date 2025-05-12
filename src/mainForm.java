@@ -1,7 +1,6 @@
 import javax.swing.*;
 import java.awt.event.*;
 import java.util.*;
-import javax.swing.plaf.basic.BasicTabbedPaneUI;
 import javax.swing.table.DefaultTableModel;
 import java.text.SimpleDateFormat;
 import javax.swing.JTable;
@@ -150,6 +149,8 @@ public class mainForm extends JFrame {
     private JComboBox comboBoxCellCellSelectionIdss;
     private JButton CritDataMassEditButton;
     private JTextField CritDataMassEdit;
+    private JTextField textFieldFilterOkpd2;
+    private JTextField textFieldFilterGroup;
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -351,7 +352,7 @@ public class mainForm extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 // установить соединение с БД модуля и отобразить поставщиков с учетом фильтров
 
-                List<rowContrasGoodsOrders> rowsCGO = dbExtractor.getCGOs(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                List<rowContrasGoodsOrders> rowsCGO = dbExtractor.getCGOs(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText(), textFieldFilterGroup.getText());
 
                 tableContrasGoodsOrders.setModel(modelCGO);
 
@@ -627,7 +628,7 @@ public class mainForm extends JFrame {
                         tableCrit.setModel(modelCritCGValuesNoEdit);
 
 
-                        rowsCGO = dbExtractor.getCGOs(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                        rowsCGO = dbExtractor.getCGOs(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText(), textFieldFilterGroup.getText());
 
 
                         updateTableCritGCViewValues(rowsCGO,CritId);

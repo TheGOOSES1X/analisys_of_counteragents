@@ -535,7 +535,7 @@ public class DatabaseManager {
             var12.printStackTrace();
         }
 
-        query = "CREATE TABLE IF NOT EXISTS public.bs_goods (id bigint NOT NULL, sname character varying(512), npreparedays int, sarticle character varying(512), nwidth numeric(38,18), nheight numeric(38,18), nlength numeric(38,18), ndiameter numeric(38,18), nthickness numeric(38,18), goodmsritem character varying(254))";
+        query = "CREATE TABLE IF NOT EXISTS public.bs_goods (id bigint NOT NULL, sname character varying(512), npreparedays int, sarticle character varying(512), nwidth numeric(38,18), nheight numeric(38,18), nlength numeric(38,18), ndiameter numeric(38,18), nthickness numeric(38,18), goodmsritem character varying(254), okpd2 character varying(254))";
 
         try {
             this.executeQueryNoResult(db_module, query);
@@ -1185,7 +1185,9 @@ public class DatabaseManager {
     }
 
 
-    public List<rowContrasGoodsOrders> getCGOs(boolean db_module, String filterContrasName, String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume) {
+    public List<rowContrasGoodsOrders> getCGOs(boolean db_module, String filterContrasName, String filterGoodName,
+                                               String filterOrderName, String filterCGDateSupply, String filterCGMinVolume,
+                                               String okpd2, String group) {
         List<rowContrasGoodsOrders> filteredCGO = new ArrayList<>();
         String query = "SELECT DISTINCT ON (bs_order.id, bs_contras.id, bs_goods.id) " +
                 "bs_order.id as o_id, bs_order.scaption as o_name, " +
@@ -1235,6 +1237,10 @@ public class DatabaseManager {
             conditions.add("prs_lot.nqty = ?");
             params.add(Double.parseDouble(filterCGMinVolume));
         }
+        if (!okpd2.isEmpty()) {
+            conditions.add("bs_goods.okpd2 = ?");  // фильтр по полю okpd2 в таблице bs_goods
+            params.add(okpd2);
+        }
 
         if (!conditions.isEmpty()) {
             query += "WHERE " + String.join(" AND ", conditions);
@@ -1269,7 +1275,8 @@ public class DatabaseManager {
                     double c_rep = resultSet.getDouble("c_rep");
                     String g_msr = resultSet.getString("g_msr");
 
-                    filteredCGO.add(new rowContrasGoodsOrders(c_id, c_name, c_code, g_id, g_name, g_code, o_id, o_name, deliveryTime, minQuantity, g_quality, c_rep, g_msr));
+                    filteredCGO.add(new rowContrasGoodsOrders(c_id, c_name, c_code, g_id, g_name, g_code,
+                            o_id, o_name, deliveryTime, minQuantity, g_quality, c_rep, g_msr));
                 }
             }
         } catch (SQLException e) {
