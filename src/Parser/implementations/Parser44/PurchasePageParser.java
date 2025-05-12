@@ -1,6 +1,7 @@
 package Parser.implementations.Parser44;
 
 import Parser.Database.models.*;
+import Parser.implementations.Parser44.Contracts.ComplaintsURLGetter;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -15,7 +16,7 @@ public class PurchasePageParser {
 
     public Purchase parsePurchasePage(String url, WebDriver driver, WebDriverWait wait) {
         try {
-
+            ComplaintsURLGetter complaintsCounter  = new ComplaintsURLGetter();
             Purchase purchase = new Purchase();
 
             parseCardMainInfo(driver, wait, purchase);
@@ -70,6 +71,9 @@ public class PurchasePageParser {
             if (dateData.containsKey("Обновлено")) {
                 purchase.setUpdateDate(parseDate(dateData.get("Обновлено")));
             }
+
+            int complaintsCount = complaintsCounter.countComplaintsByRegNumber(url, driver, wait);
+            purchase.setComplaints(complaintsCount);
 
 
             return purchase;

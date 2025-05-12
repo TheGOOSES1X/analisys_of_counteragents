@@ -50,7 +50,7 @@ public class Supplier {
     @Column(name = "phone")
     private String phone;
 
-    @OneToMany(mappedBy = "supplier")
+    @OneToMany(mappedBy = "supplier", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Contract> contracts = new ArrayList<>();
 
 

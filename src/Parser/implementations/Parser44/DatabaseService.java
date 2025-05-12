@@ -59,18 +59,10 @@ public class DatabaseService {
 
                     if (contract.getSupplier() != null) {
                         Supplier supplier = contract.getSupplier();
-                        Supplier existingSupplier = session.byNaturalId(Supplier.class)
-                                .using("name", supplier.getName())
-                                .load();
-
-                        if (existingSupplier != null) {
-                            updateSupplier(existingSupplier, supplier);
-                            contract.setSupplier(existingSupplier);
-                        } else {
-                            session.persist(supplier);
-                            session.flush();
-                        }
+                        Supplier savedSupplier = saveOrUpdateSupplier(session, supplier);
+                        contract.setSupplier(savedSupplier);
                     }
+
 
                     if (contract.getId() != null) {
                         session.merge(contract);
@@ -107,6 +99,7 @@ public class DatabaseService {
         existing.setApplicationEndDate(newData.getApplicationEndDate());
         existing.setAuctionDate(newData.getAuctionDate());
         existing.setProcurementStage(newData.getProcurementStage());
+        existing.setComplaints(newData.getComplaints());
 
 
     }
@@ -230,36 +223,13 @@ public class DatabaseService {
                 int batchSize = 50;
                 for (int i = 0; i < suppliers.size(); i++) {
                     Supplier supplier = suppliers.get(i);
-
-                    // Ищем существующего поставщика по ИНН (если он есть)
-                    Supplier existingSupplier = null;
-                    if (supplier.getInn() != null && !supplier.getInn().isEmpty()) {
-                        existingSupplier = session.byNaturalId(Supplier.class)
-                                .using("inn", supplier.getInn())
-                                .load();
-                    }
-
-                    // Если не нашли по ИНН, пробуем найти по имени
-                    if (existingSupplier == null && supplier.getName() != null) {
-                        existingSupplier = session.createQuery(
-                                        "FROM Supplier WHERE name = :name", Supplier.class)
-                                .setParameter("name", supplier.getName())
-                                .uniqueResult();
-                    }
-
-                    if (existingSupplier != null) {
-                        updateSupplier(existingSupplier, supplier);
-                        session.merge(existingSupplier);
-                    } else {
-                        session.persist(supplier);
-                    }
+                    saveOrUpdateSupplier(session, supplier);
 
                     if (i % batchSize == 0 && i > 0) {
                         session.flush();
                         session.clear();
                     }
                 }
-
                 transaction.commit();
             } catch (Exception e) {
                 if (transaction != null) {
@@ -267,6 +237,34 @@ public class DatabaseService {
                 }
                 throw new RuntimeException("Failed to save suppliers", e);
             }
+        }
+    }
+
+    private synchronized Supplier saveOrUpdateSupplier(Session session, Supplier supplier) {
+        Supplier existingSupplier = null;
+
+        // Поиск по ИНН, если он есть
+        if (supplier.getInn() != null && !supplier.getInn().isEmpty()) {
+            existingSupplier = session.byNaturalId(Supplier.class)
+                    .using("inn", supplier.getInn())
+                    .load();
+        }
+
+        // Если не найден по ИНН, ищем по имени
+        if (existingSupplier == null && supplier.getName() != null) {
+            existingSupplier = session.createQuery(
+                            "FROM Supplier WHERE name = :name", Supplier.class)
+                    .setParameter("name", supplier.getName())
+                    .uniqueResult();
+        }
+
+        if (existingSupplier != null) {
+            updateSupplier(existingSupplier, supplier);
+            session.merge(existingSupplier);
+            return existingSupplier;
+        } else {
+            session.persist(supplier);
+            return supplier;
         }
     }
     public synchronized  void saveSupplierReliability(List<SupplierReliability> reliabilities) {

@@ -59,7 +59,7 @@ public class Purchase {
     private LocalDate auctionDate;
 
     @Column(name = "complaints")
-    private String complaints;
+    private Integer complaints;
 
     @Column(name = "procurement_stage", columnDefinition = "text")
     private String procurementStage;
@@ -189,15 +189,15 @@ public class Purchase {
         return procurementStage;
     }
 
-    public String getComplaints() {
+    public Integer getComplaints() {
         return complaints;
     }
 
     public void setProcurementStage(String procurementStage) {
         this.procurementStage = procurementStage;
     }
-    public void setComplaints(String Complaints) {
-        this.complaints = complaints;
+    public void setComplaints(Integer Complaints) {
+        this.complaints = Complaints;
     }
     public Contract getContract() {
         return contract;
