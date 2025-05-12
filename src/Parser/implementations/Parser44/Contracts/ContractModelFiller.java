@@ -60,16 +60,30 @@ public class ContractModelFiller {
             Map<String, Object> conditionsData = (Map<String, Object>) contractData.get("4. Условия контракта");
             if (conditionsData != null) {
                 // 4.1. Сроки исполнения контракта
-                Map<String, String> executionTerms = (Map<String, String>) conditionsData.get("4.1. Сроки исполнения контракта");
-                if (executionTerms != null) {
-                    String startDateKey = findPartialKey(executionTerms, "Дата начала");
-                    String endDateKey = findPartialKey(executionTerms, "Дата окончания");
+
+                Map<String, String> generalData = (Map<String, String>) contractData.get("Общие данные");
+                if (generalData != null) {
+                    // Преобразуем в Map<String, String> для удобства поиска
+                    String startDateKey = findPartialKey(generalData, "Дата заключения");
+                   String endDateKey = findPartialKey(generalData, "Дата окончания");
 
                     contract.setStartDate(startDateKey != null ?
-                            parseDate(executionTerms.get(startDateKey)) : null);
+                            parseDate(generalData.get(startDateKey)) : null);
                     contract.setEndDate(endDateKey != null ?
-                            parseDate(executionTerms.get(endDateKey)) : null);
+                            parseDate(generalData.get(endDateKey)) : null);
+
+
                 }
+//                Map<String, String> executionTerms = (Map<String, String>) conditionsData.get("4.1. Сроки исполнения контракта");
+//                if (executionTerms != null) {
+//                    String startDateKey = findPartialKey(executionTerms, "Дата начала");
+//                    String endDateKey = findPartialKey(executionTerms, "Дата окончания");
+//
+//                    contract.setStartDate(startDateKey != null ?
+//                            parseDate(executionTerms.get(startDateKey)) : null);
+//                    contract.setEndDate(endDateKey != null ?
+//                            parseDate(executionTerms.get(endDateKey)) : null);
+//                }
                 // 4.2. Этапы исполнения контракта
                 String executionStagesKey = findPartialKey(conditionsData, "Этапы исполнения");
                 if (executionStagesKey != null) {
@@ -272,6 +286,22 @@ public class ContractModelFiller {
             // Дата заключения контракта (используем как дату окончания)
             String contractDateStr = commonInfo.get("Дата заключения контракта");
             contract.setEndDate(ParserUtils.parseDate(contractDateStr));
+
+
+
+            Map<String, String> generalData = (Map<String, String>) contractData.get("Общие данные");
+            if (generalData != null) {
+                // Преобразуем в Map<String, String> для удобства поиска
+                String startDateKey = findPartialKey(generalData, "Дата заключения");
+                String endDateKey = findPartialKey(generalData, "Дата окончания");
+
+                contract.setStartDate(startDateKey != null ?
+                        parseDate(generalData.get(startDateKey)) : null);
+                contract.setEndDate(endDateKey != null ?
+                        parseDate(generalData.get(endDateKey)) : null);
+
+
+            }
 
 //            System.out.println("=== Результаты заполнения ===");
 //            System.out.println("Предмет: " + contract.getSubject());

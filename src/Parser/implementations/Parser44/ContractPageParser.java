@@ -28,8 +28,9 @@ public class ContractPageParser {
     public Contract parseContractInfo(String originalUrl, WebDriver driver, WebDriverWait wait) {
         try {
             String contractDraftUrl = urlExtractor.findContractDraftUrl(originalUrl, driver, wait);
+            String contractInfoUrl = urlExtractor.findContractUrlByRegNumber(originalUrl, driver, wait);
             if (contractDraftUrl == null) {
-                System.out.println("Не удалось найти URL черновика контракта");
+                System.out.println("Не удалось найти URL контракта");
                 return null;
             }
 
@@ -37,15 +38,20 @@ public class ContractPageParser {
             Set<Cookie> cookies = driver.manage().getCookies();
 
             try {
-                Map<String, Object> contractDetails;
+                Map<String, Object> contractDetails = new LinkedHashMap<>();
+                Map<String, Object> generalData = dataExtractor.parseAndPrintGeneralContractData(contractInfoUrl, driver, wait);
+                contractDetails.putAll(generalData);
 
-                if (contractDraftUrl.contains("contract-draft.html")) {
-                    contractDetails = dataExtractor.parseContractDraft(contractDraftUrl, driver, wait);
-                } else if (contractDraftUrl.contains("common-info.html")) {
-                    contractDetails = dataExtractor.parseCommonInfoContract(contractDraftUrl, driver, wait);
-                } else {
-                    System.out.println("Неизвестный тип страницы контракта: " + contractDraftUrl);
-                    return null;
+                if (contractDraftUrl != null) {
+                    if (contractDraftUrl.contains("contract-draft.html")) {
+                        Map<String, Object> draftData = dataExtractor.parseContractDraft(contractDraftUrl, driver, wait);
+                        contractDetails.putAll(draftData);
+                    } else if (contractDraftUrl.contains("common-info.html")) {
+                        Map<String, Object> commonInfoData = dataExtractor.parseCommonInfoContract(contractDraftUrl, driver, wait);
+                        contractDetails.putAll(commonInfoData);
+                    } else {
+                        System.out.println("Неизвестный тип страницы контракта: " + contractDraftUrl);
+                    }
                 }
 
                 Contract contract = new Contract();

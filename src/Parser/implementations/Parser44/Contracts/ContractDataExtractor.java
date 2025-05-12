@@ -157,6 +157,78 @@ public class ContractDataExtractor {
         return contractData;
     }
 
+
+    public Map<String, Object> parseAndPrintGeneralContractData(String contractDraftUrl,WebDriver driver, WebDriverWait wait) {
+        Map<String, Object> contractData = new LinkedHashMap<>();
+
+        try {
+            driver.get(contractDraftUrl);
+
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("div.container")));
+
+            // Получаем все блоки с информацией
+            List<WebElement> infoBlocks = driver.findElements(By.cssSelector("div.blockInfo"));
+
+            for (WebElement block : infoBlocks) {
+                // Извлекаем заголовок блока
+                String blockTitle = getElementTextSafely(block, "h2.blockInfo__title, h2.blockInfo__title_sub");
+
+                // Парсим все секции в блоке
+                List<WebElement> sections = block.findElements(By.cssSelector("section.blockInfo__section"));
+                Map<String, String> sectionData = new LinkedHashMap<>();
+
+                for (WebElement section : sections) {
+                    String title = getElementTextSafely(section, "span.section__title");
+                    String value = getElementTextSafely(section, "span.section__info")
+                            .replace("&nbsp;", " ") // Заменяем HTML-пробелы
+                            .trim();
+
+                    if (!title.isEmpty() && !value.isEmpty()) {
+                        sectionData.put(title, value);
+                    } else if (title.isEmpty() && !value.isEmpty()) {
+                        // Для секций без заголовка (как в блоке национального режима)
+                        sectionData.put("Информация", value);
+                    }
+                }
+
+                // Обработка таблиц внутри блоков
+                try {
+                    WebElement table = block.findElement(By.cssSelector("table.blockInfo__table"));
+                    Map<String, String> tableData = parseSimpleTable(table);
+                    sectionData.putAll(tableData);
+                } catch (NoSuchElementException e) {
+                    // Таблица не найдена - это нормально
+                }
+
+                // Добавляем данные блока в общий результат
+                if (!sectionData.isEmpty()) {
+                    if (blockTitle != null && !blockTitle.isEmpty()) {
+                        contractData.put(blockTitle, sectionData);
+                    } else {
+                        contractData.putAll(sectionData);
+                    }
+                }
+            }
+
+            // Вывод результата в консоль
+            System.out.println("=== Результат парсинга общих данных контракта ===");
+            for (Map.Entry<String, Object> entry : contractData.entrySet()) {
+                System.out.println("\n" + entry.getKey() + ":");
+                if (entry.getValue() instanceof Map) {
+                    Map<?, ?> subMap = (Map<?, ?>) entry.getValue();
+                    subMap.forEach((k, v) -> System.out.println("  " + k + ": " + v));
+                } else {
+                    System.out.println("  " + entry.getValue());
+                }
+            }
+
+        } catch (Exception e) {
+            System.out.println("Ошибка при парсинге общих данных контракта: " + e.getMessage());
+        }
+
+        return contractData;
+    }
+
     // Вспомогательный метод для безопасного получения текста элемента
     private String getElementTextSafely(WebElement parent, String cssSelector) {
         try {

@@ -12,6 +12,7 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 public class PurchasePageParser {
+
     public Purchase parsePurchasePage(String url, WebDriver driver, WebDriverWait wait) {
         try {
 
@@ -69,6 +70,7 @@ public class PurchasePageParser {
             if (dateData.containsKey("Обновлено")) {
                 purchase.setUpdateDate(parseDate(dateData.get("Обновлено")));
             }
+
 
             return purchase;
 
