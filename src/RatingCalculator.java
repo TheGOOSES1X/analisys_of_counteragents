@@ -24,11 +24,11 @@ public class RatingCalculator {
      */
     public List<rowContrasGoodsOrdersWithWeights> calculateRatings(
             String contrasFilter, String goodFilter, String orderFilter,
-            String dateFilter, String minVolumeFilter) {
+            String dateFilter, String minVolumeFilter, String okpd2, String group) {
 
         // Получаем строки, соответствующие фильтрам
         List<rowContrasGoodsOrdersWithWeights> rowsCGOws = dbExtractor.getCGOwesAsUserCrit(
-                false, contrasFilter, goodFilter, orderFilter, dateFilter, minVolumeFilter);
+                false, contrasFilter, goodFilter, orderFilter, dateFilter, minVolumeFilter, okpd2);
 
         double[] sumWeight = new double[] {0.0}; // Сумма всех весов критериев (через массив для передачи по ссылке)
 

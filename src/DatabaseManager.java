@@ -3,13 +3,7 @@
 // (powered by FernFlower decompiler)
 //
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Timestamp;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
@@ -127,6 +121,16 @@ public class DatabaseManager {
                 statement.setString(2, rowC.getContrasName());
                 statement.setDouble(3, rowC.getContrasReputation());
                 statement.setString(4, rowC.getContrasCode());
+                // Обработка 5-го параметра (sinn) с проверкой на NULL
+                String inn = rowC.getInn();
+                if (inn != null && !inn.isEmpty()) {
+                    statement.setString(5, inn);
+                } else {
+                    statement.setNull(5, Types.VARCHAR); // Явное указание NULL
+                }
+
+                // 6-й параметр (nfromglobalstatus)
+                statement.setInt(6, rowC.getGlobalStatus());
                 statement.addBatch();
             }
 
@@ -527,7 +531,7 @@ public class DatabaseManager {
     }
 
     public void setTables(boolean db_module) {
-        String query = "CREATE TABLE IF NOT EXISTS public.bs_contras (id bigint NOT NULL, scaption character varying(254), ncontrasreliability numeric(38,18), scode character varying(254))";
+        String query = "CREATE TABLE IF NOT EXISTS public.bs_contras (id bigint NOT NULL, scaption character varying(254), ncontrasreliability numeric(38,18), scode character varying(254), sinn character varying(254), nfromglobalstatus numeric(38,18))";
 
         try {
             this.executeQueryNoResult(db_module, query);
@@ -603,7 +607,7 @@ public class DatabaseManager {
 
     public void updateTables(boolean db_main, boolean db_module) {
         List<rowContras> rowCs = new ArrayList();
-        String query = "SELECT DISTINCT bc.id as id_c, bc.scaption as name_c, bc.scode as code_c, bsr.bforbiddencontraspurchase as fb_pch, bsr.bforbiddencooperation as fb_coop FROM public.bs_contras bc ";
+        String query = "SELECT DISTINCT bc.id as id_c, bc.scaption as name_c, bc.scode as code_c, bc.sinn as inn_c, bsr.bforbiddencontraspurchase as fb_pch, bsr.bforbiddencooperation as fb_coop FROM public.bs_contras bc ";
         query = query + "LEFT JOIN Bs_ContrasReliability bsr ON bc.idContrasReliability = bsr.id ";
 
         String g_Name;
@@ -618,7 +622,9 @@ public class DatabaseManager {
                     boolean fb_pch = resultSet.getBoolean("fb_pch");
                     boolean fb_coop = resultSet.getBoolean("fb_coop");
                     double c_rep = !fb_pch && !fb_coop ? 1.0 : 0.0;
-                    rowCs.add(new rowContras(c_id, c_Name, c_rep, g_Name));
+                    String c_inn = resultSet.getString("inn_c");
+                    int globalStatus = 1;
+                    rowCs.add(new rowContras(c_id, c_Name, c_rep, g_Name, c_inn, globalStatus));
                 }
             } catch (Throwable var70) {
                 if (resultSet != null) {
@@ -647,7 +653,7 @@ public class DatabaseManager {
             var52.printStackTrace();
         }
 
-        query = "INSERT INTO public.bs_contras (id, scaption, ncontrasreliability, scode) VALUES (?,?,?,?)";
+        query = "INSERT INTO public.bs_contras (id, scaption, ncontrasreliability, scode, sinn, nfromglobalstatus) VALUES (?,?,?,?,?,?)";
 
         try {
             this.executeQueryBatchContras(db_module, query, rowCs);
@@ -1142,13 +1148,15 @@ public class DatabaseManager {
                 "SELECT bs_contras.id as c_id, " +
                         "bs_contras.scaption as c_name, " +
                         "bs_contras.ncontrasreliability as c_rep, " +
-                        "bs_contras.scode as c_code " +
+                        "bs_contras.scode as c_code, " +
+                        "bs_contras.sinn as c_inn, " +
+                        "bs_contras.nfromglobalstatus as c_global_status " +
                         "FROM bs_contras"
         );
 
         List<Object> params = new ArrayList<>();
 
-        // Добавляем фильтр, если строка не пустая
+        // Фильтр по названию контрагента (оставляем без изменений)
         if (filterContrasName != null && !filterContrasName.trim().isEmpty()) {
             query.append(" WHERE (")
                     .append(" REPLACE(LOWER(bs_contras.scaption), ' ', '') ILIKE REPLACE(LOWER(?), ' ', '') ")
@@ -1163,7 +1171,7 @@ public class DatabaseManager {
         try (Connection conn = getConnection(db_module);
              PreparedStatement stmt = conn.prepareStatement(query.toString())) {
 
-            // Устанавливаем параметры в подготовленный запрос
+            // Устанавливаем параметры
             for (int i = 0; i < params.size(); i++) {
                 stmt.setObject(i + 1, params.get(i));
             }
@@ -1174,10 +1182,19 @@ public class DatabaseManager {
                     String c_name = resultSet.getString("c_name");
                     double c_rep = resultSet.getDouble("c_rep");
                     String c_code = resultSet.getString("c_code");
-                    filteredCGO.add(new rowContras(c_id, c_name, c_rep, c_code));
+                    String c_inn = resultSet.getString("c_inn");
+                    int c_global_status = resultSet.getInt("c_global_status");
+
+                    // Передаем все параметры в конструктор
+                    filteredCGO.add(new rowContras(
+                            c_id, c_name, c_rep, c_code,
+                            c_inn != null ? c_inn : "", // Обработка NULL для ИНН
+                            c_global_status
+                    ));
                 }
             }
         } catch (SQLException e) {
+            System.err.println("Ошибка при получении контрагентов: " + e.getMessage());
             e.printStackTrace();
         }
 
@@ -1291,62 +1308,80 @@ public class DatabaseManager {
     public List<rowCritValues> getCrVas(
             boolean db_module, String CritString, String CritShort,
             String filterContrasName, String filterGoodName,
-            String filterOrderName, String filterCGDateSupply, String filterCGMinVolume) {
+            String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
 
         List<rowCritValues> filteredCrVa = new ArrayList<>();
-        String query = "SELECT DISTINCT " + CritString + " as " + CritShort +
-                " FROM bs_order " +
-                "JOIN mes_workorder ON bs_order.id = mes_workorder.id_order " +
-                "JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id " +
-                "JOIN prs_lot ON bs_goods.id = prs_lot.id_goods " +
-                "JOIN bs_contras ON prs_lot.id_contras = bs_contras.id ";
+
+        // Базовый запрос - обратите внимание на пробелы в конце строк
+        StringBuilder query = new StringBuilder()
+                .append("SELECT DISTINCT ").append(CritString).append(" as ").append(CritShort)
+                .append(" FROM bs_order ")
+                .append("JOIN mes_workorder ON bs_order.id = mes_workorder.id_order ")
+                .append("JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id ")
+                .append("JOIN prs_lot ON bs_goods.id = prs_lot.id_goods ")
+                .append("JOIN bs_contras ON prs_lot.id_contras = bs_contras.id ");
 
         List<String> conditions = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
 
+        // Добавляем условия фильтрации
         if (!filterContrasName.isEmpty()) {
-            conditions.add("bs_contras.scaption ILIKE '%" + filterContrasName + "%'");
+            conditions.add("bs_contras.scaption ILIKE ?");
+            params.add("%" + filterContrasName + "%");
         }
         if (!filterGoodName.isEmpty()) {
-            conditions.add("bs_goods.sname ILIKE '%" + filterGoodName + "%'");
+            conditions.add("bs_goods.sname ILIKE ?");
+            params.add("%" + filterGoodName + "%");
         }
         if (!filterOrderName.isEmpty()) {
-            conditions.add("bs_order.scaption ILIKE '%" + filterOrderName + "%'");
+            conditions.add("bs_order.scaption ILIKE ?");
+            params.add("%" + filterOrderName + "%");
         }
         if (!filterCGDateSupply.isEmpty()) {
-            conditions.add("prs_lot.ndeliverytime = " + filterCGDateSupply);
+            conditions.add("prs_lot.ndeliverytime = ?");
+            params.add(Integer.parseInt(filterCGDateSupply));
         }
         if (!filterCGMinVolume.isEmpty()) {
-            conditions.add("prs_lot.nqty = " + filterCGMinVolume);
+            conditions.add("prs_lot.nqty = ?");
+            params.add(Double.parseDouble(filterCGMinVolume));
+        }
+        if (!okpd2.isEmpty()) {
+            conditions.add("bs_goods.okpd2 = ?");
+            params.add(okpd2);
         }
 
+        // Добавляем условия к запросу
         if (!conditions.isEmpty()) {
-            query += " WHERE " + String.join(" AND ", conditions);
+            query.append(" WHERE ").append(String.join(" AND ", conditions));
         }
 
-        query += " ORDER BY " + CritString;
+        // Добавляем сортировку
+        query.append(" ORDER BY ").append(CritString);
 
-        try {
-            ResultSet resultSet = this.executeQuery(db_module, query);
-            try {
+        try (Connection conn = getConnection(db_module);
+             PreparedStatement stmt = conn.prepareStatement(query.toString())) {
+
+            // Устанавливаем параметры
+            for (int i = 0; i < params.size(); i++) {
+                Object param = params.get(i);
+                if (param instanceof Integer) {
+                    stmt.setInt(i + 1, (Integer) param);
+                } else if (param instanceof Double) {
+                    stmt.setDouble(i + 1, (Double) param);
+                } else {
+                    stmt.setString(i + 1, (String) param);
+                }
+            }
+
+            try (ResultSet resultSet = stmt.executeQuery()) {
                 while (resultSet.next()) {
                     double critVal = resultSet.getDouble(CritShort);
                     filteredCrVa.add(new rowCritValues(critVal, 0.0));
                 }
-            } catch (Throwable var15) {
-                if (resultSet != null) {
-                    try {
-                        resultSet.close();
-                    } catch (Throwable var14) {
-                        var15.addSuppressed(var14);
-                    }
-                }
-                throw var15;
             }
-            if (resultSet != null) {
-                resultSet.close();
-            }
-        } catch (SQLException var16) {
-            var16.printStackTrace();
+        } catch (SQLException e) {
+            System.err.println("SQL Error executing query: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return filteredCrVa;
@@ -1356,64 +1391,83 @@ public class DatabaseManager {
     public List<rowCritValues> getUserCrVas(
             boolean db_module, String CritString, String CritShort,
             String filterContrasName, String filterGoodName,
-            String filterOrderName, String filterCGDateSupply, String filterCGMinVolume) {
+            String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
 
         List<rowCritValues> filteredCrVa = new ArrayList<>();
-        String query = "SELECT DISTINCT module_lotcriterion." + CritString + " as " + CritShort +
-                " FROM bs_order " +
-                "JOIN mes_workorder ON bs_order.id = mes_workorder.id_order " +
-                "JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id " +
-                "JOIN prs_lot ON bs_goods.id = prs_lot.id_goods " +
-                "JOIN bs_contras ON prs_lot.id_contras = bs_contras.id " +
-                "JOIN module_lotcriterion ON module_lotcriterion.id_contras = bs_contras.id " +
-                "AND module_lotcriterion.id_goods = bs_goods.id ";
+
+        // Базовый запрос с использованием StringBuilder для безопасности
+        StringBuilder query = new StringBuilder()
+                .append("SELECT DISTINCT module_lotcriterion.").append(CritString).append(" as ").append(CritShort)
+                .append(" FROM bs_order ")
+                .append("JOIN mes_workorder ON bs_order.id = mes_workorder.id_order ")
+                .append("JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id ")
+                .append("JOIN prs_lot ON bs_goods.id = prs_lot.id_goods ")
+                .append("JOIN bs_contras ON prs_lot.id_contras = bs_contras.id ")
+                .append("JOIN module_lotcriterion ON module_lotcriterion.id_contras = bs_contras.id ")
+                .append("AND module_lotcriterion.id_goods = bs_goods.id ");
 
         List<String> conditions = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
 
+        // Добавляем условия фильтрации с параметрами
         if (!filterContrasName.isEmpty()) {
-            conditions.add("bs_contras.scaption ILIKE '%" + filterContrasName + "%'");
+            conditions.add("bs_contras.scaption ILIKE ?");
+            params.add("%" + filterContrasName + "%");
         }
         if (!filterGoodName.isEmpty()) {
-            conditions.add("bs_goods.sname ILIKE '%" + filterGoodName + "%'");
+            conditions.add("bs_goods.sname ILIKE ?");
+            params.add("%" + filterGoodName + "%");
         }
         if (!filterOrderName.isEmpty()) {
-            conditions.add("bs_order.scaption ILIKE '%" + filterOrderName + "%'");
+            conditions.add("bs_order.scaption ILIKE ?");
+            params.add("%" + filterOrderName + "%");
         }
         if (!filterCGDateSupply.isEmpty()) {
-            conditions.add("prs_lot.ndeliverytime = '" + filterCGDateSupply + "'");
+            conditions.add("prs_lot.ndeliverytime = ?");
+            params.add(filterCGDateSupply); // как строка, если поле текстовое
         }
         if (!filterCGMinVolume.isEmpty()) {
-            conditions.add("prs_lot.nqty = " + filterCGMinVolume);
+            conditions.add("prs_lot.nqty = ?");
+            params.add(Double.parseDouble(filterCGMinVolume));
+        }
+        if (!okpd2.isEmpty()) {
+            conditions.add("bs_goods.okpd2 = ?");
+            params.add(okpd2);
         }
 
+        // Добавляем условия к запросу
         if (!conditions.isEmpty()) {
-            query += " WHERE " + String.join(" AND ", conditions);
+            query.append(" WHERE ").append(String.join(" AND ", conditions));
         }
 
-        query += " ORDER BY module_lotcriterion." + CritString;
+        // Добавляем сортировку
+        query.append(" ORDER BY module_lotcriterion.").append(CritString);
 
-        try {
-            ResultSet resultSet = this.executeQuery(db_module, query);
-            try {
+
+        try (Connection conn = getConnection(db_module);
+             PreparedStatement stmt = conn.prepareStatement(query.toString())) {
+
+            // Устанавливаем параметры
+            for (int i = 0; i < params.size(); i++) {
+                Object param = params.get(i);
+                if (param instanceof Integer) {
+                    stmt.setInt(i + 1, (Integer) param);
+                } else if (param instanceof Double) {
+                    stmt.setDouble(i + 1, (Double) param);
+                } else {
+                    stmt.setString(i + 1, param.toString());
+                }
+            }
+
+            try (ResultSet resultSet = stmt.executeQuery()) {
                 while (resultSet.next()) {
                     double critVal = resultSet.getDouble(CritShort);
                     filteredCrVa.add(new rowCritValues(critVal, 0.0));
                 }
-            } catch (Throwable var15) {
-                if (resultSet != null) {
-                    try {
-                        resultSet.close();
-                    } catch (Throwable var14) {
-                        var15.addSuppressed(var14);
-                    }
-                }
-                throw var15;
             }
-            if (resultSet != null) {
-                resultSet.close();
-            }
-        } catch (SQLException var16) {
-            var16.printStackTrace();
+        } catch (SQLException e) {
+            System.err.println("SQL Error executing query: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return filteredCrVa;
@@ -1569,48 +1623,79 @@ public class DatabaseManager {
     public List<rowContrasGoodsOrders> getCGOsUserCrVas(
             boolean db_module, String CritString, String CritShort,
             String filterContrasName, String filterGoodName,
-            String filterOrderName, String filterCGDateSupply, String filterCGMinVolume) {
+            String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
 
         List<rowContrasGoodsOrders> filteredCGOsUsCrVa = new ArrayList<>();
-        String query = "SELECT DISTINCT " +
-                "bs_contras.id AS c_id, bs_contras.scaption AS c_name, bs_contras.scode AS c_code, " +
-                "bs_goods.id AS g_id, bs_goods.sname AS g_name, bs_goods.sarticle AS g_code, " +
-                "module_lotcriterion." + CritString + " AS " + CritShort +
-                " FROM bs_order " +
-                "JOIN mes_workorder ON bs_order.id = mes_workorder.id_order " +
-                "JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id " +
-                "JOIN prs_lot ON bs_goods.id = prs_lot.id_goods " +
-                "JOIN bs_contras ON prs_lot.id_contras = bs_contras.id " +
-                "JOIN module_lotcriterion ON module_lotcriterion.id_contras = bs_contras.id " +
-                "AND module_lotcriterion.id_goods = bs_goods.id ";
+
+        // Базовый запрос с использованием StringBuilder
+        StringBuilder query = new StringBuilder()
+                .append("SELECT DISTINCT ")
+                .append("bs_contras.id AS c_id, bs_contras.scaption AS c_name, bs_contras.scode AS c_code, ")
+                .append("bs_goods.id AS g_id, bs_goods.sname AS g_name, bs_goods.sarticle AS g_code, ")
+                .append("module_lotcriterion.").append(CritString).append(" AS ").append(CritShort).append(", ")
+                .append("bs_goods.okpd2 AS g_okpd2 ") // Добавляем okpd2 в выборку
+                .append("FROM bs_order ")
+                .append("JOIN mes_workorder ON bs_order.id = mes_workorder.id_order ")
+                .append("JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id ")
+                .append("JOIN prs_lot ON bs_goods.id = prs_lot.id_goods ")
+                .append("JOIN bs_contras ON prs_lot.id_contras = bs_contras.id ")
+                .append("JOIN module_lotcriterion ON module_lotcriterion.id_contras = bs_contras.id ")
+                .append("AND module_lotcriterion.id_goods = bs_goods.id ");
 
         List<String> conditions = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
 
+        // Добавляем условия фильтрации с параметрами
         if (!filterContrasName.isEmpty()) {
-            conditions.add("bs_contras.scaption ILIKE '%" + filterContrasName + "%'");
+            conditions.add("bs_contras.scaption ILIKE ?");
+            params.add("%" + filterContrasName + "%");
         }
         if (!filterGoodName.isEmpty()) {
-            conditions.add("bs_goods.sname ILIKE '%" + filterGoodName + "%'");
+            conditions.add("bs_goods.sname ILIKE ?");
+            params.add("%" + filterGoodName + "%");
         }
         if (!filterOrderName.isEmpty()) {
-            conditions.add("bs_order.scaption ILIKE '%" + filterOrderName + "%'");
+            conditions.add("bs_order.scaption ILIKE ?");
+            params.add("%" + filterOrderName + "%");
         }
         if (!filterCGDateSupply.isEmpty()) {
-            conditions.add("prs_lot.ndeliverytime = '" + filterCGDateSupply + "'");
+            conditions.add("prs_lot.ndeliverytime = ?");
+            params.add(filterCGDateSupply); // как строка, если поле текстовое
         }
         if (!filterCGMinVolume.isEmpty()) {
-            conditions.add("prs_lot.nqty = " + filterCGMinVolume);
+            conditions.add("prs_lot.nqty = ?");
+            params.add(Double.parseDouble(filterCGMinVolume));
+        }
+        if (!okpd2.isEmpty()) {
+            conditions.add("bs_goods.okpd2 = ?");
+            params.add(okpd2);
         }
 
+        // Добавляем условия к запросу
         if (!conditions.isEmpty()) {
-            query += " WHERE " + String.join(" AND ", conditions);
+            query.append(" WHERE ").append(String.join(" AND ", conditions));
         }
 
-        query += " ORDER BY bs_contras.scaption, bs_goods.sname";
+        // Добавляем сортировку
+        query.append(" ORDER BY bs_contras.scaption, bs_goods.sname");
 
-        try {
-            ResultSet resultSet = this.executeQuery(db_module, query);
-            try {
+
+        try (Connection conn = getConnection(db_module);
+             PreparedStatement stmt = conn.prepareStatement(query.toString())) {
+
+            // Устанавливаем параметры
+            for (int i = 0; i < params.size(); i++) {
+                Object param = params.get(i);
+                if (param instanceof Integer) {
+                    stmt.setInt(i + 1, (Integer) param);
+                } else if (param instanceof Double) {
+                    stmt.setDouble(i + 1, (Double) param);
+                } else {
+                    stmt.setString(i + 1, param.toString());
+                }
+            }
+
+            try (ResultSet resultSet = stmt.executeQuery()) {
                 while (resultSet.next()) {
                     long c_id = resultSet.getLong("c_id");
                     long g_id = resultSet.getLong("g_id");
@@ -1619,23 +1704,17 @@ public class DatabaseManager {
                     String c_code = resultSet.getString("c_code");
                     String g_code = resultSet.getString("g_code");
                     double minQuantity = resultSet.getDouble(CritShort);
-                    filteredCGOsUsCrVa.add(new rowContrasGoodsOrders(c_id, c_name, c_code, g_id, g_name, g_code, 0L, "", 0, minQuantity, 0.0, 0.0, ""));
+                    String g_okpd2 = resultSet.getString("g_okpd2"); // Получаем okpd2
+
+                    filteredCGOsUsCrVa.add(new rowContrasGoodsOrders(
+                            c_id, c_name, c_code, g_id, g_name, g_code,
+                            0L, "", 0, minQuantity, 0.0, 0.0, g_okpd2 // Передаем okpd2
+                    ));
                 }
-            } catch (Throwable var23) {
-                if (resultSet != null) {
-                    try {
-                        resultSet.close();
-                    } catch (Throwable var22) {
-                        var23.addSuppressed(var22);
-                    }
-                }
-                throw var23;
             }
-            if (resultSet != null) {
-                resultSet.close();
-            }
-        } catch (SQLException var24) {
-            var24.printStackTrace();
+        } catch (SQLException e) {
+            System.err.println("SQL Error executing query: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return filteredCGOsUsCrVa;
@@ -1791,7 +1870,7 @@ public class DatabaseManager {
         return filteredCGOwes;
     }
 
-    public List<rowContrasGoodsOrdersWithWeights> getCGOwesAsUserCrit(boolean db_module, String filterContrasName, String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume) {
+    public List<rowContrasGoodsOrdersWithWeights> getCGOwesAsUserCrit(boolean db_module, String filterContrasName, String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
         List<rowContrasGoodsOrdersWithWeights> filteredCGOwes = new ArrayList<>();
 
         // Базовый запрос
@@ -1801,7 +1880,8 @@ public class DatabaseManager {
                 "module_lotcriterion.ndeliverytime AS date_supply, " +
                 "module_lotcriterion.nqty AS min_vol, " +
                 "module_lotcriterion.ngoodquality AS g_qual, " +
-                "bs_contras.ncontrasreliability AS c_rep " +
+                "bs_contras.ncontrasreliability AS c_rep, " +
+                "bs_goods.okpd2 AS g_okpd2 " +
                 "FROM bs_order " +
                 "JOIN mes_workorder ON bs_order.id = mes_workorder.id_order " +
                 "JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id " +
@@ -1809,32 +1889,57 @@ public class DatabaseManager {
                 "JOIN bs_contras ON module_lotcriterion.id_contras = bs_contras.id " +
                 "WHERE 1=1";
 
-        // Добавляем фильтры
+        List<String> conditions = new ArrayList<>();
+        List<Object> params = new ArrayList<>();
+
         if (!filterContrasName.isEmpty()) {
-            query += " AND bs_contras.scaption ILIKE '%" + filterContrasName.trim().replace("'", "''") + "%'";
+            conditions.add("bs_contras.scaption ILIKE ?");
+            params.add("%" + filterContrasName.trim() + "%");
         }
 
         if (!filterGoodName.isEmpty()) {
-            query += " AND bs_goods.sname ILIKE '%" + filterGoodName.trim().replace("'", "''") + "%'";
+            conditions.add("bs_goods.sname ILIKE ?");
+            params.add("%" + filterGoodName.trim() + "%");
         }
 
         if (!filterOrderName.isEmpty()) {
-            query += " AND bs_order.scaption ILIKE '%" + filterOrderName.trim().replace("'", "''") + "%'";
+            conditions.add("bs_order.scaption ILIKE ?");
+            params.add("%" + filterOrderName.trim() + "%");
         }
 
         if (!filterCGDateSupply.isEmpty()) {
-            query += " AND module_lotcriterion.ndeliverytime = " + filterCGDateSupply;
+            conditions.add("module_lotcriterion.ndeliverytime = ?");
+            params.add(Integer.parseInt(filterCGDateSupply));
         }
 
         if (!filterCGMinVolume.isEmpty()) {
-            query += " AND module_lotcriterion.nqty = " + filterCGMinVolume;
+            conditions.add("module_lotcriterion.nqty = ?");
+            params.add(Double.parseDouble(filterCGMinVolume));
         }
 
-        // Выполняем запрос
-        try {
-            ResultSet resultSet = this.executeQuery(db_module, query);
+        if (!okpd2.isEmpty()) {
+            conditions.add("bs_goods.okpd2 = ?");
+            params.add(okpd2);
+        }
 
-            try {
+        if (!conditions.isEmpty()) {
+            query += " AND " + String.join(" AND ", conditions);
+        }
+
+        try (Connection conn = getConnection(db_module);
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            for (int i = 0; i < params.size(); i++) {
+                if (params.get(i) instanceof Integer) {
+                    stmt.setInt(i + 1, (Integer) params.get(i));
+                } else if (params.get(i) instanceof Double) {
+                    stmt.setDouble(i + 1, (Double) params.get(i));
+                } else {
+                    stmt.setString(i + 1, (String) params.get(i));
+                }
+            }
+
+            try (ResultSet resultSet = stmt.executeQuery()) {
                 while (resultSet.next()) {
                     long o_id = resultSet.getLong("o_id");
                     long c_id = resultSet.getLong("c_id");
@@ -1853,19 +1958,6 @@ public class DatabaseManager {
                             g_quality, 1.0, c_rep, 1.0, null, 1.0
                     ));
                 }
-            } catch (Throwable var27) {
-                if (resultSet != null) {
-                    try {
-                        resultSet.close();
-                    } catch (Throwable var26) {
-                        var27.addSuppressed(var26);
-                    }
-                }
-                throw var27;
-            }
-
-            if (resultSet != null) {
-                resultSet.close();
             }
         } catch (SQLException e) {
             e.printStackTrace();

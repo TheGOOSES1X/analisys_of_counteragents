@@ -323,7 +323,7 @@ public class mainForm extends JFrame {
 
         DefaultTableModel modelC = new DefaultTableModel(
                 new Object[][]{},
-                new String[]{"Код поставщика", "Наименование поставщика", "Деловая репутация, флаг"}
+                new String[]{"Код поставщика", "Наименование поставщика", "ИИН", "Деловая репутация, флаг"}
         ) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -531,9 +531,9 @@ public class mainForm extends JFrame {
 
                 List<rowCritValues> rowsCrVa;
                 if (CritId == 3) {
-                    rowsCrVa = dbExtractor.getCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                    rowsCrVa = dbExtractor.getCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
                 } else {
-                    rowsCrVa = dbExtractor.getUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                    rowsCrVa = dbExtractor.getUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
                 }
 
                 // установить соединение с БД модуля и создать таблицу в случае её отсутствия)
@@ -698,7 +698,7 @@ public class mainForm extends JFrame {
                         CritDataMassEdit.setEnabled(true);
                         tableCrit.setModel(modelCritCGValuesEdit);
 
-                        rowsCGO = dbExtractor.getCGOsUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                        rowsCGO = dbExtractor.getCGOsUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
 
                         updateTableCritGCViewUserValues(rowsCGO,CritId);
                         //   rowsLotGCVa = dbExtractor.getUserCrVas(false, CritString, CritShort, "", "", "", "", "");
@@ -887,7 +887,9 @@ public class mainForm extends JFrame {
                         textFieldFilterGood.getText(),
                         textFieldFilterOrder.getText(),
                         textFieldFilterDate.getText(),
-                        textFieldFilterMinVolume.getText()
+                        textFieldFilterMinVolume.getText(),
+                        textFieldFilterOkpd2.getText(),
+                        textFieldFilterGroup.getText()
                 );
 
                 // Обновляем таблицу
@@ -1766,6 +1768,7 @@ public class mainForm extends JFrame {
                 modelContras.addRow(new Object[]{
                         rowC.getContrasCode(),
                         rowC.getContrasName(),
+                        rowC.getInn(),
                         formatValue(rowC.getContrasReputation())
                 });
             }
@@ -1903,9 +1906,9 @@ public class mainForm extends JFrame {
     private void updateCritValues() {
         List<rowCritValues> rowsCrVa;
         if (CritId == 3) {
-            rowsCrVa = dbExtractor.getCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), "", textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+            rowsCrVa = dbExtractor.getCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), "", textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
         } else {
-            rowsCrVa = dbExtractor.getUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), "", textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+            rowsCrVa = dbExtractor.getUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), "", textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
         }
         // установить соединение с БД модуля и создать таблицу критериев в случае её отсутствия)
         dbExtractor.setCritData(false);
