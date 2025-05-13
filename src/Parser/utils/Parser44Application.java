@@ -51,8 +51,8 @@ public class Parser44Application {
 //                result -> handleParseResult(result),
 //                4,null
 //        );
-        parser.parseSupplierStatuses();
-        parser.parseSupplierLitigations();
+//        parser.parseSupplierStatuses();
+//        parser.parseSupplierLitigations();
 //        parser.cleanupDownloadDirectory();
 
     }
