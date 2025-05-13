@@ -2804,8 +2804,8 @@ public class mainForm extends JFrame {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("searchString", searchQuery);
 
-        // Добавляем стандартные параметры только если есть хотя бы один фильтр
-        if (hasAnyFilter) {
+        // Добавляем стандартные параметры если есть фильтры ИЛИ если есть ОКПД2
+        if (hasAnyFilter || !OKPD2Field.getText().trim().isEmpty()) {
             params.put("morphology", "on");
             params.put("pageNumber", "1");
             params.put("sortDirection", "false");
@@ -2904,6 +2904,9 @@ public class mainForm extends JFrame {
     }
 
     private void onQueryButtonClicked() {
+        // Сбрасываем UI перед запуском нового парсера
+        resetParserUI();
+
         Map<String, String> params = buildFinalParams();
         clearTable(HeadersTable);
 
@@ -2912,18 +2915,32 @@ public class mainForm extends JFrame {
         CurrentRecords.setText("Обработано: 0");
         StatusLabel.setText("Статус: запуск парсера...");
 
-//        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
         currentParser = new PurchasesParserHead(driverSetup, null, params, statusForm);
-        PauseParser.setEnabled(true);
-        StopParser.setEnabled(true);
 
         new Thread(() -> {
             currentParser.parse();
             SwingUtilities.invokeLater(() -> {
-                PauseParser.setEnabled(false);
-                StopParser.setEnabled(false);
+                // После завершения парсинга сбрасываем кнопки
+                PauseParser.setEnabled(true);  // "Пауза" активна
+                StopParser.setEnabled(true);
+                StatusLabel.setText("Статус: парсинг завершён");
             });
         }).start();
+    }
+
+    private void resetParserUI() {
+        SwingUtilities.invokeLater(() -> {
+            // Сбрасываем текст кнопок
+            PauseParser.setText("Пауза");
+            PauseParser.setEnabled(true);
+            StopParser.setEnabled(true); // Аналогично
+
+            // Сбрасываем статус
+            StatusLabel.setText("Статус: готов к работе");
+
+            // Если у вас есть другие элементы (например, ProgressBar), их тоже можно сбросить
+            // ParserProgressBar.setValue(0);
+        });
     }
 
     // Метод для обработки поискового запроса
@@ -2946,25 +2963,47 @@ public class mainForm extends JFrame {
         DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
         int rowCount = model.getRowCount();
 
+        // Проверяем, есть ли хотя бы один выбранный элемент
+        boolean hasSelectedItems = false;
         for (int i = 0; i < rowCount; i++) {
-            model.setValueAt(true, i, 3);
-            PurchaseItem item = statusForm.allItems.get(i);
-            if (!statusForm.selectedUrls.contains(item.getUrl())) {
-                statusForm.selectedUrls.add(item.getUrl());
+            if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
+                hasSelectedItems = true;
+                break;
             }
         }
 
-        System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
+        // Если есть выбранные элементы — снимаем все галочки и очищаем список
+        if (hasSelectedItems) {
+            for (int i = 0; i < rowCount; i++) {
+                model.setValueAt(false, i, 3); // Снимаем галочку
+            }
+            statusForm.selectedUrls.clear(); // Очищаем список URL
+            System.out.println("Все элементы сняты. Список пуст.");
+        }
+        // Если нет выбранных элементов — выбираем все
+        else {
+            for (int i = 0; i < rowCount; i++) {
+                model.setValueAt(true, i, 3); // Ставим галочку
+                PurchaseItem item = statusForm.allItems.get(i);
+                if (!statusForm.selectedUrls.contains(item.getUrl())) {
+                    statusForm.selectedUrls.add(item.getUrl()); // Добавляем URL
+                }
+            }
+            System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
+        }
     }
 
     private void togglePauseParser() {
         if (currentParser != null) {
             PurchasesParserHead parser = (PurchasesParserHead) currentParser;
+
             if (parser.isPaused) {
+                // Если парсер на паузе — возобновляем
                 parser.resumeParser();
                 PauseParser.setText("Пауза");
                 StatusLabel.setText("Статус: парсинг продолжен");
             } else {
+                // Если парсер работает — ставим на паузу
                 parser.pauseParser();
                 PauseParser.setText("Продолжить");
                 StatusLabel.setText("Статус: парсинг на паузе");
@@ -2992,6 +3031,7 @@ public class mainForm extends JFrame {
                     (ParserProgressBar.getValue() >= statusForm.selectedUrls.size() ?
                             " (парсинг судебных дел)" : ""));
             StopParseringButton.setEnabled(true);
+
         }
     }
 
