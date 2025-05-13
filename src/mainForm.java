@@ -24,6 +24,7 @@ import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONException;
@@ -2800,12 +2801,14 @@ public class mainForm extends JFrame {
     }
 
 
+
+
     private Map<String, String> createQueryParams(String searchQuery, boolean hasAnyFilter) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("searchString", searchQuery);
 
-        // Добавляем стандартные параметры если есть фильтры ИЛИ если есть ОКПД2
-        if (hasAnyFilter || !OKPD2Field.getText().trim().isEmpty()) {
+        // Добавляем стандартные параметры только если есть хотя бы один фильтр
+        if (hasAnyFilter) {
             params.put("morphology", "on");
             params.put("pageNumber", "1");
             params.put("sortDirection", "false");
@@ -2868,7 +2871,7 @@ public class mainForm extends JFrame {
         }
 //         Добавляем параметры дат
         SimpleDateFormat urlDateFormat = new SimpleDateFormat("dd.MM.yyyy");
-       // Обработка даты публикации (основной фильтр даты)
+        // Обработка даты публикации (основной фильтр даты)
         if (dateChooseFilterStart.getDate() != null) {
             params.put("publishDateFrom", urlDateFormat.format(dateChooseFilterStart.getDate()));
         }
@@ -2877,30 +2880,35 @@ public class mainForm extends JFrame {
             params.put("publishDateTo", urlDateFormat.format(dateChooserFilterEnd.getDate()));
         }
 
-        // Минимальная цена
-        String minPrice = MinPriceTextField.getText().trim();
-        if (!minPrice.isEmpty()) {
-            params.put("priceFromGeneral", minPrice);
+
+
+// Максимальная цена
+        // Фильтр по цене
+        try {
+            // Минимальная цена (убираем научную нотацию)
+            if (!MinPriceTextField.getText().trim().isEmpty()) {
+                double minPrice = Double.parseDouble(MinPriceTextField.getText().trim());
+                params.put("priceFromGeneral", String.format("%.0f", minPrice));
+            }
+
+            // Максимальная цена
+            if (!MaxPriceTextField.getText().trim().isEmpty()) {
+                double maxPrice = Double.parseDouble(MaxPriceTextField.getText().trim());
+                params.put("priceToGeneral", String.format("%.0f", maxPrice));
+            }
+
+            // Валюта (1 - рубли, -1 - все валюты)
+            params.put("currencyIdGeneral",
+                    comboBoxCurrency.getSelectedItem() != null ? "1" : "-1");
+
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(null,
+                    "Некорректный формат цены. Используйте только цифры.",
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
         }
-
-        // Максимальная цена
-        String maxPrice = MaxPriceTextField.getText().trim();
-        if (!maxPrice.isEmpty()) {
-            params.put("priceToGeneral", maxPrice);
-        }
-
-        // Валюта (рубли)
-
-
-        if (comboBoxCurrency.getSelectedItem() != null) {
-            String selectedCurrency = comboBoxCurrency.getSelectedItem().toString();
-            String currencyId = Okpd2Converter.getCurrencyIdByName(selectedCurrency);
-            params.put("currencyIdGeneral", currencyId != null ? currencyId : "-1"); // "-1" как fallback
-        } else {
-            params.put("currencyIdGeneral", "-1"); // значение по умолчанию
-        }
-
+        System.out.println("Final URL params: " + params);
         return params;
+
     }
 
     private void onQueryButtonClicked() {
@@ -2909,7 +2917,16 @@ public class mainForm extends JFrame {
 
         Map<String, String> params = buildFinalParams();
         clearTable(HeadersTable);
+        // Логируем все параметры
+        System.out.println("Формируемые параметры:");
+        params.forEach((k, v) -> System.out.println(k + " = " + v));
 
+        // Формируем тестовый URL для проверки в браузере
+        String testUrl = "https://zakupki.gov.ru/epz/order/extendedsearch/results.html?" +
+                params.entrySet().stream()
+                        .map(e -> e.getKey() + "=" + e.getValue())
+                        .collect(Collectors.joining("&"));
+        System.out.println("ПОЛНЫЙ URL ДЛЯ ПРОВЕРКИ:\n" + testUrl);
         // Очищаем предыдущие данные
         TotalRecords.setText("Всего записей: 0");
         CurrentRecords.setText("Обработано: 0");

@@ -111,13 +111,20 @@ public class PurchasesParserHead implements Parser {
         params.put("ca", "on");
         params.put("pc", "on");
         params.put("pa", "on");
-//        params.put("currencyIdGeneral", "-1");
-        params.put("publishDateFrom", "dd.MM.yyyy"); // Дата от
-        params.put("publishDateTo", "dd.MM.yyyy");
 
+        // Установка валюты (1 - рубли)
+        params.put("currencyIdGeneral", "1");
+
+        // Удаляем фиктивные даты или устанавливаем реальные
+        // params.remove("publishDateFrom");
+        // params.remove("publishDateTo");
+
+        // Добавляем параметры цены (пример значений)
+        params.put("priceFromGeneral", "0");
+        params.put("priceToGeneral", "100000000");
 
         if (okpd2Code != null && !okpd2Code.isEmpty()) {
-            String okpd2Id = Okpd2Converter.getOkpd2Id(okpd2Code); // Конвертер кодов
+            String okpd2Id = Okpd2Converter.getOkpd2Id(okpd2Code);
             if (okpd2Id != null) {
                 params.put("okpd2Ids", okpd2Id);
                 params.put("okpd2IdsCodes", okpd2Code);
