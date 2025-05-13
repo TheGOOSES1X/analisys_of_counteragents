@@ -2899,7 +2899,7 @@ public class mainForm extends JFrame {
                 currentParser.parseUrlsParallel(
                         new ArrayList<>(statusForm.selectedUrls),
                         this::handleParseResult,
-                        6,
+                        8,
                         progress -> SwingUtilities.invokeLater(() -> {
                             ParserProgressBar.setValue(progress);
                             StatusLabel.setText(String.format("Обработано %d из %d (парсинг закупок)",
@@ -2920,7 +2920,7 @@ public class mainForm extends JFrame {
 
                 currentParser.parseSupplierLitigations();
                 currentParser.parseSupplierStatuses();
-                currentParser.cleanupDownloadDirectory();
+//                currentParser.cleanupDownloadDirectory();
 
             } finally {
                 SwingUtilities.invokeLater(() -> {
@@ -2931,6 +2931,7 @@ public class mainForm extends JFrame {
                         StopParseringButton.setEnabled(false);
                         parserState = ParserState.IDLE;
                         StatusLabel.setText("Парсинг завершен");
+                        statusForm.selectedUrls.clear();
                     }
                 });
             }
@@ -3027,7 +3028,8 @@ public class mainForm extends JFrame {
                 if (okpd2Id != null) {
                     params.put("okpd2Ids", okpd2Id);
                     params.put("okpd2IdsCodes", okpd2Code);
-                    params.put("okpd2IdsWithNested", "on"); // Важный параметр!
+                    params.put("okpd2IdsWithNested", "on");
+                    // Важный параметр!
 
                     // Для отладки выведем в консоль
                     System.out.println("Установлены параметры ОКПД2:");
@@ -3158,6 +3160,7 @@ public class mainForm extends JFrame {
             StopParser.setEnabled(false);
             PauseParser.setEnabled(false);
             StatusLabel.setText("Статус: парсинг остановлен");
+            statusForm.selectedUrls.clear();
         }
     }
 
@@ -3188,7 +3191,7 @@ public class mainForm extends JFrame {
         if (currentParser != null && (parserState == ParserState.RUNNING || parserState == ParserState.PAUSED)) {
             currentParser.stopParser();
             parserState = ParserState.STOPPED;
-
+            statusForm.selectedUrls.clear();
             if (parserThread != null) {
                 parserThread.interrupt();
             }
@@ -3201,6 +3204,7 @@ public class mainForm extends JFrame {
                 StopParseringButton.setEnabled(false);
                 StatusLabel.setText("Парсинг остановлен");
                 ParserProgressBar.setValue(0);
+
             });
         }
     }

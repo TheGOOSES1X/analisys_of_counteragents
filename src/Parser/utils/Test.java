@@ -45,6 +45,8 @@ public class Test {
         ComplaintsURLGetter getter = new ComplaintsURLGetter();
         int result = getter.countComplaintsByRegNumber( "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
                 driver,wait);
+
+
 //        System.out.println(" поиске жалобы: " + result);
 //        try {
 //            // 3. Тестирование первого URL

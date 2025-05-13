@@ -36,8 +36,12 @@ public class PurchasePageParser {
 //            System.out.println("=======================================\n");
 
             // Парсим объекты закупки
+//            List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
+//            procurementObjects.forEach(purchase::addProcurementObject);
             List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
-            procurementObjects.forEach(purchase::addProcurementObject);
+            if (!procurementObjects.isEmpty()) {
+                purchase.addProcurementObject(procurementObjects.get(0)); // Добавляем только первый элемент
+            }
 
             // Выводим информацию о количестве найденных объектов
             System.out.println("Найдено объектов закупки: " + procurementObjects.size());

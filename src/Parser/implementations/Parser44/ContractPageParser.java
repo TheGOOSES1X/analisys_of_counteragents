@@ -46,6 +46,8 @@ public class ContractPageParser {
                     if (contractDraftUrl.contains("contract-draft.html")) {
                         Map<String, Object> draftData = dataExtractor.parseContractDraft(contractDraftUrl, driver, wait);
                         contractDetails.putAll(draftData);
+
+
                     } else if (contractDraftUrl.contains("common-info.html")) {
                         Map<String, Object> commonInfoData = dataExtractor.parseCommonInfoContract(contractDraftUrl, driver, wait);
                         contractDetails.putAll(commonInfoData);
@@ -56,18 +58,23 @@ public class ContractPageParser {
 
                 Contract contract = new Contract();
                 Supplier supplier = new Supplier();
-
+                Map<String, Object> suppliersData = dataExtractor.parseSuppliersInfo(contractInfoUrl,driver, wait);
+                modelFiller.fillSupplierModel(supplier, suppliersData);
                 if (contractDraftUrl.contains("contract-draft.html")) {
-                    modelFiller.fillContractModel(contract, contractDetails);
-                    modelFiller.fillSupplierModel(supplier, contractDetails);
+                    modelFiller.fillContractModel(contract, contractDetails,suppliersData);
+//                    modelFiller.fillSupplierModel(supplier, contractDetails);
                 }
                 if (contractDraftUrl.contains("common-info.html")) {
-                    modelFiller.fillContractModelFromCommonInfo(contract, contractDetails);
-                    modelFiller.fillSupplierModelFromCommonInfo(supplier, contractDetails);
+                    modelFiller.fillContractModelFromCommonInfo(contract, contractDetails,suppliersData);
+//                    modelFiller.fillSupplierModelFromCommonInfo(supplier, contractDetails);
                 }
 
+//                fillSupplierModelFromParticipantData(supplier, suppliersData);
+
+                // 2. Сохраняем всех поставщиков в базу данных
 //                modelFiller.fillSupplierModel(supplier, contractDetails);
                 contract.setSupplier(supplier);
+
 
                 return contract;
             } finally {
@@ -91,4 +98,59 @@ public class ContractPageParser {
         }
     }
 
+    public void fillSupplierModelFromParticipantData(Supplier supplier, Map<String, Object> participantData) {
+        try {
+            // Основная информация
+            supplier.setName(getStringValue(participantData, "Организация"));
+            supplier.setAddress(getStringValue(participantData, "Адрес места нахождения"));
+            supplier.setPostalAddress(getStringValue(participantData, "Почтовый адрес"));
+
+            // Контактная информация
+            supplier.setPhone(getStringValue(participantData, "Телефон"));
+            supplier.setEmail(getStringValue(participantData, "Email"));
+
+            // Реквизиты
+            supplier.setInn(getStringValue(participantData, "ИНН"));
+
+            // Страна (используем значения из данных или по умолчанию для России)
+            supplier.setCountryName(getStringValue(participantData, "Страна", "Российская Федерация"));
+            supplier.setCountryCode(getStringValue(participantData, "Код страны", "643"));
+
+            // Определяем тип поставщика (юр. лицо или ИП)
+            String name = supplier.getName();
+            if (name != null && (name.contains("Индивидуальный предприниматель") || name.contains("ИП"))) {
+                supplier.setType("Индивидуальный предприниматель");
+            } else {
+                supplier.setType("Юридическое лицо");
+            }
+
+            // Статус по умолчанию
+            supplier.setStatus("Активен");
+
+            // Обработка почтового индекса из адреса
+            processPostalCode(supplier);
+
+        } catch (Exception e) {
+            System.err.println("Ошибка при заполнении модели поставщика: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // Вспомогательные методы
+    private String getStringValue(Map<String, Object> map, String key) {
+        return map.containsKey(key) ? map.get(key).toString() : null;
+    }
+
+    private String getStringValue(Map<String, Object> map, String key, String defaultValue) {
+        return map.containsKey(key) ? map.get(key).toString() : defaultValue;
+    }
+
+    private void processPostalCode(Supplier supplier) {
+        if (supplier.getPostalAddress() == null || supplier.getPostalAddress().isEmpty()) {
+            String address = supplier.getAddress();
+            if (address != null && address.matches("^\\d{6}.*")) {
+                supplier.setPostalAddress(address.substring(0, 6));
+            }
+        }
+    }
 }

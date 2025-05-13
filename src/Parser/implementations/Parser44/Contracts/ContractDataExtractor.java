@@ -3,9 +3,11 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static Parser.implementations.Parser44.Contracts.ParserUtils.parseStateContractId;
 import static Parser.implementations.Parser44.Contracts.WebTableParserContract.*;
@@ -211,22 +213,116 @@ public class ContractDataExtractor {
             }
 
             // Вывод результата в консоль
-            System.out.println("=== Результат парсинга общих данных контракта ===");
-            for (Map.Entry<String, Object> entry : contractData.entrySet()) {
-                System.out.println("\n" + entry.getKey() + ":");
-                if (entry.getValue() instanceof Map) {
-                    Map<?, ?> subMap = (Map<?, ?>) entry.getValue();
-                    subMap.forEach((k, v) -> System.out.println("  " + k + ": " + v));
-                } else {
-                    System.out.println("  " + entry.getValue());
-                }
-            }
+//            System.out.println("=== Результат парсинга общих данных контракта ===");
+//            for (Map.Entry<String, Object> entry : contractData.entrySet()) {
+//                System.out.println("\n" + entry.getKey() + ":");
+//                if (entry.getValue() instanceof Map) {
+//                    Map<?, ?> subMap = (Map<?, ?>) entry.getValue();
+//                    subMap.forEach((k, v) -> System.out.println("  " + k + ": " + v));
+//                } else {
+//                    System.out.println("  " + entry.getValue());
+//                }
+//            }
 
         } catch (Exception e) {
             System.out.println("Ошибка при парсинге общих данных контракта: " + e.getMessage());
         }
 
         return contractData;
+    }
+
+    public Map<String, Object> parseSuppliersInfo(String url, WebDriver driver, WebDriverWait wait) {
+        Map<String, Object> suppliersData = new LinkedHashMap<>();
+        driver.get(url);
+
+        try {
+            // Ожидаем появления блока с поставщиками
+            wait.until(ExpectedConditions.presenceOfElementLocated(
+                    By.xpath("//h2[contains(text(), 'Информация о поставщиках')]")));
+
+            // Находим таблицу с поставщиками
+            WebElement table = driver.findElement(
+                    By.xpath("//h2[contains(text(), 'Информация о поставщиках')]/following::table[contains(@class, 'blockInfo__table')][1]"));
+
+            // Получаем все строки поставщиков
+            List<WebElement> rows = table.findElements(By.cssSelector("tbody tr.tableBlock__row"));
+            List<Map<String, String>> suppliersList = new ArrayList<>();
+
+            for (WebElement row : rows) {
+                Map<String, String> supplierInfo = new LinkedHashMap<>();
+
+                // 1. Организация и ИНН
+                WebElement orgCell = row.findElement(By.cssSelector("td.tableBlock__col_first"));
+                String organization = orgCell.findElement(By.xpath("./*[1]")).getText().trim();
+                supplierInfo.put("Организация", organization);
+
+                try {
+                    String inn = orgCell.findElement(By.xpath(".//span[contains(@class,'grey-main-light') and contains(text(),'ИНН:')]/following-sibling::span"))
+                            .getText().trim();
+                    supplierInfo.put("ИНН", inn);
+                } catch (NoSuchElementException e) {
+                    supplierInfo.put("ИНН", null);
+                }
+
+                // 2. Страна и код страны
+                try {
+                    WebElement countryCell = row.findElements(By.cssSelector("td.tableBlock__col")).get(0);
+                    String countryText = countryCell.getText().trim();
+                    String[] countryParts = countryText.split("\n");
+
+                    if (countryParts.length > 0) {
+                        supplierInfo.put("Страна", countryParts[0].trim());
+                    }
+                    if (countryParts.length > 1) {
+                        supplierInfo.put("Код страны", countryParts[1].trim());
+                    }
+                } catch (Exception e) {
+                    System.out.println("Не удалось извлечь данные о стране: " + e.getMessage());
+                }
+
+                // 3. Адрес места нахождения
+                try {
+                    WebElement addressCell = row.findElements(By.cssSelector("td.tableBlock__col")).get(1);
+                    supplierInfo.put("Адрес места нахождения", addressCell.getText().trim());
+                } catch (Exception e) {
+                    System.out.println("Не удалось извлечь адрес: " + e.getMessage());
+                }
+
+                // 4. Почтовый адрес
+                try {
+                    WebElement postalAddressCell = row.findElements(By.cssSelector("td.tableBlock__col")).get(2);
+                    supplierInfo.put("Почтовый адрес", postalAddressCell.getText().trim());
+                } catch (Exception e) {
+                    System.out.println("Не удалось извлечь почтовый адрес: " + e.getMessage());
+                }
+
+                // 5. Контактная информация (телефон и email)
+                try {
+                    WebElement contactsCell = row.findElements(By.cssSelector("td.tableBlock__col")).get(3);
+                    String contactsText = contactsCell.getText().trim();
+                    String[] contacts = contactsText.split("\n");
+
+                    if (contacts.length > 0) {
+                        supplierInfo.put("Телефон", contacts[0].trim());
+                    }
+                    if (contacts.length > 1) {
+                        supplierInfo.put("Email", contacts[1].trim());
+                    }
+                } catch (Exception e) {
+                    System.out.println("Не удалось извлечь контактную информацию: " + e.getMessage());
+                }
+
+                suppliersList.add(supplierInfo);
+            }
+
+            suppliersData.put("Поставщики", suppliersList);
+
+        } catch (Exception e) {
+            System.out.println("Ошибка при парсинге информации о поставщиках: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return suppliersData;
     }
 
     // Вспомогательный метод для безопасного получения текста элемента

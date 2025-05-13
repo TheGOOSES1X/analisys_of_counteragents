@@ -13,6 +13,11 @@ public class Contract {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+
+
+    @Column(name = "inn", length = 12)
+    private String inn;
+
     @Column(columnDefinition = "TEXT")
     private String subject;
 
@@ -370,6 +375,16 @@ public class Contract {
     public Long getId() {
         return id;
     }
+
+
+    public void setInn(String inn) {
+        this.inn = inn;
+    }
+
+    public Object getContractNumber() {
+        return contractNumber;
+    }
+
 
 //    public ProcurementObject getProcurementObject() {
 //        return procurementObject;
