@@ -193,6 +193,9 @@ public class mainForm extends JFrame {
     private JButton PauseParsingButton;
     private JButton StopParseringButton;
     private StatusForm statusForm;
+    private JTextField textFieldFilterOkpd2;
+    private JTextField textFieldFilterGroup;
+
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
     private String CritString;
@@ -409,7 +412,7 @@ public class mainForm extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 // установить соединение с БД модуля и отобразить поставщиков с учетом фильтров
 
-                List<rowContrasGoodsOrders> rowsCGO = dbExtractor.getCGOs(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                List<rowContrasGoodsOrders> rowsCGO = dbExtractor.getCGOs(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText(), textFieldFilterGroup.getText());
 
                 tableContrasGoodsOrders.setModel(modelCGO);
 
@@ -685,7 +688,7 @@ public class mainForm extends JFrame {
                         tableCrit.setModel(modelCritCGValuesNoEdit);
 
 
-                        rowsCGO = dbExtractor.getCGOs(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                        rowsCGO = dbExtractor.getCGOs(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText(), textFieldFilterGroup.getText());
 
 
                         updateTableCritGCViewValues(rowsCGO,CritId);
@@ -872,214 +875,30 @@ public class mainForm extends JFrame {
 
         tableRating.setModel(modelCGOws);
 
-
         button_getRating.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // вычисление рейтинга поставщиков
-                // получение отфильтрованных данных
-                List<rowContrasGoodsOrdersWithWeights> rowsCGOws = dbExtractor.getCGOwesAsUserCrit(false, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
-                // получение данных о критериях
+                // Создаем экземпляр калькулятора рейтингов
+                RatingCalculator ratingCalculator = new RatingCalculator(dbExtractor);
 
-                List<rowCritData> rowsCrData;
-                double sum_weight = 0;
-                // срок поставки
-                rowsCrData = dbExtractor.getCritData(false, 0);
-                if (!rowsCrData.isEmpty()) {
-                    // модифицировать вес, если имеется, оставить 1, если нет
-                    rowCritData rowsCrD = rowsCrData.get(0);
+                // Вычисляем рейтинги
+                List<rowContrasGoodsOrdersWithWeights> rowsCGOws = ratingCalculator.calculateRatings(
+                        textFieldFilterContras.getText(),
+                        textFieldFilterGood.getText(),
+                        textFieldFilterOrder.getText(),
+                        textFieldFilterDate.getText(),
+                        textFieldFilterMinVolume.getText()
+                );
 
-                    if (rowsCrD.getCritFunction() < 4) {
-                        // Одна из фиксированных функций
-                        double minV = rowsCrD.getMinVal();
-                        double maxV = rowsCrD.getMaxVal();
-                        double wei = rowsCrD.getCritWeight();
-                        sum_weight = sum_weight + wei;
-                        int funType = rowsCrD.getCritFunction();
-
-                        for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                            double crW = calcWeight(rowsCGOw.getDeliveryTime(), minV, maxV, funType) * wei;
-                            rowsCGOw.setDeliveryTimeFinalWeight(crW);
-                        }
-                    } else {
-                        // Произвольная функция
-                        String currentJsonDataPoints = rowsCrD.getJsonDataPoints();
-                        double wei = rowsCrD.getCritWeight();
-                        sum_weight = sum_weight + wei;
-
-                        List<rowCritValues> rowsCrVa;
-                        List<rowCritValues> dataPointsSaved = new ArrayList<>();
-
-                        JSONObject pointsJSON = new JSONObject(currentJsonDataPoints);
-                        for (int i = 0; i < pointsJSON.length(); i++) {
-                            String iKey = (JSONObject.getNames(pointsJSON))[i];
-                            dataPointsSaved.add(new rowCritValues(Double.parseDouble(iKey), pointsJSON.getDouble(iKey)));
-                            //
-                        }
-                        dataPointsSaved.sort(Comparator.comparingDouble(rowCritValues::getCritVal));
-
-                        rowsCrVa = dataPointsSaved;
-
-                        for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                            double crW = calcWeightDataPoints(rowsCGOw.getDeliveryTime(), rowsCrVa) * wei;
-                            rowsCGOw.setGoodQualityFinalWeight(crW);
-                        }
-                    }
-                }
-                // минимальная партия поставки
-                rowsCrData = dbExtractor.getCritData(false, 1);
-                if (!rowsCrData.isEmpty()) {
-                    // модифицировать вес, если имеется, оставить 1, если нет
-                    rowCritData rowsCrD = rowsCrData.get(0);
-
-                    if (rowsCrD.getCritFunction() < 4) {
-                        // Одна из фиксированных функций
-                        double minV = rowsCrD.getMinVal();
-                        double maxV = rowsCrD.getMaxVal();
-                        double wei = rowsCrD.getCritWeight();
-                        sum_weight = sum_weight + wei;
-                        int funType = rowsCrD.getCritFunction();
-
-                        for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                            double crW = calcWeight(rowsCGOw.getMinVolume(), minV, maxV, funType) * wei;
-                            rowsCGOw.setMinVolumeFinalWeight(crW);
-                        }
-                    } else {
-                        // Произвольная функция
-                        String currentJsonDataPoints = rowsCrD.getJsonDataPoints();
-                        double wei = rowsCrD.getCritWeight();
-                        sum_weight = sum_weight + wei;
-
-                        List<rowCritValues> rowsCrVa;
-                        List<rowCritValues> dataPointsSaved = new ArrayList<>();
-
-                        JSONObject pointsJSON = new JSONObject(currentJsonDataPoints);
-                        for (int i = 0; i < pointsJSON.length(); i++) {
-                            String iKey = (JSONObject.getNames(pointsJSON))[i];
-                            dataPointsSaved.add(new rowCritValues(Double.parseDouble(iKey), pointsJSON.getDouble(iKey)));
-                            //
-                        }
-                        dataPointsSaved.sort(Comparator.comparingDouble(rowCritValues::getCritVal));
-
-                        rowsCrVa = dataPointsSaved;
-
-                        for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                            double crW = calcWeightDataPoints(rowsCGOw.getMinVolume(), rowsCrVa) * wei;
-                            rowsCGOw.setGoodQualityFinalWeight(crW);
-                        }
-                    }
-                }
-                // качество продукции
-                rowsCrData = dbExtractor.getCritData(false, 2);
-                if (!rowsCrData.isEmpty()) {
-                    // модифицировать вес, если имеется, оставить 1, если нет
-                    rowCritData rowsCrD = rowsCrData.get(0);
-
-                    if (rowsCrD.getCritFunction() < 4) {
-                        // Одна из фиксированных функций
-                        double minV = rowsCrD.getMinVal();
-                        double maxV = rowsCrD.getMaxVal();
-                        double wei = rowsCrD.getCritWeight();
-                        sum_weight = sum_weight + wei;
-                        int funType = rowsCrD.getCritFunction();
-
-                        for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                            double crW = calcWeight(rowsCGOw.getGoodQuality(), minV, maxV, funType) * wei;
-                            rowsCGOw.setGoodQualityFinalWeight(crW);
-                        }
-                    } else {
-                        // Произвольная функция
-                        String currentJsonDataPoints = rowsCrD.getJsonDataPoints();
-                        double wei = rowsCrD.getCritWeight();
-                        sum_weight = sum_weight + wei;
-
-                        List<rowCritValues> rowsCrVa;
-                        List<rowCritValues> dataPointsSaved = new ArrayList<>();
-
-                        JSONObject pointsJSON = new JSONObject(currentJsonDataPoints);
-                        for (int i = 0; i < pointsJSON.length(); i++) {
-                            String iKey = (JSONObject.getNames(pointsJSON))[i];
-                            dataPointsSaved.add(new rowCritValues(Double.parseDouble(iKey), pointsJSON.getDouble(iKey)));
-                            //
-                        }
-                        dataPointsSaved.sort(Comparator.comparingDouble(rowCritValues::getCritVal));
-
-                        rowsCrVa = dataPointsSaved;
-
-                        for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                            double crW = calcWeightDataPoints(rowsCGOw.getGoodQuality(), rowsCrVa) * wei;
-                            rowsCGOw.setGoodQualityFinalWeight(crW);
-                        }
-
-                    }
-                }
-                // деловая репутация
-                rowsCrData = dbExtractor.getCritData(false, 3);
-                if (!rowsCrData.isEmpty()) {
-                    // модифицировать вес, если имеется, оставить 1, если нет
-                    rowCritData rowsCrD = rowsCrData.get(0);
-
-                    if (rowsCrD.getCritFunction() < 4) {
-                        // Одна из фиксированных функций
-                        double minV = rowsCrD.getMinVal();
-                        double maxV = rowsCrD.getMaxVal();
-                        double wei = rowsCrD.getCritWeight();
-                        sum_weight = sum_weight + wei;
-                        int funType = rowsCrD.getCritFunction();
-
-                        for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                            double crW = calcWeight(rowsCGOw.getContrasReputation(), minV, maxV, funType) * wei;
-                            rowsCGOw.setContrasReputationFinalWeight(crW);
-                        }
-                    } else {
-                        // Произвольная функция
-                        String currentJsonDataPoints = rowsCrD.getJsonDataPoints();
-                        double wei = rowsCrD.getCritWeight();
-                        sum_weight = sum_weight + wei;
-
-                        List<rowCritValues> rowsCrVa;
-                        List<rowCritValues> dataPointsSaved = new ArrayList<>();
-
-                        JSONObject pointsJSON = new JSONObject(currentJsonDataPoints);
-                        for (int i = 0; i < pointsJSON.length(); i++) {
-                            String iKey = (JSONObject.getNames(pointsJSON))[i];
-                            dataPointsSaved.add(new rowCritValues(Double.parseDouble(iKey), pointsJSON.getDouble(iKey)));
-                            //
-                        }
-                        dataPointsSaved.sort(Comparator.comparingDouble(rowCritValues::getCritVal));
-
-                        rowsCrVa = dataPointsSaved;
-
-                        for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                            double crW = calcWeightDataPoints(rowsCGOw.getContrasReputation(), rowsCrVa) * wei;
-                            rowsCGOw.setGoodQualityFinalWeight(crW);
-                        }
-                    }
-                }
-
-                // пользовательские критерии
-
-
-
-                for (rowContrasGoodsOrdersWithWeights rowsCGOw : rowsCGOws) {
-                    double w_delTime = rowsCGOw.getDeliveryTimeFinalWeight();
-                    double w_minVol = rowsCGOw.getMinVolumeFinalWeight();
-                    double w_gdsQual = rowsCGOw.getGoodQualityFinalWeight();
-                    double w_ctrRep = rowsCGOw.getContrasReputationFinalWeight();
-
-                    rowsCGOw.setRatingComplete((w_delTime + w_minVol + w_gdsQual + w_ctrRep) / sum_weight);
-                }
-
+                // Обновляем таблицу
                 tableRating.setModel(modelCGOws);
                 updateTableContrasGoodsOrdersWes(rowsCGOws);
 
-                // сохранение рейтинга поставщиков
-
+                // Сохраняем рейтинги поставщиков
                 dbExtractor.setRatingTable(false);
                 dbExtractor.updateRatingTable(false, rowsCGOws);
 
                 button_getBest.setEnabled(true);
-
                 tabbedPaneMain.setSelectedIndex(3);
                 System.out.println("Button pressed");
             }
