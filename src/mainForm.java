@@ -3250,7 +3250,7 @@ public class mainForm extends JFrame {
                 // После завершения парсинга сбрасываем кнопки
                 PauseParser.setEnabled(true);  // "Пауза" активна
                 StopParser.setEnabled(true);
-                StatusLabel.setText("Статус: парсинг завершён");
+                StatusLabel.setText("Статус: запуск парсера...");
             });
         }).start();
     }
