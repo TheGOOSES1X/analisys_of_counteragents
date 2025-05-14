@@ -14,6 +14,8 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,16 +26,18 @@ import java.util.concurrent.*;
 
 
 public class Parser {
-    private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Parser_EGRUL");
-    private static final int TIMEOUT_SECONDS = 20;
-    private static final int THREAD_POOL_SIZE = 3; // Количество потоков
+    private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Parser_EGRUL", "PDF_files");
+    private static final int TIMEOUT_SECONDS = 30;
+    private static final int THREAD_POOL_SIZE = 6; // Количество потоков
     private static final String url = "https://egrul.nalog.ru/index.html";
     private static final String InputId = "query";
     private static final String searchButtonId = "btnSearch";
     private static final String endButtonId = "btnReference";
     private static final Logger log = LogManager.getLogger(Parser.class);
+    private static final String CSV_FILE = "./src/Parser_EGRUL/INN_list.csv";
+    private static final Object fileLock = new Object(); // Общий объект для синхронизации
 
-    public static void asyncEGRULParse(List<String> list, ChromeOptions options) {
+    public static void asyncEGRULParse(List<String> list, ChromeOptions options) throws IOException {
         // Создаем пул потоков
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         // Создаем список Future для отслеживания результатов
@@ -59,6 +63,12 @@ public class Parser {
         }
 
         executor.shutdown();
+
+        if (countRemainingUrls() > 1){
+            list = Files.readAllLines(Paths.get(CSV_FILE));
+            System.out.println("Ссылки ещё остались, продолжаем");
+            asyncEGRULParse(list, options);
+        }
     }
 
     private static void innEGRULParse(String key, ChromeOptions options) throws InterruptedException {
@@ -83,8 +93,10 @@ public class Parser {
                 }
                 endButton = wait.until(ExpectedConditions.elementToBeClickable(endButton));
                 endButton.click();
-                Thread.sleep(10000);
+                Thread.sleep(5000);
                 System.out.println("Успешно обработан " + key);
+                removeUrlFromCSV(key);
+                System.out.println("Осталось обработать " + (countRemainingUrls()+1));
             } catch (TimeoutException e) {
                 try {
                     List<WebElement> infoFileButtons = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
@@ -100,6 +112,8 @@ public class Parser {
                         clickableButton.click();
                         Thread.sleep(5000);
                         System.out.println("Успешно обработан: " + key);  // key можно заменить на что-то осмысленное
+                        removeUrlFromCSV(key);
+                        System.out.println("Осталось обработать " + (countRemainingUrls()+1));
                     }
                 } catch (TimeoutException ex) {
                     System.out.println("Ни одна из кнопок не появилась в течение " + TIMEOUT_SECONDS + " секунд для: " + key);
@@ -115,15 +129,73 @@ public class Parser {
         }
     }
 
-    public static void main(String[] args) {
-        DatabaseService ds_obj = new DatabaseService();
-        List<String> INN_list = ds_obj.getAllSupplierInns();
+    public static void StartParsingEGRUL () throws IOException {
+        List<String> INN_list;
+
+        // Проверяем существование файла
+        if (Files.exists(Paths.get(CSV_FILE))) {
+            try {
+                INN_list = Files.readAllLines(Paths.get(CSV_FILE));
+                // Если файл пуст, вызываем функцию для получения данных
+                if (INN_list.isEmpty()) {
+                    System.out.println("Файл существует, но пуст, вызываем функцию...");
+
+                    INN_list = ConnectToDB_Start.CollectINNFromDB();
+
+                    // Записываем полученные данные в файл
+                    Files.write(Paths.get(CSV_FILE), INN_list);
+                    System.out.println("Данные записаны в существующий файл.");
+                }
+            } catch (IOException e) {
+                System.err.println("Ошибка при чтении файла: " + e.getMessage());
+                INN_list = new ArrayList<>(); // Создаём пустой список в случае ошибки
+            }
+        } else {
+            System.out.println("Файл не существует, вызываем функцию...");
+
+            INN_list = ConnectToDB_Start.CollectINNFromDB();
+
+            try {
+                // Создаём файл и записываем в него данные
+                Files.write(Paths.get(CSV_FILE), INN_list);
+                System.out.println("Файл создан и данные записаны.");
+            } catch (IOException e) {
+                System.err.println("Ошибка при создании файла: " + e.getMessage());
+            }
+        }
 
         System.setProperty("webdriver.chrome.silentOutput", "true");
         WebDriverManager.chromedriver().setup();
         ChromeOptions options = getChromeOptions();
 
-        asyncEGRULParse(INN_list, options);
+        //asyncEGRULParse(INN_list, options);
+
+        System.out.println("Сбор PDF файлов по ИНН завершён");
+    }
+
+    private static void removeUrlFromCSV(String url) {
+        synchronized (fileLock) {
+            try {
+                List<String> lines = Files.readAllLines(Paths.get(CSV_FILE))
+                        .stream()
+                        .filter(line -> !line.trim().equals(url))
+                        .toList();
+                Files.write(Paths.get(CSV_FILE), lines);
+            } catch (IOException e) {
+                throw new RuntimeException("Ошибка при удалении URL", e);
+            }
+        }
+    }
+
+    private static int countRemainingUrls() {
+        try {
+            return (int) Files.readAllLines(Paths.get(CSV_FILE))
+                    .stream()
+                    .filter(line -> !line.trim().isEmpty())
+                    .count();
+        } catch (IOException e) {
+            throw new RuntimeException("Ошибка при подсчете URL", e);
+        }
     }
 
     private static ChromeOptions getChromeOptions() {

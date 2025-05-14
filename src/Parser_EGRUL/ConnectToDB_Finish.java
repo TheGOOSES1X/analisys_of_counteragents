@@ -1,10 +1,8 @@
 package Parser_EGRUL;
 import java.sql.*;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
-public class ConnectToDB {
+public class ConnectToDB_Finish {
     public static void writeToPostgres(List<List<Object>> data) {
         String url = "jdbc:postgresql://localhost:5432/globaldb";
         String user = "postgres";

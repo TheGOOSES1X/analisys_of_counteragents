@@ -1,6 +1,8 @@
 package Parser_EGRUL;
 
-import Parser.implementations.Parser44.DatabaseService;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.cos.COSDocument;
+import org.apache.pdfbox.io.MemoryUsageSetting;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 
@@ -21,30 +23,28 @@ import java.util.stream.Stream;
 
 public class Data_Extractor {
 
-    private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Parser_EGRUL");
+    private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Parser_EGRUL", "PDF_files");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-
-    public static void main(String[] args) {
-        readAllInfoFromFiles();
-    }
 
     public static void readAllInfoFromFiles() {
         try {
             List<Path> pdfFiles = findAllPdfFiles();
-            DatabaseService ds_obj = new DatabaseService();
-            List<String> INN_list = ds_obj.getAllSupplierInns();
             List<List<Object>> Activity_Data_list = new ArrayList<>();
+            List<String> INN_list = ConnectToDB_Start.CollectINNFromDB();;
+
+            int countdown = pdfFiles.size();
 
             for (Path pdfFile : pdfFiles) {
                 try{
-                    Activity_Data_list.addAll(readMemberINFOFromPDF(pdfFile, INN_list));
+                    Activity_Data_list.addAll(readMemberINFOFromPDF(pdfFile, INN_list, countdown));
                 }
                 catch (Exception e) {
                     continue;
                 }
+                System.out.println("Осталось обработать " + countdown + " pdf файлов");
+                countdown -= 1;
             }
-            ConnectToDB.writeToPostgres(Activity_Data_list);
-
+            ConnectToDB_Finish.writeToPostgres(Activity_Data_list);
         } catch (IOException e) {
             System.err.println("Ошибка при обработке файлов: " + e.getMessage());
         }
@@ -59,32 +59,33 @@ public class Data_Extractor {
         }
     }
 
-    private static List<List<Object>> readMemberINFOFromPDF(Path filePath, List<String> INN_list) throws Exception {
-        try {
-            PDDocument pdfDocument = PDDocument.load(filePath.toFile());
+    private static List<List<Object>> readMemberINFOFromPDF(Path filePath, List<String> INN_list, int countdown) throws Exception {
+        try (PDDocument pdfDocument = Loader.loadPDF(filePath.toFile())) {
             PDFTextStripper stripper = new PDFTextStripper();
             String pdf_text = stripper.getText(pdfDocument);
             List<List<Object>> activity_list = new ArrayList<>();
 
             String inn = checkINN(pdf_text, INN_list);
+
             if (checkOGRNIP(pdf_text) == null){
                 return Arrays.asList(Arrays.asList(inn, null, null, null));
             }
-            else{
-                int monthsBetweenNow = getMonthsFromNow(checkMainActivityDate(pdf_text));
+            else if (checkMainActivity(pdf_text) == null){
+                return Arrays.asList(Arrays.asList(inn, null, null, null));
+            }
+            else {
+                float monthsBetweenNow = getMonthsFromNow(checkMainActivityDate(pdf_text));
                 if (checkEndDate(pdf_text) == null)
                 {
-                    //System.out.println(List.of(inn, checkMainActivity(pdf_text), monthsBetweenNow, monthsBetweenNow));
-                    activity_list.add(List.of(inn, checkMainActivity(pdf_text), monthsBetweenNow, monthsBetweenNow));
+                    activity_list.add(Arrays.asList(inn, checkMainActivity(pdf_text), monthsBetweenNow, monthsBetweenNow));
                 }
                 else{
-                    int monthsBetween = getMonthsBetweenDates(checkMainActivityDate(pdf_text), checkEndDate(pdf_text));
-                    //System.out.println(List.of(inn, checkMainActivity(pdf_text), monthsBetween, monthsBetweenNow));
-                    activity_list.add(List.of(inn, checkMainActivity(pdf_text), monthsBetween, monthsBetweenNow));
+                    float monthsBetween = getMonthsBetweenDates(checkMainActivityDate(pdf_text), checkEndDate(pdf_text));
+                    activity_list.add(Arrays.asList(inn, checkMainActivity(pdf_text), monthsBetween, monthsBetweenNow));
                 }
 
                 try {
-                    activity_list.addAll(checkAndAddDopActivity(pdf_text, inn));
+                    activity_list.addAll(checkAndAddDopActivity(pdf_text, inn, filePath));
                 } catch (Exception e) {
 
                 }
@@ -95,6 +96,11 @@ public class Data_Extractor {
             System.err.println("Ошибка при конвертации файла: " + filePath);
             e.printStackTrace();
             throw new Exception();
+        } catch (Exception e){
+            System.err.println("Ошибка при обработке файла: " + filePath);
+            e.printStackTrace();
+            List<List<Object>> activity_list = new ArrayList<>();
+            return activity_list;
         }
     }
 
@@ -115,7 +121,7 @@ public class Data_Extractor {
 
 
 
-    public static List<List<Object>> checkAndAddDopActivity(String pdf_text, String inn) throws Exception {
+    public static List<List<Object>> checkAndAddDopActivity(String pdf_text, String inn, Path filepath) throws Exception {
 
         List<List<Object>> activity_list = new ArrayList<>();
 
@@ -149,8 +155,8 @@ public class Data_Extractor {
 
         // Проверяем, что списки одинакового размера
         if (keysList.size() != valuesList.size()) {
-            System.out.println("Предупреждение: количество ключей (" + keysList.size() +
-                    ") не совпадает с количеством значений (" + valuesList.size() + ")");
+//            System.out.println("Предупреждение: количество ключей (" + keysList.size() +
+//                    ") не совпадает с количеством значений (" + valuesList.size() + ")");
             // Оставляем минимальное количество элементов
             int minSize = Math.min(keysList.size(), valuesList.size());
             keysList = keysList.subList(0, minSize);
@@ -158,15 +164,13 @@ public class Data_Extractor {
         }
 
         for (int i = 0; i < keysList.size(); i++){
-            int monthsBetweenNow = getMonthsFromNow(valuesList.get(i));
+            float monthsBetweenNow = getMonthsFromNow(valuesList.get(i));
             if (checkEndDate(pdf_text) == null){
-                //System.out.println(List.of(inn, keysList.get(i), monthsBetweenNow, monthsBetweenNow));
-                activity_list.add(List.of(inn, keysList.get(i), monthsBetweenNow, monthsBetweenNow));
+                activity_list.add(Arrays.asList(inn, keysList.get(i), monthsBetweenNow/2, monthsBetweenNow));
             }
             else{
-                int monthsBetween = getMonthsBetweenDates(valuesList.get(i), checkEndDate(pdf_text));
-                //System.out.println(List.of(inn, keysList.get(i), monthsBetween, monthsBetweenNow));
-                activity_list.add(List.of(inn, keysList.get(i), monthsBetween, monthsBetweenNow));
+                float monthsBetween = getMonthsBetweenDates(valuesList.get(i), checkEndDate(pdf_text));
+                activity_list.add(Arrays.asList(inn, keysList.get(i), monthsBetween/2, monthsBetweenNow));
             }
         }
 
@@ -184,7 +188,7 @@ public class Data_Extractor {
 
     private static String checkOGRNIP(String text){
         Pattern pattern = Pattern.compile(
-                "(?:5|6|7|8|9|10)\\s+ОГРНИП\\s+(.*?)\\s+(?:[1-9]\\d?|100)\\b",
+                "(?:3|4|5|6|7|8|9|10|11|12|13|14)\\s+(?:ОГРН|ОГРНИП)\\s+(.*?)\\s+(?:[1-9]\\d?|100)\\b",
                 Pattern.CASE_INSENSITIVE
         );
         Matcher matcher = pattern.matcher(text);
@@ -205,34 +209,12 @@ public class Data_Extractor {
         return null;
     }
 
-    private static String checkOGRNIPData(String text){
-        Pattern pattern = Pattern.compile("(Дата регистрации\\s+(.*?)\\s+Сведения)");
-        Matcher matcher = pattern.matcher(text);
-
-        if (matcher.find()) {
-            return matcher.group(2);
-        } else {
-            return null;
-        }
-    }
-
-    private static String checkTaxStartData(String text){
-        Pattern pattern = Pattern.compile("((?:7|8|9|10|11|12|13|14|15|16)\\s+Дата постановки на учет\\s+(.*?)\\s+)");
-        Matcher matcher = pattern.matcher(text);
-
-        if (matcher.find()) {
-            return matcher.group(2);
-        } else {
-            return null;
-        }
-    }
-
     private static String checkMainActivity(String text) {
-        Pattern pattern = Pattern.compile("(Сведения об основном виде деятельности\\s+(?:[1-9]\\d?|100)\\s+Код и наименование вида деятельности\\s+(.*?)\\s+[А-ЯЁ])");
+        Pattern pattern = Pattern.compile("Сведения об основном виде деятельности.*?Код и наименование вида деятельности\\s(.*?)\\s[А-ЯЁ]", Pattern.DOTALL);
         Matcher matcher = pattern.matcher(text);
 
         if (matcher.find()) {
-            return matcher.group(2);
+            return matcher.group(1);
         } else {
             return null;
         }
@@ -274,5 +256,35 @@ public class Data_Extractor {
         LocalDate today = LocalDate.now();
         Period period = Period.between(firstDate, today);
         return period.getYears() * 12 + period.getMonths();
+    }
+
+
+
+
+
+
+
+
+
+    private static String checkOGRNIPData(String text){
+        Pattern pattern = Pattern.compile("(Дата регистрации\\s+(.*?)\\s+Сведения)");
+        Matcher matcher = pattern.matcher(text);
+
+        if (matcher.find()) {
+            return matcher.group(2);
+        } else {
+            return null;
+        }
+    }
+
+    private static String checkTaxStartData(String text){
+        Pattern pattern = Pattern.compile("((?:7|8|9|10|11|12|13|14|15|16)\\s+Дата постановки на учет\\s+(.*?)\\s+)");
+        Matcher matcher = pattern.matcher(text);
+
+        if (matcher.find()) {
+            return matcher.group(2);
+        } else {
+            return null;
+        }
     }
 }
