@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 import static Parser.implementations.Parser44.Contracts.ParserUtils.*;
 
 public class ContractModelFiller {
-    public void fillContractModel(Contract contract, Map<String, Object> contractData) {
+    public void fillContractModel(Contract contract, Map<String, Object> contractData,Map<String, Object> participantData ) {
         try {
             // 3. Предмет контракта
             Map<String, Object> subjectData = (Map<String, Object>) contractData.get("3. Предмет контракта");
@@ -60,16 +60,36 @@ public class ContractModelFiller {
             Map<String, Object> conditionsData = (Map<String, Object>) contractData.get("4. Условия контракта");
             if (conditionsData != null) {
                 // 4.1. Сроки исполнения контракта
-                Map<String, String> executionTerms = (Map<String, String>) conditionsData.get("4.1. Сроки исполнения контракта");
-                if (executionTerms != null) {
-                    String startDateKey = findPartialKey(executionTerms, "Дата начала");
-                    String endDateKey = findPartialKey(executionTerms, "Дата окончания");
+
+                Map<String, String> generalData = (Map<String, String>) contractData.get("Общие данные");
+                if (generalData != null) {
+                    // Преобразуем в Map<String, String> для удобства поиска
+                    String startDateKey = findPartialKey(generalData, "Дата заключения");
+                   String endDateKey = findPartialKey(generalData, "Дата окончания");
 
                     contract.setStartDate(startDateKey != null ?
-                            parseDate(executionTerms.get(startDateKey)) : null);
+                            parseDate(generalData.get(startDateKey)) : null);
                     contract.setEndDate(endDateKey != null ?
-                            parseDate(executionTerms.get(endDateKey)) : null);
+                            parseDate(generalData.get(endDateKey)) : null);
+
                 }
+
+                contract.setInn(getStringValue(participantData, "ИНН"));
+
+
+
+
+
+//                Map<String, String> executionTerms = (Map<String, String>) conditionsData.get("4.1. Сроки исполнения контракта");
+//                if (executionTerms != null) {
+//                    String startDateKey = findPartialKey(executionTerms, "Дата начала");
+//                    String endDateKey = findPartialKey(executionTerms, "Дата окончания");
+//
+//                    contract.setStartDate(startDateKey != null ?
+//                            parseDate(executionTerms.get(startDateKey)) : null);
+//                    contract.setEndDate(endDateKey != null ?
+//                            parseDate(executionTerms.get(endDateKey)) : null);
+//                }
                 // 4.2. Этапы исполнения контракта
                 String executionStagesKey = findPartialKey(conditionsData, "Этапы исполнения");
                 if (executionStagesKey != null) {
@@ -200,47 +220,72 @@ public class ContractModelFiller {
         }
     }
 
-    public void fillSupplierModel(Supplier supplier, Map<String, Object> contractData) {
+    public void fillSupplierModel(Supplier supplier, Map<String, Object> suppliersData) {
         try {
-            // 2.2. Информация о поставщике
-            Map<String, Object> contractParties = (Map<String, Object>) contractData.get("2. Стороны контракта");
-            if (contractParties != null) {
-                Map<String, String> supplierInfo = (Map<String, String>) contractParties.get("2.2. Информация о поставщике");
-                if (supplierInfo != null) {
-                    supplier.setType(supplierInfo.get("Вид"));
-                    supplier.setName(supplierInfo.get("Наименование организации (ФИО физического лица)"));
+            // Получаем список поставщиков из данных (ключ "Поставщики" вместо "Информация о поставщиках")
+            List<Map<String, String>> suppliersList = (List<Map<String, String>>) suppliersData.get("Поставщики");
 
-                    // Парсим страну (формат: "Российская Федерация (643)")
-                    String countryInfo = supplierInfo.get("Наименование страны, код по ОКСМ");
-                    if (countryInfo != null && countryInfo.contains("(")) {
-                        supplier.setCountryName(countryInfo.substring(0, countryInfo.indexOf("(")).trim());
-                        supplier.setCountryCode(countryInfo.substring(countryInfo.indexOf("(") + 1, countryInfo.indexOf(")")).trim());
+            if (suppliersList != null && !suppliersList.isEmpty()) {
+                // Берем первого поставщика
+                Map<String, String> supplierInfo = suppliersList.get(0);
+
+                // Заполняем модель поставщика
+                supplier.setName(supplierInfo.get("Организация"));
+                supplier.setInn(supplierInfo.get("ИНН"));
+
+                // Обработка страны и кода страны
+                String country = supplierInfo.get("Страна");
+                String countryCode = supplierInfo.get("Код страны");
+                if (country != null) {
+                    supplier.setCountryName(country);
+                    if (countryCode != null) {
+                        supplier.setCountryCode(countryCode);
                     }
+                }
 
-                    supplier.setAddress(supplierInfo.get("Адрес места нахождения (адрес места жительства)"));
-                    supplier.setPostalAddress(supplierInfo.get("Почтовый адрес"));
-                    supplier.setOgrn(supplierInfo.get("ОГРН (для юридических лиц)"));
-                    supplier.setInn(supplierInfo.get("ИНН"));
-                    supplier.setKpp(supplierInfo.get("КПП (для юридических лиц)"));
+                // Адреса
+                supplier.setAddress(supplierInfo.get("Адрес места нахождения"));
+                supplier.setPostalAddress(supplierInfo.get("Почтовый адрес"));
+
+                // Контакты
+                supplier.setPhone(supplierInfo.get("Телефон"));
+                supplier.setEmail(supplierInfo.get("Email"));
+
+                // Дополнительные поля (если есть в данных)
+                if (supplierInfo.containsKey("ОГРН")) {
+                    supplier.setOgrn(supplierInfo.get("ОГРН"));
+                }
+                if (supplierInfo.containsKey("КПП")) {
+                    supplier.setKpp(supplierInfo.get("КПП"));
+                }
+                if (supplierInfo.containsKey("Статус")) {
                     supplier.setStatus(supplierInfo.get("Статус"));
-                    supplier.setEmail(supplierInfo.get("Электронная почта"));
-                    supplier.setPhone(supplierInfo.get("Телефон"));
+                }
 
-                    // Парсим информацию о руководителе (если есть)
-                    String directorInfo = supplierInfo.get("Руководитель (лицо, имеющее право без доверенности действовать от имени юридического лица)");
-                    if (directorInfo != null) {
-                        // Можно сохранить дополнительную информацию о руководителе
+                // Определяем тип поставщика
+                String orgName = supplierInfo.get("Организация");
+                if (orgName != null) {
+                    if (orgName.contains("ИП") || orgName.contains("Индивидуальный предприниматель")) {
+                        supplier.setType("Индивидуальный предприниматель");
+                    } else if (orgName.contains("ООО") || orgName.contains("АО") || orgName.contains("ПАО")) {
+                        supplier.setType("Юридическое лицо");
+                    } else {
+                        // Если не удалось определить по названию, проверяем ИНН
+                        String inn = supplierInfo.get("ИНН");
+                        if (inn != null && inn.length() == 12) { // ИНН физлица/ИП
+                            supplier.setType("Индивидуальный предприниматель");
+                        } else {
+                            supplier.setType("Юридическое лицо");
+                        }
                     }
                 }
             }
-
-
-
         } catch (Exception e) {
             System.out.println("Ошибка при заполнении данных поставщика: " + e.getMessage());
-        }// Логика заполнения модели поставщика
+            e.printStackTrace();
+        }
     }
-    public void fillContractModelFromCommonInfo(Contract contract, Map<String, Object> contractData) {
+    public void fillContractModelFromCommonInfo(Contract contract, Map<String, Object> contractData,Map<String, Object> participantData ) {
         try {
             // Получаем блок с основной информацией
             Map<String, String> commonInfo = (Map<String, String>) contractData.get("Информация о контракте");
@@ -248,7 +293,7 @@ public class ContractModelFiller {
                 System.out.println("Блок 'Информация о контракте' не найден");
                 return;
             }
-
+            contract.setInn(getStringValue(participantData, "ИНН"));
             // Вывод содержимого для отладки
             System.out.println("=== Данные для заполнения контракта ===");
             commonInfo.forEach((k, v) -> System.out.println(k + ": " + v));
@@ -272,6 +317,22 @@ public class ContractModelFiller {
             // Дата заключения контракта (используем как дату окончания)
             String contractDateStr = commonInfo.get("Дата заключения контракта");
             contract.setEndDate(ParserUtils.parseDate(contractDateStr));
+
+
+
+            Map<String, String> generalData = (Map<String, String>) contractData.get("Общие данные");
+            if (generalData != null) {
+                // Преобразуем в Map<String, String> для удобства поиска
+                String startDateKey = findPartialKey(generalData, "Дата заключения");
+                String endDateKey = findPartialKey(generalData, "Дата окончания");
+
+                contract.setStartDate(startDateKey != null ?
+                        parseDate(generalData.get(startDateKey)) : null);
+                contract.setEndDate(endDateKey != null ?
+                        parseDate(generalData.get(endDateKey)) : null);
+
+
+            }
 
 //            System.out.println("=== Результаты заполнения ===");
 //            System.out.println("Предмет: " + contract.getSubject());
@@ -324,7 +385,9 @@ public class ContractModelFiller {
             System.out.println("Ошибка при заполнении данных поставщика из common-info: " + e.getMessage());
         }
     }
-
+    private String getStringValue(Map<String, Object> map, String key) {
+        return map.containsKey(key) ? map.get(key).toString() : null;
+    }
 
 
 }

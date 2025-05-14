@@ -1,6 +1,7 @@
 package Parser.implementations.Parser44;
 
 import Parser.Database.models.*;
+import Parser.implementations.Parser44.Contracts.ComplaintsURLGetter;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -12,9 +13,10 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 public class PurchasePageParser {
+
     public Purchase parsePurchasePage(String url, WebDriver driver, WebDriverWait wait) {
         try {
-
+            ComplaintsURLGetter complaintsCounter  = new ComplaintsURLGetter();
             Purchase purchase = new Purchase();
 
             parseCardMainInfo(driver, wait, purchase);
@@ -34,8 +36,12 @@ public class PurchasePageParser {
 //            System.out.println("=======================================\n");
 
             // Парсим объекты закупки
+//            List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
+//            procurementObjects.forEach(purchase::addProcurementObject);
             List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
-            procurementObjects.forEach(purchase::addProcurementObject);
+            if (!procurementObjects.isEmpty()) {
+                purchase.addProcurementObject(procurementObjects.get(0)); // Добавляем только первый элемент
+            }
 
             // Выводим информацию о количестве найденных объектов
             System.out.println("Найдено объектов закупки: " + procurementObjects.size());
@@ -69,6 +75,10 @@ public class PurchasePageParser {
             if (dateData.containsKey("Обновлено")) {
                 purchase.setUpdateDate(parseDate(dateData.get("Обновлено")));
             }
+
+            int complaintsCount = complaintsCounter.countComplaintsByRegNumber(url, driver, wait);
+            purchase.setComplaints(complaintsCount);
+
 
             return purchase;
 

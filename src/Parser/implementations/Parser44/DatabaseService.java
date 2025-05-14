@@ -22,67 +22,17 @@ public class DatabaseService {
             try {
                 Purchase purchase = result.purchaseData;
 
-                // 1. Обработка Customer (должен быть сохранен первым)
-                if (purchase.getCustomer() != null) {
-                    Customer customer = purchase.getCustomer();
-                    Customer existingCustomer = session.createQuery(
-                                    "FROM Customer WHERE fullName = :fullName", Customer.class)
-                            .setParameter("fullName", customer.getFullName())
-                            .uniqueResult();
+                // 1. Обработка Customer
+                handleCustomer(session, purchase);
 
-                    if (existingCustomer != null) {
-                        updateCustomer(existingCustomer, customer);
-                        purchase.setCustomer(existingCustomer);
-                    } else {
-                        session.persist(customer);
-                        session.flush(); // Гарантируем получение ID
-                    }
-                }
+                // 2. Обработка Supplier и Contract
+                handleSupplierAndContract(session, purchase);
 
-                // 2. Обработка Purchase
-                Purchase existingPurchase = session.createQuery(
-                                "FROM Purchase WHERE purchaseNumber = :purchaseNumber", Purchase.class)
-                        .setParameter("purchaseNumber", purchase.getPurchaseNumber())
-                        .uniqueResult();
-
-                if (existingPurchase != null) {
-                    updatePurchase(existingPurchase, purchase);
-                    purchase = existingPurchase;
-                } else {
-                    session.persist(purchase);
-                }
-
-                // 3. Обработка Contract и Supplier
-                if (purchase.getContract() != null) {
-                    Contract contract = purchase.getContract();
-                    contract.setPurchase(purchase);
-
-                    if (contract.getSupplier() != null) {
-                        Supplier supplier = contract.getSupplier();
-                        Supplier existingSupplier = session.byNaturalId(Supplier.class)
-                                .using("name", supplier.getName())
-                                .load();
-
-                        if (existingSupplier != null) {
-                            updateSupplier(existingSupplier, supplier);
-                            contract.setSupplier(existingSupplier);
-                        } else {
-                            session.persist(supplier);
-                            session.flush();
-                        }
-                    }
-
-                    if (contract.getId() != null) {
-                        session.merge(contract);
-                    } else {
-                        session.persist(contract);
-                    }
-                }
+                // 3. Обработка Purchase
+                handlePurchase(session, purchase);
 
                 // 4. Обработка ProcurementObjects
-                if (purchase.getProcurementObjects() != null && !purchase.getProcurementObjects().isEmpty()) {
-                    updateProcurementObjects(session, purchase);
-                }
+                handleProcurementObjects(session, purchase);
 
                 transaction.commit();
             } catch (Exception e) {
@@ -91,6 +41,85 @@ public class DatabaseService {
                 }
                 throw new RuntimeException("Failed to save to database", e);
             }
+        }
+    }
+
+    private void handleCustomer(Session session, Purchase purchase) {
+        if (purchase.getCustomer() == null) return;
+
+        Customer customer = purchase.getCustomer();
+        Customer existingCustomer = session.createQuery(
+                        "FROM Customer WHERE fullName = :fullName", Customer.class)
+                .setParameter("fullName", customer.getFullName())
+                .uniqueResult();
+
+        if (existingCustomer != null) {
+            updateCustomer(existingCustomer, customer);
+            purchase.setCustomer(existingCustomer);
+        } else {
+            session.persist(customer);
+            session.flush();
+        }
+    }
+
+    private void handleSupplierAndContract(Session session, Purchase purchase) {
+        if (purchase.getContract() == null) return;
+
+        // Обработка Supplier
+        Supplier supplier = purchase.getContract().getSupplier();
+        if (supplier != null) {
+            Supplier existingSupplier = session.createQuery(
+                            "FROM Supplier WHERE name = :name", Supplier.class)
+                    .setParameter("name", supplier.getName())
+                    .uniqueResult();
+
+            if (existingSupplier != null) {
+                updateSupplier(existingSupplier, supplier);
+                supplier = existingSupplier;
+            } else {
+                session.persist(supplier);
+                session.flush();
+            }
+            purchase.getContract().setSupplier(supplier);
+        }
+
+        // Обработка Contract
+        Contract contract = purchase.getContract();
+        contract.setPurchase(purchase);
+
+        Contract existingContract = session.createQuery(
+                        "FROM Contract WHERE contractNumber = :contractNumber", Contract.class)
+                .setParameter("contractNumber", contract.getContractNumber())
+                .uniqueResult();
+
+        if (existingContract != null) {
+            purchase.setContract(existingContract);
+        } else {
+            session.persist(contract);
+        }
+        session.flush();
+    }
+
+    private void handlePurchase(Session session, Purchase purchase) {
+        Purchase existingPurchase = session.createQuery(
+                        "FROM Purchase WHERE purchaseNumber = :purchaseNumber", Purchase.class)
+                .setParameter("purchaseNumber", purchase.getPurchaseNumber())
+                .uniqueResult();
+
+        if (existingPurchase != null) {
+            updatePurchase(existingPurchase, purchase);
+            purchase = existingPurchase;
+        } else {
+            session.persist(purchase);
+        }
+    }
+
+    private void handleProcurementObjects(Session session, Purchase purchase) {
+        if (purchase.getProcurementObjects() == null || purchase.getProcurementObjects().isEmpty()) return;
+
+        for (ProcurementObject po : purchase.getProcurementObjects()) {
+            po.setPurchase(purchase);
+            session.persist(po);
         }
     }
 
@@ -107,6 +136,7 @@ public class DatabaseService {
         existing.setApplicationEndDate(newData.getApplicationEndDate());
         existing.setAuctionDate(newData.getAuctionDate());
         existing.setProcurementStage(newData.getProcurementStage());
+        existing.setComplaints(newData.getComplaints());
 
 
     }
@@ -230,36 +260,13 @@ public class DatabaseService {
                 int batchSize = 50;
                 for (int i = 0; i < suppliers.size(); i++) {
                     Supplier supplier = suppliers.get(i);
-
-                    // Ищем существующего поставщика по ИНН (если он есть)
-                    Supplier existingSupplier = null;
-                    if (supplier.getInn() != null && !supplier.getInn().isEmpty()) {
-                        existingSupplier = session.byNaturalId(Supplier.class)
-                                .using("inn", supplier.getInn())
-                                .load();
-                    }
-
-                    // Если не нашли по ИНН, пробуем найти по имени
-                    if (existingSupplier == null && supplier.getName() != null) {
-                        existingSupplier = session.createQuery(
-                                        "FROM Supplier WHERE name = :name", Supplier.class)
-                                .setParameter("name", supplier.getName())
-                                .uniqueResult();
-                    }
-
-                    if (existingSupplier != null) {
-                        updateSupplier(existingSupplier, supplier);
-                        session.merge(existingSupplier);
-                    } else {
-                        session.persist(supplier);
-                    }
+                    saveOrUpdateSupplier(session, supplier);
 
                     if (i % batchSize == 0 && i > 0) {
                         session.flush();
                         session.clear();
                     }
                 }
-
                 transaction.commit();
             } catch (Exception e) {
                 if (transaction != null) {
@@ -267,6 +274,67 @@ public class DatabaseService {
                 }
                 throw new RuntimeException("Failed to save suppliers", e);
             }
+        }
+    }
+
+    public synchronized void saveSingleSupplier(Supplier supplier) {
+        if (supplier == null) {
+            System.out.println("Поставщик для сохранения равен null");
+            return;
+        }
+
+        try (Session session = HibernateUtil.getSessionFactory().openSession()) {
+            Transaction transaction = session.beginTransaction();
+            try {
+                // Проверяем существование поставщика по NaturalId (имени)
+                Supplier existingSupplier = session.bySimpleNaturalId(Supplier.class)
+                        .load(supplier.getName());
+
+                if (existingSupplier == null) {
+                    // Сохраняем нового поставщика
+                    session.persist(supplier);
+                    System.out.println("Сохранен новый поставщик: " + supplier.getName());
+                } else {
+                    // Обновляем существующего поставщика
+
+
+                    System.out.println("Обновлен существующий поставщик: " + supplier.getName());
+                }
+
+                transaction.commit();
+            } catch (Exception e) {
+                if (transaction != null && transaction.isActive()) {
+                    transaction.rollback();
+                }
+                throw new RuntimeException("Ошибка при сохранении поставщика: " + supplier.getName(), e);
+            }
+        }
+    }
+    private synchronized Supplier saveOrUpdateSupplier(Session session, Supplier supplier) {
+        Supplier existingSupplier = null;
+
+        // Поиск по ИНН, если он есть
+        if (supplier.getInn() != null && !supplier.getInn().isEmpty()) {
+            existingSupplier = session.byNaturalId(Supplier.class)
+                    .using("inn", supplier.getInn())
+                    .load();
+        }
+
+        // Если не найден по ИНН, ищем по имени
+        if (existingSupplier == null && supplier.getName() != null) {
+            existingSupplier = session.createQuery(
+                            "FROM Supplier WHERE name = :name", Supplier.class)
+                    .setParameter("name", supplier.getName())
+                    .uniqueResult();
+        }
+
+        if (existingSupplier != null) {
+            updateSupplier(existingSupplier, supplier);
+            session.merge(existingSupplier);
+            return existingSupplier;
+        } else {
+            session.persist(supplier);
+            return supplier;
         }
     }
     public synchronized  void saveSupplierReliability(List<SupplierReliability> reliabilities) {

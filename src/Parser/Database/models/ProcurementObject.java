@@ -12,17 +12,17 @@ import jakarta.persistence.*;
 
         private String name;
 
-    @Column(name = "type")
+    @Column(name = "type",  columnDefinition = "TEXT")
     private String type;
 
-    @Column(name = "ktru_okpd2_codes")
+    @Column(name = "ktru_okpd2_codes",  columnDefinition = "TEXT")
     private String ktruOkpd2Codes;
 
     @Column(name = "quantity", precision = 19, scale = 3)
 
     private BigDecimal quantity;
 
-    @Column(name = "unit", length = 20)
+    @Column(name = "unit", length = 200)
     private String unit;
 
     @Column(name = "price_per_unit", precision = 19, scale = 2)
@@ -33,7 +33,7 @@ import jakarta.persistence.*;
 
     private String vatRate;
 
-    @Column(name = "country_of_origin", length = 100)
+    @Column(name = "country_of_origin",   columnDefinition = "TEXT")
     private String countryOfOrigin;
 
     @Column(name = "total_amount", precision = 19, scale = 2)

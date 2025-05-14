@@ -72,6 +72,53 @@ public class ContractDraftUrlFinder {
             System.out.println("Ошибка при поиске контракта: " + e.getMessage());
             return null;
         }
+
+
+    }
+
+    public String findContractUrlByRegNumber(String originalUrl, WebDriver driver, WebDriverWait wait) {
+
+        String regNumber = extractRegNumber(originalUrl);
+        if (regNumber == null) {
+            System.out.println("Не удалось извлечь номер закупки из URL: " + originalUrl);
+            return null;
+        }
+        try {
+            // Формируем URL для поиска контракта
+            String searchUrl = "https://zakupki.gov.ru/epz/contract/search/results.html?" +
+                    "searchString=&orderNumber=" + regNumber +
+                    "&openMode=USE_DEFAULT_PARAMS&fz44=on&priceFrom=0&priceTo=200000000000" +
+                    "&contractStageList=0%2C1%2C2%2C3&budgetaryFunds=on&extraBudgetaryFunds=on";
+
+            // Открываем страницу поиска
+            driver.get(searchUrl);
+
+            // Ждем появления блока с результатами
+            wait.until(ExpectedConditions.presenceOfElementLocated(
+                    By.cssSelector("div.search-registry-entrys-block")));
+
+            // Ищем блок с контрактом
+            WebElement contractBlock = driver.findElement(
+                    By.cssSelector("div.search-registry-entry-block"));
+
+            // Извлекаем ссылку на контракт
+            WebElement contractLink = contractBlock.findElement(
+                    By.cssSelector("a[href*='/epz/contract/contractCard/common-info.html']"));
+
+            String href = contractLink.getAttribute("href");
+            System.out.println("Найдена ссылка на контракт: " + href);
+            return href;
+
+        } catch (TimeoutException e) {
+            System.out.println("Не удалось найти блок с контрактом по номеру: " + regNumber);
+            return null;
+        } catch (NoSuchElementException e) {
+            System.out.println("Не удалось найти ссылку на контракт: " + e.getMessage());
+            return null;
+        } catch (Exception e) {
+            System.out.println("Ошибка при поиске контракта: " + e.getMessage());
+            return null;
+        }
     }
 
 }

@@ -27,6 +27,7 @@ import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONException;
@@ -2936,7 +2937,7 @@ public class mainForm extends JFrame {
                 currentParser.parseUrlsParallel(
                         new ArrayList<>(statusForm.selectedUrls),
                         this::handleParseResult,
-                        6,
+                        8,
                         progress -> SwingUtilities.invokeLater(() -> {
                             ParserProgressBar.setValue(progress);
                             StatusLabel.setText(String.format("Обработано %d из %d (парсинг закупок)",
@@ -2957,7 +2958,7 @@ public class mainForm extends JFrame {
 
                 currentParser.parseSupplierLitigations();
                 currentParser.parseSupplierStatuses();
-                currentParser.cleanupDownloadDirectory();
+//                currentParser.cleanupDownloadDirectory();
 
             } finally {
                 SwingUtilities.invokeLater(() -> {
@@ -2968,6 +2969,7 @@ public class mainForm extends JFrame {
                         StopParseringButton.setEnabled(false);
                         parserState = ParserState.IDLE;
                         StatusLabel.setText("Парсинг завершен");
+                        statusForm.selectedUrls.clear();
                     }
                 });
             }
@@ -3126,6 +3128,8 @@ public class mainForm extends JFrame {
     }
 
 
+
+
     private Map<String, String> createQueryParams(String searchQuery, boolean hasAnyFilter) {
         Map<String, String> params = new LinkedHashMap<>();
         params.put("searchString", searchQuery);
@@ -3144,27 +3148,30 @@ public class mainForm extends JFrame {
 
     private Map<String, String> buildFinalParams() {
         String searchText = SearchParamentInsert.getText().trim();
-        String searchQuery = searchText.isEmpty()
-                ? ""  // Пустая строка вместо пробела
-                : processSearchQuery(searchText);
+        String searchQuery = searchText.isEmpty() ? "" : processSearchQuery(searchText);
 
-        boolean hasAnyFilter = PurchaseCancelled.isSelected() ||
-                PurchaseCompleted.isSelected() ||
-                SubmissionOfApplications.isSelected() ||
-                CommissionWork.isSelected() ||
-                fz44.isSelected();
+        // Всегда добавляем базовые параметры
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("morphology", "on");
+        params.put("pageNumber", "1");
+        params.put("sortDirection", "false");
+        params.put("showLotsInfoHidden", "false");
+        params.put("sortBy", "UPDATE_DATE");
+        params.put("recordsPerPage", "_10"); // Важно для пагинации
 
-        Map<String, String> params = createQueryParams(searchQuery, hasAnyFilter);
+        // Параметры поиска
+        params.put("searchString", searchQuery);
 
-        // Добавляем параметры чекбоксов
+        // Фильтры статусов
         if (PurchaseCancelled.isSelected()) params.put("pa", "on");
         if (PurchaseCompleted.isSelected()) params.put("pc", "on");
         if (SubmissionOfApplications.isSelected()) params.put("af", "on");
         if (CommissionWork.isSelected()) params.put("ca", "on");
+
+        // Фильтры ФЗ
         if (fz44.isSelected()) params.put("fz44", "on");
         if (fz223.isSelected()) params.put("fz223", "on");
 
-        // Обрабатываем ОКПД2
         // Обработка ОКПД2
         String okpd2Code = OKPD2Field.getText().trim();
         if (!okpd2Code.isEmpty()) {
@@ -3173,82 +3180,94 @@ public class mainForm extends JFrame {
                 if (okpd2Id != null) {
                     params.put("okpd2Ids", okpd2Id);
                     params.put("okpd2IdsCodes", okpd2Code);
-                    params.put("okpd2IdsWithNested", "on"); // Важный параметр!
-
-                    // Для отладки выведем в консоль
-                    System.out.println("Установлены параметры ОКПД2:");
-                    System.out.println("Код: " + okpd2Code);
-                    System.out.println("ID: " + okpd2Id);
-                } else {
-                    System.err.println("ОКПД2 код не найден: " + okpd2Code);
-                    // Можно показать сообщение пользователю
-                    JOptionPane.showMessageDialog(null,
-                            "Код ОКПД2 не найден в справочнике: " + okpd2Code,
-                            "Ошибка",
-                            JOptionPane.WARNING_MESSAGE);
+                    params.put("okpd2IdsWithNested", "on");
                 }
             } catch (Exception e) {
                 System.err.println("Ошибка обработки ОКПД2: " + e.getMessage());
             }
         }
-//         Добавляем параметры дат
+
+        // Обработка дат
         SimpleDateFormat urlDateFormat = new SimpleDateFormat("dd.MM.yyyy");
         // Обработка даты публикации (основной фильтр даты)
         if (dateChooseFilterStart.getDate() != null) {
             params.put("publishDateFrom", urlDateFormat.format(dateChooseFilterStart.getDate()));
         }
-
         if (dateChooserFilterEnd.getDate() != null) {
             params.put("publishDateTo", urlDateFormat.format(dateChooserFilterEnd.getDate()));
         }
 
-        // Минимальная цена
-        String minPrice = MinPriceTextField.getText().trim();
-        if (!minPrice.isEmpty()) {
-            params.put("priceFromGeneral", minPrice);
+        // Фильтр по цене
+        try {
+            if (!MinPriceTextField.getText().trim().isEmpty()) {
+                double minPrice = Double.parseDouble(MinPriceTextField.getText().trim());
+                params.put("priceFromGeneral", String.format("%.0f", minPrice));
+            }
+            if (!MaxPriceTextField.getText().trim().isEmpty()) {
+                double maxPrice = Double.parseDouble(MaxPriceTextField.getText().trim());
+                params.put("priceToGeneral", String.format("%.0f", maxPrice));
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(null,
+                    "Некорректный формат цены. Используйте только цифры.",
+                    "Ошибка", JOptionPane.ERROR_MESSAGE);
         }
 
-        // Максимальная цена
-        String maxPrice = MaxPriceTextField.getText().trim();
-        if (!maxPrice.isEmpty()) {
-            params.put("priceToGeneral", maxPrice);
-        }
+        // Валюта
+        params.put("currencyIdGeneral",
+                comboBoxCurrency.getSelectedItem() != null ? "1" : "-1");
 
-        // Валюта (рубли)
-
-
-        if (comboBoxCurrency.getSelectedItem() != null) {
-            String selectedCurrency = comboBoxCurrency.getSelectedItem().toString();
-            String currencyId = Okpd2Converter.getCurrencyIdByName(selectedCurrency);
-            params.put("currencyIdGeneral", currencyId != null ? currencyId : "-1"); // "-1" как fallback
-        } else {
-            params.put("currencyIdGeneral", "-1"); // значение по умолчанию
-        }
-
+        System.out.println("Final URL params: " + params);
         return params;
     }
 
     private void onQueryButtonClicked() {
+        // Сбрасываем UI перед запуском нового парсера
+        resetParserUI();
+
         Map<String, String> params = buildFinalParams();
         clearTable(HeadersTable);
+        // Логируем все параметры
+        System.out.println("Формируемые параметры:");
+        params.forEach((k, v) -> System.out.println(k + " = " + v));
 
+        // Формируем тестовый URL для проверки в браузере
+        String testUrl = "https://zakupki.gov.ru/epz/order/extendedsearch/results.html?" +
+                params.entrySet().stream()
+                        .map(e -> e.getKey() + "=" + e.getValue())
+                        .collect(Collectors.joining("&"));
+        System.out.println("ПОЛНЫЙ URL ДЛЯ ПРОВЕРКИ:\n" + testUrl);
         // Очищаем предыдущие данные
         TotalRecords.setText("Всего записей: 0");
         CurrentRecords.setText("Обработано: 0");
         StatusLabel.setText("Статус: запуск парсера...");
 
-//        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
         currentParser = new PurchasesParserHead(driverSetup, null, params, statusForm);
-        PauseParser.setEnabled(true);
-        StopParser.setEnabled(true);
 
         new Thread(() -> {
             currentParser.parse();
             SwingUtilities.invokeLater(() -> {
-                PauseParser.setEnabled(false);
-                StopParser.setEnabled(false);
+                // После завершения парсинга сбрасываем кнопки
+                PauseParser.setEnabled(true);  // "Пауза" активна
+                StopParser.setEnabled(true);
+                StatusLabel.setText("Статус: парсинг завершён");
             });
         }).start();
+    }
+
+    private void resetParserUI() {
+        SwingUtilities.invokeLater(() -> {
+            // Сбрасываем текст кнопок
+            PauseParser.setText("Пауза");
+            PauseParser.setEnabled(true);
+            StopParser.setEnabled(true); // Аналогично
+
+            // Сбрасываем статус
+            StatusLabel.setText("Статус: готов к работе");
+
+            // Если у вас есть другие элементы (например, ProgressBar), их тоже можно сбросить
+            // ParserProgressBar.setValue(0);
+        });
     }
 
     // Метод для обработки поискового запроса
@@ -3271,25 +3290,47 @@ public class mainForm extends JFrame {
         DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
         int rowCount = model.getRowCount();
 
+        // Проверяем, есть ли хотя бы один выбранный элемент
+        boolean hasSelectedItems = false;
         for (int i = 0; i < rowCount; i++) {
-            model.setValueAt(true, i, 3);
-            PurchaseItem item = statusForm.allItems.get(i);
-            if (!statusForm.selectedUrls.contains(item.getUrl())) {
-                statusForm.selectedUrls.add(item.getUrl());
+            if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
+                hasSelectedItems = true;
+                break;
             }
         }
 
-        System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
+        // Если есть выбранные элементы — снимаем все галочки и очищаем список
+        if (hasSelectedItems) {
+            for (int i = 0; i < rowCount; i++) {
+                model.setValueAt(false, i, 3); // Снимаем галочку
+            }
+            statusForm.selectedUrls.clear(); // Очищаем список URL
+            System.out.println("Все элементы сняты. Список пуст.");
+        }
+        // Если нет выбранных элементов — выбираем все
+        else {
+            for (int i = 0; i < rowCount; i++) {
+                model.setValueAt(true, i, 3); // Ставим галочку
+                PurchaseItem item = statusForm.allItems.get(i);
+                if (!statusForm.selectedUrls.contains(item.getUrl())) {
+                    statusForm.selectedUrls.add(item.getUrl()); // Добавляем URL
+                }
+            }
+            System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
+        }
     }
 
     private void togglePauseParser() {
         if (currentParser != null) {
             PurchasesParserHead parser = (PurchasesParserHead) currentParser;
+
             if (parser.isPaused) {
+                // Если парсер на паузе — возобновляем
                 parser.resumeParser();
                 PauseParser.setText("Пауза");
                 StatusLabel.setText("Статус: парсинг продолжен");
             } else {
+                // Если парсер работает — ставим на паузу
                 parser.pauseParser();
                 PauseParser.setText("Продолжить");
                 StatusLabel.setText("Статус: парсинг на паузе");
@@ -3304,6 +3345,7 @@ public class mainForm extends JFrame {
             StopParser.setEnabled(false);
             PauseParser.setEnabled(false);
             StatusLabel.setText("Статус: парсинг остановлен");
+            statusForm.selectedUrls.clear();
         }
     }
 
@@ -3316,6 +3358,7 @@ public class mainForm extends JFrame {
                     (ParserProgressBar.getValue() >= statusForm.selectedUrls.size() ?
                             " (парсинг судебных дел)" : ""));
             StopParseringButton.setEnabled(true);
+
         }
     }
 
@@ -3334,7 +3377,7 @@ public class mainForm extends JFrame {
         if (currentParser != null && (parserState == ParserState.RUNNING || parserState == ParserState.PAUSED)) {
             currentParser.stopParser();
             parserState = ParserState.STOPPED;
-
+            statusForm.selectedUrls.clear();
             if (parserThread != null) {
                 parserThread.interrupt();
             }
@@ -3347,6 +3390,7 @@ public class mainForm extends JFrame {
                 StopParseringButton.setEnabled(false);
                 StatusLabel.setText("Парсинг остановлен");
                 ParserProgressBar.setValue(0);
+
             });
         }
     }

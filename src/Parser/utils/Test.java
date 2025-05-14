@@ -5,6 +5,10 @@ package Parser.utils;
 import Parser.implementations.ChromeDriverSetup;
 import Parser.implementations.Parser223.DocumentDraftUrlFinder;
 import Parser.implementations.Parser223.ExtractInfoFromDocument;
+import Parser.implementations.Parser44.Contracts.ComplaintsURLGetter;
+import Parser.implementations.Parser44.Contracts.ContractDataExtractor;
+import Parser.implementations.Parser44.Contracts.ContractDraftUrlFinder;
+
 import Parser.implementations.Parser44.LitigationParser;
 import Parser.implementations.Parser44.PurchaseParser44;
 import Parser.implementations.TextFileResultsSaver;
@@ -29,12 +33,21 @@ public class Test {
 //        String url1 = "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18049823";
 //        String url2 = "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18015273";
 //
-//        String userAgent = RandomUserAgent.getRandomUserAgent();
-//        DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
-//        WebDriver  driver = chromeSetup.setupDriver();
-//        DocumentDraftUrlFinder finder = new DocumentDraftUrlFinder();
-//        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
-//
+        String userAgent = RandomUserAgent.getRandomUserAgent();
+        DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
+        WebDriver  driver = chromeSetup.setupDriver();
+        DocumentDraftUrlFinder finder = new DocumentDraftUrlFinder();
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+//        ContractDataExtractor extractor = new ContractDataExtractor();
+//        extractor.parseAndPrintGeneralContractData("https://zakupki.gov.ru/epz/contract/contractCard/common-info.html?reestrNumber=4780551456224000016",
+//                driver,wait);
+
+        ComplaintsURLGetter getter = new ComplaintsURLGetter();
+        int result = getter.countComplaintsByRegNumber( "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
+                driver,wait);
+
+
+//        System.out.println(" поиске жалобы: " + result);
 //        try {
 //            // 3. Тестирование первого URL
 //            testUrl(finder, driver, wait, url1);
@@ -47,9 +60,9 @@ public class Test {
 //            driver.quit();
 //        }
 
-        ExtractInfoFromDocument extractor = new ExtractInfoFromDocument();
-        Map<String, Map<String, Object>> participantsData = extractor.extractParticipantsFromAllDocuments();
-        printParticipantsData(participantsData);
+//        ExtractInfoFromDocument extractor = new ExtractInfoFromDocument();
+//        Map<String, Map<String, Object>> participantsData = extractor.extractParticipantsFromAllDocuments();
+//        printParticipantsData(participantsData);
 
 
 
