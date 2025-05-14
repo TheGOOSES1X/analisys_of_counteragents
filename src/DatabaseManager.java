@@ -1488,6 +1488,20 @@ public class DatabaseManager {
 
     }
 
+    public long getMaxCritId(boolean db_module) {
+        String query = "SELECT COALESCE(MAX(id), 3) FROM public.module_criterion";
+        try (Connection conn = this.getConnection(db_module);
+             PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return 3; // fallback, если таблица пустая
+    }
+
     public List<rowCritData> getCritData(boolean db_module, long CritId) {
         List<rowCritData> critData = new ArrayList();
         String query = "SELECT DISTINCT id as cr_id, sname as cr_name, nfunctiontype as cr_fun, nminval as cr_min, nmaxval as cr_max, nweight as cr_weight, jdatapoints as cr_pts  FROM module_criterion WHERE id = " + CritId + " ";
@@ -1537,6 +1551,80 @@ public class DatabaseManager {
             var12.printStackTrace();
         }
 
+    }
+
+    public long addUserCritData(boolean db_module, String critName, String funcInd, String minVal, String maxVal, String critW, String jPoints) {
+        String query = "INSERT INTO public.module_criterion (sname, nfunctiontype, nminval, nmaxval, nweight, jdatapoints) " +
+                "VALUES ('" + critName + "', '" + funcInd + "', '" + minVal + "', '" + maxVal + "', '" + critW + "', '" + jPoints + "') RETURNING id";
+
+        Connection conn = null;
+        PreparedStatement stmt = null;
+        ResultSet rs = null;
+
+        try {
+            conn = this.getConnection(db_module);  // Открываем соединение
+            stmt = conn.prepareStatement(query);  // Подготавливаем запрос
+            rs = stmt.executeQuery();  // Выполняем запрос
+
+            if (rs.next()) {
+                return rs.getLong("id");  // Возвращаем сгенерированный id
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                if (rs != null) {
+                    rs.close();  // Закрываем ResultSet
+                }
+                if (stmt != null) {
+                    stmt.close();  // Закрываем PreparedStatement
+                }
+                if (conn != null) {
+                    conn.close();  // Закрываем соединение
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+        return -1;  // Если ошибка, возвращаем -1
+    }
+    public List<rowCritData> getAllCritData(boolean db_module) {
+        List<rowCritData> critData = new ArrayList<>();
+        String query = "SELECT DISTINCT id as cr_id, sname as cr_name, nfunctiontype as cr_fun, nminval as cr_min, nmaxval as cr_max, nweight as cr_weight, jdatapoints as cr_pts FROM module_criterion WHERE id > 3";
+
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+
+            try {
+                while (resultSet.next()) {
+                    long crId = resultSet.getLong("cr_id");
+                    String crName = resultSet.getString("cr_name");
+                    int crFun = resultSet.getInt("cr_fun");
+                    double crMin = resultSet.getDouble("cr_min");
+                    double crMax = resultSet.getDouble("cr_max");
+                    double crW = resultSet.getDouble("cr_weight");
+                    String crPoints = resultSet.getString("cr_pts");
+                    critData.add(new rowCritData(crId, crName, crFun, crMin, crMax, crW, crPoints));
+                }
+            } catch (Throwable var19) {
+                if (resultSet != null) {
+                    try {
+                        resultSet.close();
+                    } catch (Throwable var18) {
+                        var19.addSuppressed(var18);
+                    }
+                }
+                throw var19;
+            }
+
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        } catch (SQLException var20) {
+            var20.printStackTrace();
+        }
+
+        return critData;
     }
 
     public void changeCritData(boolean db_module, long critId, String critName, String funcInd, String minVal, String maxVal, String critW, String jPoints) {

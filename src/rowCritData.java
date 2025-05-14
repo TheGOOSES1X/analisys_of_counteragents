@@ -44,4 +44,9 @@ public class rowCritData {
     public String getJsonDataPoints() {
         return jsonDataPoints;
     }
+
+    @Override
+    public String toString() {
+        return this.critName; // или любое другое поле, которое содержит название
+    }
 }
