@@ -14,6 +14,10 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import org.json.JSONObject;
+import org.postgresql.util.PGobject;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class DatabaseManager {
     private String __URL;
@@ -30,10 +34,255 @@ public class DatabaseManager {
         this.__PASSWORD = _PASSWORD;
     }
 
-    private Connection getConnection() throws SQLException {
+
+    public Connection getConnection() throws SQLException {
         String _fullURL = "jdbc:postgresql:" + this.__URL + "/" + this.__DB_Module;
         return DriverManager.getConnection(_fullURL, this.__USER, this.__PASSWORD);
     }
+
+    public class CriterionData {
+        public int id;
+        public String nfunctiontype;
+        public double nminval;
+        public double nmaxval;
+        public double nweight;
+
+        public CriterionData(int id, String type, double min, double max, double weight) {
+            this.id = id;
+            this.nfunctiontype = type;
+            this.nminval = min;
+            this.nmaxval = max;
+            this.nweight = weight;
+        }
+    }
+
+    public List<CriterionData> getAllCriteria() {
+        List<CriterionData> list = new ArrayList<>();
+        String sql = "SELECT id, nfunctiontype, nminval, nmaxval, nweight FROM module_criterion";
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                list.add(new CriterionData(
+                        rs.getInt("id"),
+                        rs.getString("nfunctiontype"),
+                        rs.getDouble("nminval"),
+                        rs.getDouble("nmaxval"),
+                        rs.getDouble("nweight")
+                ));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return list;
+    }
+
+    public String getJValuesForProfile(String profileName) {
+        String sql = "SELECT jvalues FROM module_profiles WHERE profile_name = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, profileName);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                return rs.getString("jvalues");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public boolean applyProfileByName(String profileName) {
+        String sql = "SELECT module_criterion_id, jvalues FROM module_profiles WHERE profile_name = ?";
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, profileName);
+            ResultSet rs = stmt.executeQuery();
+
+            while (rs.next()) {
+                int moduleCriterionId = rs.getInt("module_criterion_id");
+                String jvalues = rs.getString("jvalues");
+
+                // jvalues — это один JSON-объект, а не массив
+                JSONObject obj = new JSONObject(jvalues);
+
+                int functionType = obj.getInt("nfunctiontype");
+                double minVal = obj.getDouble("nminval");
+                double maxVal = obj.getDouble("nmaxval");
+                double weight = obj.getDouble("nweight");
+
+                // Обновляем module_criterion по id
+                String updateSql = "UPDATE module_criterion SET nfunctiontype = ?, nminval = ?, nmaxval = ?, nweight = ? WHERE id = ?";
+
+                try (PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+                    updateStmt.setInt(1, functionType);
+                    updateStmt.setDouble(2, minVal);
+                    updateStmt.setDouble(3, maxVal);
+                    updateStmt.setDouble(4, weight);
+                    updateStmt.setInt(5, moduleCriterionId);
+                    updateStmt.executeUpdate();
+                }
+            }
+
+            return true;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+
+
+
+
+
+
+    public boolean insertProfile(String profileName, int moduleCriterionId, String jValues) {
+        String sql = "INSERT INTO module_profiles (profile_name, module_criterion_id, jvalues) VALUES (?, ?, ?)";
+        System.out.println("Executing SQL: " + sql);
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            // Преобразуем строку в валидный JSON (если нужно проверить, что это корректный JSON)
+            JSONObject jsonObject = new JSONObject(jValues);
+
+            // Создаем объект PGobject и задаем тип jsonb
+            PGobject jsonbObject = new PGobject();
+            jsonbObject.setType("jsonb");
+            jsonbObject.setValue(jsonObject.toString());
+
+            stmt.setString(1, profileName);
+            stmt.setInt(2, moduleCriterionId);
+            stmt.setObject(3, jsonbObject); // <-- передаем jsonb
+
+            stmt.executeUpdate();
+            return true;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+    public void createProfilesFromModuleCriterion(String baseProfileName) {
+        String selectQuery = "SELECT id, nfunctiontype, nminval, nmaxval, nweight FROM module_criterion";
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(selectQuery);
+             ResultSet rs = stmt.executeQuery()) {
+
+            int index = 1;
+            while (rs.next()) {
+                int id = rs.getInt("id");
+
+                JSONObject obj = new JSONObject();
+                obj.put("nfunctiontype", rs.getString("nfunctiontype"));
+                obj.put("nminval", rs.getDouble("nminval"));
+                obj.put("nmaxval", rs.getDouble("nmaxval"));
+                obj.put("nweight", rs.getDouble("nweight"));
+
+                // Пример: profile_1, profile_2 и т.д.
+                String profileName = baseProfileName + "_" + index++;
+
+                boolean success = insertProfile(profileName, id, obj.toString());
+                if (success) {
+                    System.out.println("Профиль " + profileName + " успешно добавлен.");
+                } else {
+                    System.out.println("Ошибка при добавлении профиля " + profileName);
+                }
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public List<String> getAllProfileNames() {
+        List<String> profileNames = new ArrayList<>();
+        String sql = "SELECT DISTINCT profile_name FROM module_profiles";
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                profileNames.add(rs.getString("profile_name"));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return profileNames;
+    }
+
+
+
+
+
+    public class ModuleProfile {
+        private int id;
+        private String name;
+
+        public ModuleProfile(int id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        public int getId() {
+            return id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public String toString() {
+            return name; // Отображаем имя в JComboBox
+        }
+    }
+
+    public List<ModuleProfile> loadModuleProfiles() {
+        List<ModuleProfile> profiles = new ArrayList<>();
+        String sql = "SELECT id, profile_name FROM module_profiles";
+
+        try (Connection conn = getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()) {
+                int id = rs.getInt("id");
+                String name = rs.getString("profile_name");
+                profiles.add(new ModuleProfile(id, name));
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return profiles;
+    }
+
+
+
+
+
+
+
+
+
+
+
 
     private Connection getConnection(boolean db_main) throws SQLException {
         String _fullURL = "jdbc:postgresql:" + this.__URL + "/";
