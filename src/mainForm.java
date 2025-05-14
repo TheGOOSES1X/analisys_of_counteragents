@@ -1704,7 +1704,7 @@ public class mainForm extends JFrame {
                     String g_code = tableOptGoodsConditionsEdit.getValueAt(i, 1).toString();
                     String g_name = tableOptGoodsConditionsEdit.getValueAt(i, 2).toString();
                     int g_cond = Integer.parseInt(tableOptGoodsConditionsEdit.getValueAt(i, 3).toString());
-                    rowsGoodCond.add(new rowGoods(g_id, g_name, g_cond,g_code,0,0,0,0,0,""));
+                    rowsGoodCond.add(new rowGoods(g_id, g_name, g_cond,g_code,0,0,0,0,0,"",""));
 
                 }
 
@@ -3429,8 +3429,6 @@ public class mainForm extends JFrame {
 
 
         final String finalContras = contras;
-        System.out.println(finalContras);
-        System.out.println("TESTBAT");
         final String finalGood = good;
         final String finalDate = date;
         final String finalMinVolume = minVolume;
@@ -3454,7 +3452,7 @@ public class mainForm extends JFrame {
 
         // Запускаем интерфейс
         SwingUtilities.invokeLater(() -> {
-            mainForm form = new mainForm(Role.USER); // ← по умолчанию роль USER
+            mainForm form = new mainForm(Role.EXPERT); // ← по умолчанию роль USER
             form.setContentPane(form.MainPanel);
             form.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             form.pack();

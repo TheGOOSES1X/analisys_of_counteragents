@@ -168,6 +168,10 @@ public class DatabaseManager {
                 statement.setDouble(8, rowG.getDiameter());
                 statement.setDouble(9, rowG.getThickness());
                 statement.setString(10, rowG.getGoodMeasure());
+                // Добавляем okpd2, если запрос этого требует
+                if (query.contains("okpd2")) {
+                    statement.setString(11, rowG.getOkpd2());
+                }
                 statement.addBatch();
             }
 
@@ -534,7 +538,7 @@ public class DatabaseManager {
     }
 
     public void setTables(boolean db_module) {
-        String query = "CREATE TABLE IF NOT EXISTS public.bs_contras (id bigint NOT NULL, scaption character varying(254), ncontrasreliability numeric(38,18), scode character varying(254), sinn character varying(254), nfromglobalstatus numeric(38,18))";
+        String query = "CREATE TABLE IF NOT EXISTS public.bs_contras (id bigint NOT NULL, scaption character varying(512), ncontrasreliability numeric(38,18), scode character varying(254), sinn character varying(254), nfromglobalstatus numeric(38,18))";
 
         try {
             this.executeQueryNoResult(db_module, query);
@@ -609,16 +613,18 @@ public class DatabaseManager {
     }
 
     public void updateTables(boolean db_main, boolean db_module) {
-        List<rowContras> rowCs = new ArrayList();
-        String query = "SELECT DISTINCT bc.id as id_c, bc.scaption as name_c, bc.scode as code_c, bc.sinn as inn_c, bsr.bforbiddencontraspurchase as fb_pch, bsr.bforbiddencooperation as fb_coop FROM public.bs_contras bc ";
-        query = query + "LEFT JOIN Bs_ContrasReliability bsr ON bc.idContrasReliability = bsr.id ";
+        List<rowContras> rowCs = new ArrayList<>();
 
+        // 1. Загрузка данных из bs_contras
+        String query = "SELECT DISTINCT bc.id as id_c, bc.scaption as name_c, bc.scode as code_c, bc.sinn as inn_c, " +
+                "bsr.bforbiddencontraspurchase as fb_pch, bsr.bforbiddencooperation as fb_coop " +
+                "FROM public.bs_contras bc " +
+                "LEFT JOIN Bs_ContrasReliability bsr ON bc.idContrasReliability = bsr.id";
         String g_Name;
         try {
             ResultSet resultSet = this.executeQuery(db_main, query);
-
             try {
-                while(resultSet.next()) {
+                while (resultSet.next()) {
                     long c_id = resultSet.getLong("id_c");
                     String c_Name = resultSet.getString("name_c");
                     g_Name = resultSet.getString("code_c");
@@ -629,24 +635,39 @@ public class DatabaseManager {
                     int globalStatus = 1;
                     rowCs.add(new rowContras(c_id, c_Name, c_rep, g_Name, c_inn, globalStatus));
                 }
-            } catch (Throwable var70) {
+            } finally {
                 if (resultSet != null) {
-                    try {
-                        resultSet.close();
-                    } catch (Throwable var53) {
-                        var70.addSuppressed(var53);
-                    }
+                    resultSet.close();
                 }
-
-                throw var70;
             }
-
-            if (resultSet != null) {
-                resultSet.close();
-            }
-        } catch (SQLException var71) {
-            var71.printStackTrace();
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
+
+        // 2. Загрузка данных из suppliers
+        String supplierQuery = "SELECT id, country_name, country_code, inn FROM public.suppliers";
+        try {
+            ResultSet supplierSet = this.executeQuery(db_module, supplierQuery);
+            try {
+                while (supplierSet.next()) {
+                    long id = supplierSet.getLong("id") + 10_000_000;
+                    String name = supplierSet.getString("country_name"); // scaption
+                    String code = supplierSet.getString("country_code"); // scode
+                    String inn = supplierSet.getString("inn"); // sinn
+                    double c_rep = 1.0;
+                    int globalStatus = 0;
+                    rowCs.add(new rowContras(id, name, c_rep, code, inn, globalStatus));
+                }
+            } finally {
+                if (supplierSet != null) {
+                    supplierSet.close();
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+
 
         query = "DELETE FROM public.bs_contras";
 
@@ -656,12 +677,12 @@ public class DatabaseManager {
             var52.printStackTrace();
         }
 
-        query = "INSERT INTO public.bs_contras (id, scaption, ncontrasreliability, scode, sinn, nfromglobalstatus) VALUES (?,?,?,?,?,?)";
-
+        // 3. Вставка объединённых данных
+        String insertQuery = "INSERT INTO public.bs_contras (id, scaption, ncontrasreliability, scode, sinn, nfromglobalstatus) VALUES (?,?,?,?,?,?)";
         try {
-            this.executeQueryBatchContras(db_module, query, rowCs);
-        } catch (SQLException var51) {
-            var51.printStackTrace();
+            this.executeQueryBatchContras(db_module, insertQuery, rowCs);
+        } catch (SQLException e) {
+            e.printStackTrace();
         }
 
         List<rowGoods> rowGs = new ArrayList();
@@ -687,7 +708,7 @@ public class DatabaseManager {
                     nprc = resultSet.getDouble("d_g");
                     n_qty_b = resultSet.getDouble("t_g");
                     String g_MU = resultSet.getString("measure_g");
-                    rowGs.add(new rowGoods(g_id, g_Name, 0, o_Name, g_W, n_qty, n_qty, nprc, n_qty_b, g_MU));
+                    rowGs.add(new rowGoods(g_id, g_Name, 0, o_Name, g_W, n_qty, n_qty, nprc, n_qty_b, g_MU, ""));
                 }
             } catch (Throwable var68) {
                 if (resultSet != null) {
@@ -708,6 +729,46 @@ public class DatabaseManager {
             var69.printStackTrace();
         }
 
+        List<rowGoods> rowGsExtra = new ArrayList<>();
+        query = "SELECT po.id + 10000000 AS id_shifted, " +
+                "REPLACE(REPLACE(po.name, CHR(13), ' '), CHR(10), ' ') AS name_cleaned, " +
+                "po.unit, po.ktru_okpd2_codes " +
+                "FROM procurement_objects po " +
+                "WHERE po.ktru_okpd2_codes IS NOT NULL";
+
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+
+            try {
+                while (resultSet.next()) {
+                    long id_shifted = resultSet.getLong("id_shifted");
+                    String name_cleaned = resultSet.getString("name_cleaned");
+                    if (name_cleaned != null && name_cleaned.length() > 512) {
+                        name_cleaned = name_cleaned.substring(0, 512);
+                    }
+                    String unit = resultSet.getString("unit");
+                    String okpd2 = resultSet.getString("ktru_okpd2_codes");
+
+                    rowGsExtra.add(new rowGoods(id_shifted, name_cleaned, 0, null, 0, 0, 0, 0, 0, unit, okpd2));
+                }
+            } catch (Throwable var100) {
+                if (resultSet != null) {
+                    try {
+                        resultSet.close();
+                    } catch (Throwable varX) {
+                        var100.addSuppressed(varX);
+                    }
+                }
+                throw var100;
+            }
+
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+
         query = "DELETE FROM public.bs_goods";
 
         try {
@@ -722,6 +783,15 @@ public class DatabaseManager {
             this.executeQueryBatchGoods(db_module, query, rowGs);
         } catch (SQLException var48) {
             var48.printStackTrace();
+        }
+        // второй batch-запрос — ДОБАВЛЕНИЕ новых записей
+        query = "INSERT INTO public.bs_goods (id, sname, npreparedays, sarticle, nwidth, nheight, nlength, ndiameter, nthickness, goodmsritem, okpd2) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+
+        try {
+            this.executeQueryBatchGoods(db_module, query, rowGsExtra);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
         }
 
         List<rowOrders> rowOs = new ArrayList();
@@ -2784,7 +2854,7 @@ public class DatabaseManager {
                     String g_name = resultSet.getString("g_name");
                     int g_cond = resultSet.getInt("g_cond");
                     String g_code = resultSet.getString("g_code");
-                    filteredCGO_CV.add(new rowGoods(g_id, g_name, g_cond, g_code, 0.0, 0.0, 0.0, 0.0, 0.0, ""));
+                    filteredCGO_CV.add(new rowGoods(g_id, g_name, g_cond, g_code, 0.0, 0.0, 0.0, 0.0, 0.0, "", ""));
                 }
             } catch (Throwable var13) {
                 if (resultSet != null) {

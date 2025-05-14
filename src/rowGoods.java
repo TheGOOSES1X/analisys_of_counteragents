@@ -5,7 +5,8 @@ public class rowGoods {
     private String goodCode;
     private double width,height, length, diameter, thickness;
     private String goodMeasure;
-    public rowGoods(long idGood, String goodName, int prepareDays, String goodCode,double w,double h, double l,double d, double t, String goodMeasure) {
+    private String okpd2;
+    public rowGoods(long idGood, String goodName, int prepareDays, String goodCode,double w,double h, double l,double d, double t, String goodMeasure, String okpd2) {
         this.idGood = idGood;
         this.goodName = goodName;
         this.prepareDays = prepareDays;
@@ -16,6 +17,7 @@ public class rowGoods {
         this.diameter = d;
         this.thickness = t;
         this.goodMeasure = goodMeasure;
+        this.okpd2 = okpd2;
     }
 
     public long getIdGood() {
@@ -56,4 +58,5 @@ public class rowGoods {
     public String getGoodMeasure() {
         return goodMeasure;
     }
+    public String getOkpd2(){return okpd2;}
 }
