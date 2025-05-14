@@ -9,6 +9,8 @@ import javax.swing.JTable;
 import java.util.Comparator;
 import java.awt.*;
 import java.sql.PreparedStatement;
+
+import MainAnalyzer.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -536,7 +538,7 @@ public class mainForm extends JFrame {
             }
         }
 
-// Использование:
+        // Использование:
         buttonCreateProfile.addActionListener(e -> {
             CreateProfileDialog dialog = new CreateProfileDialog(dbExtractor, comboBoxProfileCriterion);
             dialog.setVisible(true);
@@ -575,32 +577,6 @@ public class mainForm extends JFrame {
                 }
             }
         });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         buttongetAllContras.addActionListener(new ActionListener() {
             @Override
