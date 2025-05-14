@@ -2821,27 +2821,30 @@ public class mainForm extends JFrame {
 
     private Map<String, String> buildFinalParams() {
         String searchText = SearchParamentInsert.getText().trim();
-        String searchQuery = searchText.isEmpty()
-                ? ""  // Пустая строка вместо пробела
-                : processSearchQuery(searchText);
+        String searchQuery = searchText.isEmpty() ? "" : processSearchQuery(searchText);
 
-        boolean hasAnyFilter = PurchaseCancelled.isSelected() ||
-                PurchaseCompleted.isSelected() ||
-                SubmissionOfApplications.isSelected() ||
-                CommissionWork.isSelected() ||
-                fz44.isSelected();
+        // Всегда добавляем базовые параметры
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("morphology", "on");
+        params.put("pageNumber", "1");
+        params.put("sortDirection", "false");
+        params.put("showLotsInfoHidden", "false");
+        params.put("sortBy", "UPDATE_DATE");
+        params.put("recordsPerPage", "_10"); // Важно для пагинации
 
-        Map<String, String> params = createQueryParams(searchQuery, hasAnyFilter);
+        // Параметры поиска
+        params.put("searchString", searchQuery);
 
-        // Добавляем параметры чекбоксов
+        // Фильтры статусов
         if (PurchaseCancelled.isSelected()) params.put("pa", "on");
         if (PurchaseCompleted.isSelected()) params.put("pc", "on");
         if (SubmissionOfApplications.isSelected()) params.put("af", "on");
         if (CommissionWork.isSelected()) params.put("ca", "on");
+
+        // Фильтры ФЗ
         if (fz44.isSelected()) params.put("fz44", "on");
         if (fz223.isSelected()) params.put("fz223", "on");
 
-        // Обрабатываем ОКПД2
         // Обработка ОКПД2
         String okpd2Code = OKPD2Field.getText().trim();
         if (!okpd2Code.isEmpty()) {
@@ -2851,64 +2854,43 @@ public class mainForm extends JFrame {
                     params.put("okpd2Ids", okpd2Id);
                     params.put("okpd2IdsCodes", okpd2Code);
                     params.put("okpd2IdsWithNested", "on");
-                    // Важный параметр!
-
-                    // Для отладки выведем в консоль
-                    System.out.println("Установлены параметры ОКПД2:");
-                    System.out.println("Код: " + okpd2Code);
-                    System.out.println("ID: " + okpd2Id);
-                } else {
-                    System.err.println("ОКПД2 код не найден: " + okpd2Code);
-                    // Можно показать сообщение пользователю
-                    JOptionPane.showMessageDialog(null,
-                            "Код ОКПД2 не найден в справочнике: " + okpd2Code,
-                            "Ошибка",
-                            JOptionPane.WARNING_MESSAGE);
                 }
             } catch (Exception e) {
                 System.err.println("Ошибка обработки ОКПД2: " + e.getMessage());
             }
         }
-//         Добавляем параметры дат
+
+        // Обработка дат
         SimpleDateFormat urlDateFormat = new SimpleDateFormat("dd.MM.yyyy");
-        // Обработка даты публикации (основной фильтр даты)
         if (dateChooseFilterStart.getDate() != null) {
             params.put("publishDateFrom", urlDateFormat.format(dateChooseFilterStart.getDate()));
         }
-
         if (dateChooserFilterEnd.getDate() != null) {
             params.put("publishDateTo", urlDateFormat.format(dateChooserFilterEnd.getDate()));
         }
 
-
-
-// Максимальная цена
         // Фильтр по цене
         try {
-            // Минимальная цена (убираем научную нотацию)
             if (!MinPriceTextField.getText().trim().isEmpty()) {
                 double minPrice = Double.parseDouble(MinPriceTextField.getText().trim());
                 params.put("priceFromGeneral", String.format("%.0f", minPrice));
             }
-
-            // Максимальная цена
             if (!MaxPriceTextField.getText().trim().isEmpty()) {
                 double maxPrice = Double.parseDouble(MaxPriceTextField.getText().trim());
                 params.put("priceToGeneral", String.format("%.0f", maxPrice));
             }
-
-            // Валюта (1 - рубли, -1 - все валюты)
-            params.put("currencyIdGeneral",
-                    comboBoxCurrency.getSelectedItem() != null ? "1" : "-1");
-
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(null,
                     "Некорректный формат цены. Используйте только цифры.",
                     "Ошибка", JOptionPane.ERROR_MESSAGE);
         }
+
+        // Валюта
+        params.put("currencyIdGeneral",
+                comboBoxCurrency.getSelectedItem() != null ? "1" : "-1");
+
         System.out.println("Final URL params: " + params);
         return params;
-
     }
 
     private void onQueryButtonClicked() {
