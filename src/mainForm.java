@@ -3342,6 +3342,32 @@ public class mainForm extends JFrame {
 
 
     public static void main(String[] args) {
+        // Параметры по умолчанию
+        String contras = "";
+        String good = "";
+        String date = "";
+        String minVolume = "";
+        String order = "";
+
+        // Если есть аргументы командной строки, используем их
+        if (args.length >= 5) {
+            contras = args[0];  // первый аргумент (после имени программы)
+            good = args[1];     // второй аргумент
+            date = args[2];     // третий аргумент
+            minVolume = args[3]; // четвертый аргумент
+            order = args[4];    // пятый аргумент
+        }
+
+
+        final String finalContras = contras;
+        System.out.println(finalContras);
+        System.out.println("TESTBAT");
+        final String finalGood = good;
+        final String finalDate = date;
+        final String finalMinVolume = minVolume;
+        final String finalOrder = order;
+
+
         try {
             for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
                 if ("Nimbus".equals(info.getName())) {
@@ -3364,6 +3390,13 @@ public class mainForm extends JFrame {
             form.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             form.pack();
             form.setVisible(true);
+
+            form.textFieldFilterContras.setText(finalContras);
+            System.out.println(finalContras);
+            form.textFieldFilterDate.setText(finalDate);
+            form.textFieldFilterGood.setText(finalGood);
+            form.textFieldFilterMinVolume.setText(finalMinVolume);
+            form.textFieldFilterOrder.setText(finalOrder);
         });
     }
 
