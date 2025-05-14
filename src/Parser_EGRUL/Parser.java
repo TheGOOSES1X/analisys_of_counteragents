@@ -1,6 +1,6 @@
 package Parser_EGRUL;
-import Parser.implementations.Parser44.DatabaseService;
 import Parser.utils.RandomUserAgent;
+import Parser_EGRUL.Interfaces.CountdownListener;
 
 import io.github.bonigarcia.wdm.WebDriverManager;
 import org.apache.logging.log4j.LogManager;
@@ -37,7 +37,7 @@ public class Parser {
     private static final String CSV_FILE = "./src/Parser_EGRUL/INN_list.csv";
     private static final Object fileLock = new Object(); // Общий объект для синхронизации
 
-    public static void asyncEGRULParse(List<String> list, ChromeOptions options) throws IOException {
+    public static void asyncEGRULParse(List<String> list, ChromeOptions options, CountdownListener listener) throws IOException {
         // Создаем пул потоков
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         // Создаем список Future для отслеживания результатов
@@ -46,7 +46,7 @@ public class Parser {
         for (String key : list) {
             futures.add(executor.submit(() -> {
                 try {
-                    innEGRULParse(key, options);
+                    innEGRULParse(key, options, listener);
                 } catch (InterruptedException e) {
                     log.error("e: ", e);
                     throw new RuntimeException(e);
@@ -67,11 +67,11 @@ public class Parser {
         if (countRemainingUrls() > 1){
             list = Files.readAllLines(Paths.get(CSV_FILE));
             System.out.println("Ссылки ещё остались, продолжаем");
-            asyncEGRULParse(list, options);
+            asyncEGRULParse(list, options, listener);
         }
     }
 
-    private static void innEGRULParse(String key, ChromeOptions options) throws InterruptedException {
+    private static void innEGRULParse(String key, ChromeOptions options, CountdownListener listener) throws InterruptedException {
         WebDriver driver = null;
         try {
             driver = new ChromeDriver(options);
@@ -96,7 +96,8 @@ public class Parser {
                 Thread.sleep(5000);
                 System.out.println("Успешно обработан " + key);
                 removeUrlFromCSV(key);
-                System.out.println("Осталось обработать " + (countRemainingUrls()+1));
+                listener.onCountdownUpdate(countRemainingUrls()+1);
+                //System.out.println("Осталось обработать " + (countRemainingUrls()+1));
             } catch (TimeoutException e) {
                 try {
                     List<WebElement> infoFileButtons = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
@@ -113,7 +114,8 @@ public class Parser {
                         Thread.sleep(5000);
                         System.out.println("Успешно обработан: " + key);  // key можно заменить на что-то осмысленное
                         removeUrlFromCSV(key);
-                        System.out.println("Осталось обработать " + (countRemainingUrls()+1));
+                        listener.onCountdownUpdate(countRemainingUrls()+1);
+                        //System.out.println("Осталось обработать " + (countRemainingUrls()+1));
                     }
                 } catch (TimeoutException ex) {
                     System.out.println("Ни одна из кнопок не появилась в течение " + TIMEOUT_SECONDS + " секунд для: " + key);
@@ -129,7 +131,7 @@ public class Parser {
         }
     }
 
-    public static void StartParsingEGRUL () throws IOException {
+    public static void StartParsingEGRUL (CountdownListener listener) throws IOException {
         List<String> INN_list;
 
         // Проверяем существование файла
@@ -168,7 +170,7 @@ public class Parser {
         WebDriverManager.chromedriver().setup();
         ChromeOptions options = getChromeOptions();
 
-        //asyncEGRULParse(INN_list, options);
+        asyncEGRULParse(INN_list, options, listener);
 
         System.out.println("Сбор PDF файлов по ИНН завершён");
     }
@@ -187,7 +189,7 @@ public class Parser {
         }
     }
 
-    private static int countRemainingUrls() {
+    public static int countRemainingUrls() {
         try {
             return (int) Files.readAllLines(Paths.get(CSV_FILE))
                     .stream()

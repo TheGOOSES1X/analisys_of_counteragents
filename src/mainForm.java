@@ -16,7 +16,6 @@ import Parser.utils.Okpd2Converter;
 import Parser.utils.RandomUserAgent;
 import com.toedter.calendar.JDateChooser;
 
-
 import java.awt.*;
 // для json
 import java.io.IOException;
@@ -188,6 +187,11 @@ public class mainForm extends JFrame {
     private JButton StopParser;
     private JButton PauseParsingButton;
     private JButton StopParseringButton;
+    private JButton EGRUL_PDF_Parser_Start;
+    private JButton EGRUL_PDF_Parser_Stop;
+    private JButton EGRUL_PDF_To_Data;
+    private JProgressBar EGRUL_Parser_Progress_Bar;
+    private JLabel EGRUL_PDF_Bar_status;
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -207,6 +211,7 @@ public class mainForm extends JFrame {
     private ParserState parserState = ParserState.IDLE;
 
     private Thread parserThread;
+    private Thread EGRUL_Parser_Thread;
 
 
     // List<rowGoodsOrders> rowTableCritIntervalEdit;
@@ -1893,6 +1898,8 @@ public class mainForm extends JFrame {
         StopParseringButton.addActionListener(e -> {
             stopParsing();
         });
+        EGRUL_PDF_Parser_Start.addActionListener(e -> EGRUL_Parser_Start());
+        EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
 
         // Кнопка паузы/продолжения
         PauseParsingButton.addActionListener(e -> {
@@ -2848,6 +2855,29 @@ public class mainForm extends JFrame {
         enableSortingForTable(tableOptVolResultPurchase,  2, 3,6,7); // Сортировка по OrderName, GoodName, PurchaseQuantity, GoodMeasure
     }
 
+    private void EGRUL_Parser_Start(){
+//        try {
+//            EGRUL_PDF_Parser_Start.setText("Парсинг...");
+//            EGRUL_PDF_Parser_Start.setEnabled(false);
+//
+//            EGRUL_Parser_Progress_Bar.setMinimum(0);
+//            EGRUL_Parser_Progress_Bar.setMaximum(Parser_EGRUL.Parser.countRemainingUrls());
+//
+//
+//
+//            Parser_EGRUL.Parser.StartParsingEGRUL();
+//        } catch (IOException e) {
+//            EGRUL_PDF_Bar_status.setText("Ошибка при сборе данных " + e.toString());
+//        }
+    }
+
+    private void EGRUL_PDF_Processing(){
+//        try {
+//            Parser_EGRUL.Parser.StartParsingEGRUL(this);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
+    }
 
     private void initStartParsingButton() {
         if (statusForm.selectedUrls.isEmpty()) {
