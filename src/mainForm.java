@@ -1692,16 +1692,7 @@ public class mainForm extends JFrame {
         setVisible(true);
 
 
-        //Фильтры для парсинга
-
-//
-//        dateChooserFilterStart.setDateFormatString("dd.MM.yyyy");
-//        dateChooserFilterEnd.setDateFormatString("dd.MM.yyyy");
-//        PanelFildterDataStart.setLayout(new BorderLayout());
-//        PanelFildterDataStart.add(dateChooserFilterStart, BorderLayout.CENTER);
-//        PanelFildterDataEnd.setLayout(new BorderLayout());
-//        PanelFildterDataEnd.add(dateChooserFilterEnd, BorderLayout.CENTER);
-
+        //Раздел парсинга
 
 
         statusForm = new StatusForm();
@@ -1719,8 +1710,6 @@ public class mainForm extends JFrame {
         });
 
         Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "src/currency.json");
-
-
 
         // Кнопка паузы/продолжения
         PauseParsingButton.addActionListener(e -> {
@@ -1751,7 +1740,7 @@ public class mainForm extends JFrame {
         }
 //        Эти методы для стилей таблицы, не трогать без необходимости
 //        configureTableColumns();
-        initTableWithScroll();
+//      initTableWithScroll();
 
 
 
@@ -2922,7 +2911,7 @@ public class mainForm extends JFrame {
                 // После завершения парсинга сбрасываем кнопки
                 PauseParser.setEnabled(true);  // "Пауза" активна
                 StopParser.setEnabled(true);
-                StatusLabel.setText("Статус: парсинг завершён");
+                StatusLabel.setText("Статус: запуск парсера...");
             });
         }).start();
     }
@@ -3013,6 +3002,7 @@ public class mainForm extends JFrame {
     private void stopParser() {
         if (currentParser != null) {
             PurchasesParserHead parser = (PurchasesParserHead) currentParser;
+
             parser.stopParser();
             StopParser.setEnabled(false);
             PauseParser.setEnabled(false);

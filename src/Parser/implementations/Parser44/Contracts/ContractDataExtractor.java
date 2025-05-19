@@ -236,83 +236,82 @@ public class ContractDataExtractor {
         driver.get(url);
 
         try {
-            // Ожидаем появления блока с поставщиками
             wait.until(ExpectedConditions.presenceOfElementLocated(
                     By.xpath("//h2[contains(text(), 'Информация о поставщиках')]")));
 
-            // Находим таблицу с поставщиками
-            WebElement table = driver.findElement(
-                    By.xpath("//h2[contains(text(), 'Информация о поставщиках')]/following::table[contains(@class, 'blockInfo__table')][1]"));
+            List<WebElement> tables = driver.findElements(
+                    By.xpath("//h2[contains(text(), 'Информация о поставщиках')]/following::table[contains(@class, 'blockInfo__table')]"));
 
-            // Получаем все строки поставщиков
-            List<WebElement> rows = table.findElements(By.cssSelector("tbody tr.tableBlock__row"));
             List<Map<String, String>> suppliersList = new ArrayList<>();
 
-            for (WebElement row : rows) {
-                Map<String, String> supplierInfo = new LinkedHashMap<>();
+            for (WebElement table : tables) {
+                List<WebElement> rows = table.findElements(By.cssSelector("tbody tr.tableBlock__row"));
 
-                // 1. Организация и ИНН
-                WebElement orgCell = row.findElement(By.cssSelector("td.tableBlock__col_first"));
-                String organization = orgCell.findElement(By.xpath("./*[1]")).getText().trim();
-                supplierInfo.put("Организация", organization);
+                for (WebElement row : rows) {
+                    Map<String, String> supplierInfo = new LinkedHashMap<>();
 
-                try {
-                    String inn = orgCell.findElement(By.xpath(".//span[contains(@class,'grey-main-light') and contains(text(),'ИНН:')]/following-sibling::span"))
-                            .getText().trim();
-                    supplierInfo.put("ИНН", inn);
-                } catch (NoSuchElementException e) {
-                    supplierInfo.put("ИНН", null);
-                }
+                    // Получаем все ячейки в строке (6 колонок, последняя пустая)
+                    List<WebElement> cells = row.findElements(By.cssSelector("td"));
 
-                // 2. Страна и код страны
-                try {
-                    WebElement countryCell = row.findElements(By.cssSelector("td.tableBlock__col")).get(0);
-                    String countryText = countryCell.getText().trim();
-                    String[] countryParts = countryText.split("\n");
+                    // 1. Организация и ИНН (первая колонка)
+                    WebElement orgCell = cells.get(0);
+                    String orgText = orgCell.getText();
+                    String[] orgLines = orgText.split("\n");
 
-                    if (countryParts.length > 0) {
+                    supplierInfo.put("Организация", orgLines[0].trim());
+
+                    // ИНН
+                    try {
+                        String inn = orgCell.findElement(By.xpath(".//span[contains(@class,'grey-main-light') and contains(text(),'ИНН:')]/following-sibling::span"))
+                                .getText().trim();
+                        supplierInfo.put("ИНН", inn);
+                    } catch (NoSuchElementException e) {
+                        supplierInfo.put("ИНН", null);
+                    }
+
+                    // КПП
+                    try {
+                        String kpp = orgCell.findElement(By.xpath(".//span[contains(@class,'grey-main-light') and contains(text(),'КПП:')]/following-sibling::span"))
+                                .getText().trim();
+                        supplierInfo.put("КПП", kpp);
+                    } catch (NoSuchElementException e) {
+                        supplierInfo.put("КПП", null);
+                    }
+
+                    // 2. Страна и код страны (вторая колонка)
+                    if (cells.size() > 1) {
+                        String countryText = cells.get(1).getText().trim();
+                        String[] countryParts = countryText.split("\n");
                         supplierInfo.put("Страна", countryParts[0].trim());
+                        if (countryParts.length > 1) {
+                            supplierInfo.put("Код страны", countryParts[1].trim());
+                        }
                     }
-                    if (countryParts.length > 1) {
-                        supplierInfo.put("Код страны", countryParts[1].trim());
+
+                    // 3. Адрес места нахождения (третья колонка)
+                    if (cells.size() > 2) {
+                        supplierInfo.put("Адрес места нахождения", cells.get(2).getText().trim());
                     }
-                } catch (Exception e) {
-                    System.out.println("Не удалось извлечь данные о стране: " + e.getMessage());
-                }
 
-                // 3. Адрес места нахождения
-                try {
-                    WebElement addressCell = row.findElements(By.cssSelector("td.tableBlock__col")).get(1);
-                    supplierInfo.put("Адрес места нахождения", addressCell.getText().trim());
-                } catch (Exception e) {
-                    System.out.println("Не удалось извлечь адрес: " + e.getMessage());
-                }
-
-                // 4. Почтовый адрес
-                try {
-                    WebElement postalAddressCell = row.findElements(By.cssSelector("td.tableBlock__col")).get(2);
-                    supplierInfo.put("Почтовый адрес", postalAddressCell.getText().trim());
-                } catch (Exception e) {
-                    System.out.println("Не удалось извлечь почтовый адрес: " + e.getMessage());
-                }
-
-                // 5. Контактная информация (телефон и email)
-                try {
-                    WebElement contactsCell = row.findElements(By.cssSelector("td.tableBlock__col")).get(3);
-                    String contactsText = contactsCell.getText().trim();
-                    String[] contacts = contactsText.split("\n");
-
-                    if (contacts.length > 0) {
-                        supplierInfo.put("Телефон", contacts[0].trim());
+                    // 4. Почтовый адрес (четвертая колонка)
+                    if (cells.size() > 3) {
+                        supplierInfo.put("Почтовый адрес", cells.get(3).getText().trim());
                     }
-                    if (contacts.length > 1) {
-                        supplierInfo.put("Email", contacts[1].trim());
-                    }
-                } catch (Exception e) {
-                    System.out.println("Не удалось извлечь контактную информацию: " + e.getMessage());
-                }
 
-                suppliersList.add(supplierInfo);
+                    // 5. Контактная информация (пятая колонка)
+                    if (cells.size() > 4) {
+                        String contactsText = cells.get(4).getText().trim();
+                        String[] contacts = contactsText.split("\n");
+                        if (contacts.length > 0) {
+                            supplierInfo.put("Телефон", contacts[0].trim());
+                        }
+                        if (contacts.length > 1) {
+                            supplierInfo.put("Email", contacts[1].trim());
+                        }
+                    }
+
+                    suppliersList.add(supplierInfo);
+                }
             }
 
             suppliersData.put("Поставщики", suppliersList);

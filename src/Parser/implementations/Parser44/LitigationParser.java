@@ -50,8 +50,11 @@ public class LitigationParser {
 
     public List<JudicialProceeding> parseCases() {
         List<JudicialProceeding> proceedings = new ArrayList<>();
+        String mainWindow = driver.getWindowHandle();
         try {
-            List<WebElement> rows = driver.findElements(By.cssSelector("#b-cases tbody tr"));
+            List<WebElement> rows = wait.until(
+                    ExpectedConditions.presenceOfAllElementsLocatedBy(By.cssSelector("#b-cases tbody tr"))
+            );
 
             for (WebElement row : rows) {
                 currentProceeding = new JudicialProceeding();

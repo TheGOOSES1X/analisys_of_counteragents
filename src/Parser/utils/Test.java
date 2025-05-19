@@ -38,13 +38,13 @@ public class Test {
         WebDriver  driver = chromeSetup.setupDriver();
         DocumentDraftUrlFinder finder = new DocumentDraftUrlFinder();
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
-//        ContractDataExtractor extractor = new ContractDataExtractor();
-//        extractor.parseAndPrintGeneralContractData("https://zakupki.gov.ru/epz/contract/contractCard/common-info.html?reestrNumber=4780551456224000016",
-//                driver,wait);
-
-        ComplaintsURLGetter getter = new ComplaintsURLGetter();
-        int result = getter.countComplaintsByRegNumber( "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
+        ContractDataExtractor extractor = new ContractDataExtractor();
+        extractor.parseAndPrintGeneralContractData("https://zakupki.gov.ru/epz/contract/contractCard/common-info.html?reestrNumber=4780551456224000016",
                 driver,wait);
+
+//        ComplaintsURLGetter getter = new ComplaintsURLGetter();
+//        int result = getter.countComplaintsByRegNumber( "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
+//                driver,wait);
 
 
 //        System.out.println(" поиске жалобы: " + result);

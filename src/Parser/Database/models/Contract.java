@@ -1,7 +1,6 @@
 package Parser.Database.models;
 
 import jakarta.persistence.Table;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import jakarta.persistence.*;
@@ -13,103 +12,38 @@ public class Contract {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "registry_number", columnDefinition = "TEXT")
+    private String registryNumber;
 
+    @Column(name = "status", columnDefinition = "TEXT")
+    private String status;
 
-    @Column(name = "inn", length = 12)
-    private String inn;
+    @Column(name = "procurement_notice_number", columnDefinition = "TEXT")
+    private String procurementNoticeNumber;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "procurement_identification_code", columnDefinition = "TEXT")
+    private String procurementIdentificationCode;
+
+    @Column(name = "electronic_contract_id", columnDefinition = "TEXT")
+    private String electronicContractId;
+
+    @Column(name = "sole_supplier_basis", columnDefinition = "TEXT")
+    private String soleSupplierBasis;
+
+    @Column(name = "sole_supplier_document_details", columnDefinition = "TEXT")
+    private String soleSupplierDocumentDetails;
+
+    @Column(name = "banking_treasury_support_info", columnDefinition = "TEXT")
+    private String bankingTreasurySupportInfo;
+
+    @Column(name = "conclusion_date")
+    private LocalDate conclusionDate;
+
+    @Column(name = "contract_number", columnDefinition = "TEXT")
+    private String contractNumber;
+
+    @Column(name = "subject", columnDefinition = "TEXT")
     private String subject;
-
-    @Column(columnDefinition = "TEXT")
-    private String specialization;
-
-    @Column(name = "is_defense_order", columnDefinition = "TEXT")
-    private String isDefenseOrder;
-
-    @Column(name = "is_lifecycle_contract", columnDefinition = "TEXT")
-    private String isLifecycleContract;
-
-    @Column(name = "is_quantity_undefined", columnDefinition = "TEXT")
-    private String isQuantityUndefined;
-
-    @Column(name = "start_date")
-    private LocalDate startDate;
-
-    @Column(name = "end_date")
-    private LocalDate endDate;
-
-    @Column(name = "execution_stages", columnDefinition = "TEXT")
-    private String executionStages;
-
-    @Column(columnDefinition = "TEXT")
-    private String country;
-
-    @Column(columnDefinition = "TEXT")
-    private String address;
-
-    @Column(name = "additional_address_info", columnDefinition = "TEXT")
-    private String additionalAddressInfo;
-
-    @Column(name = "quality_guarantee_required", columnDefinition = "TEXT")
-    private String qualityGuaranteeRequired;
-
-    @Column(name = "warranty_requirements", columnDefinition = "TEXT")
-    private String warrantyRequirements;
-
-    @Column(name = "manufacturer_warranty_requirements", columnDefinition = "TEXT")
-    private String manufacturerWarrantyRequirements;
-
-    @Column(name = "warranty_period", columnDefinition = "TEXT")
-    private String warrantyPeriod;
-
-    @Column(name = "warranty_guarantee_required", columnDefinition = "TEXT")
-    private String warrantyGuaranteeRequired;
-
-    @Column(name = "guarantee_type", columnDefinition = "TEXT")
-    private String guaranteeType;
-
-    @Column(name = "guarantee_percentage", precision = 5, scale = 2)
-    private BigDecimal guaranteePercentage;
-
-    @Column(name = "guarantee_amount", precision = 19, scale = 2)
-    private BigDecimal guaranteeAmount;
-
-    @Column(name = "guarantee_requirements", columnDefinition = "TEXT")
-    private String guaranteeRequirements;
-
-    @Column(name = "smp_subcontractors_required", columnDefinition = "TEXT")
-    private String smpSubcontractorsRequired;
-
-    @Column(name = "smp_subcontractors_exempt", columnDefinition = "TEXT")
-    private String smpSubcontractorsExempt;
-
-    @Column(name = "smp_subcontractors_percentage", precision = 5, scale = 2)
-    private BigDecimal smpSubcontractorsPercentage;
-
-    @Column(name = "smp_subcontractors_liability", columnDefinition = "TEXT")
-    private String smpSubcontractorsLiability;
-
-    @Column(name = "unilateral_termination_allowed", columnDefinition = "TEXT")
-    private String unilateralTerminationAllowed;
-
-    @Column(name = "budget_name", columnDefinition = "TEXT")
-    private String budgetName;
-
-    @Column(name = "budget_type", columnDefinition = "TEXT")
-    private String budgetType;
-
-    @Column(name = "municipality_code", columnDefinition = "TEXT")
-    private String municipalityCode;
-
-    @Column(name = "is_self_funded",  columnDefinition = "TEXT")
-    private String isSelfFunded;
-
-    @Column(name = "banking_support_info", columnDefinition = "TEXT")
-    private String bankingSupportInfo;
-
-    @Column(name = "price_indication_method", columnDefinition = "TEXT")
-    private String priceIndicationMethod;
 
     @Column(name = "contract_price", precision = 19, scale = 2)
     private BigDecimal contractPrice;
@@ -117,48 +51,41 @@ public class Contract {
     @Column(name = "including_vat", precision = 19, scale = 2)
     private BigDecimal includingVat;
 
-    @Column(name = "treasury_guarantee_amount", precision = 19, scale = 2)
-    private BigDecimal treasuryGuaranteeAmount;
-
-    @Column(name = "price_formula", columnDefinition = "TEXT")
-    private String priceFormula;
-
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "currency", columnDefinition = "TEXT")
     private String currency;
 
-    @Column(name = "contract_right_price", precision = 19, scale = 2)
-    private BigDecimal contractRightPrice;
+    @Column(name = "start_date")
+    private LocalDate startDate;
 
-    @Column(name = "advance_payment_available", columnDefinition = "TEXT")
-    private String advancePaymentAvailable;
+    @Column(name = "end_date")
+    private LocalDate endDate;
 
-    @Column(name = "advance_percentage", precision = 5, scale = 2)
-    private BigDecimal advancePercentage;
+    @Column(name = "contract_stage_id", columnDefinition = "TEXT")
+    private String contractStageId;
 
     @Column(name = "advance_amount", precision = 19, scale = 2)
     private BigDecimal advanceAmount;
 
-    @Column(name = "tax_deduction_applied", columnDefinition = "TEXT")
-    private String taxDeductionApplied;
-
     @Column(name = "penalty_deduction_applied", columnDefinition = "TEXT")
     private String penaltyDeductionApplied;
 
-    @Column(name = "total_amount", precision = 19, scale = 2)
-    private BigDecimal totalAmount;
+    @Column(name = "additional_info", columnDefinition = "TEXT")
+    private String additionalInfo;
 
-    @Column(name = "advance_payment", precision = 19, scale = 2)
-    private BigDecimal advancePayment;
+    @Column(name = "treasury_guarantee_amount", precision = 19, scale = 2)
+    private BigDecimal treasuryGuaranteeAmount;
 
-    @Column(name = "contract_number", columnDefinition = "TEXT")
-    private String contractNumber;
+    @Column(name = "national_regime_info", columnDefinition = "TEXT")
+    private String nationalRegimeInfo;
 
-    @Column(name = "state_contract_id", columnDefinition = "TEXT")
-    private String stateContractId;
+    @Column(name = "contract_guarantee_info", columnDefinition = "TEXT")
+    private String contractGuaranteeInfo;
 
-//    @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
-//    @JoinColumn(name = "procurement_object_id", nullable = true)
-//    private ProcurementObject procurementObject;
+    @Column(name = "quality_guarantee_info", columnDefinition = "TEXT")
+    private String qualityGuaranteeInfo;
+
+    @Column(name = "delivery_place_info", columnDefinition = "TEXT")
+    private String deliveryPlaceInfo;
 
     @ManyToOne
     @JoinColumn(name = "supplier_id", nullable = true)
@@ -167,227 +94,228 @@ public class Contract {
     @OneToOne(mappedBy = "contract")
     private Purchase purchase;
 
-    // Сеттеры для новых полей
+    // Геттеры и сеттеры
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getRegistryNumber() {
+        return registryNumber;
+    }
+
+    public void setRegistryNumber(String registryNumber) {
+        this.registryNumber = registryNumber;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public String getProcurementNoticeNumber() {
+        return procurementNoticeNumber;
+    }
+
+    public void setProcurementNoticeNumber(String procurementNoticeNumber) {
+        this.procurementNoticeNumber = procurementNoticeNumber;
+    }
+
+    public String getProcurementIdentificationCode() {
+        return procurementIdentificationCode;
+    }
+
+    public void setProcurementIdentificationCode(String procurementIdentificationCode) {
+        this.procurementIdentificationCode = procurementIdentificationCode;
+    }
+
+    public String getElectronicContractId() {
+        return electronicContractId;
+    }
+
+    public void setElectronicContractId(String electronicContractId) {
+        this.electronicContractId = electronicContractId;
+    }
+
+    public String getSoleSupplierBasis() {
+        return soleSupplierBasis;
+    }
+
+    public void setSoleSupplierBasis(String soleSupplierBasis) {
+        this.soleSupplierBasis = soleSupplierBasis;
+    }
+
+    public String getSoleSupplierDocumentDetails() {
+        return soleSupplierDocumentDetails;
+    }
+
+    public void setSoleSupplierDocumentDetails(String soleSupplierDocumentDetails) {
+        this.soleSupplierDocumentDetails = soleSupplierDocumentDetails;
+    }
+
+    public String getBankingTreasurySupportInfo() {
+        return bankingTreasurySupportInfo;
+    }
+
+    public void setBankingTreasurySupportInfo(String bankingTreasurySupportInfo) {
+        this.bankingTreasurySupportInfo = bankingTreasurySupportInfo;
+    }
+
+    public LocalDate getConclusionDate() {
+        return conclusionDate;
+    }
+
+    public void setConclusionDate(LocalDate conclusionDate) {
+        this.conclusionDate = conclusionDate;
+    }
+
+    public String getContractNumber() {
+        return contractNumber;
+    }
+
     public void setContractNumber(String contractNumber) {
         this.contractNumber = contractNumber;
     }
 
-    public void setStateContractId(String stateContractId) {
-        this.stateContractId = stateContractId;
-    }
-
-
-
-    public void setId(Long id) {
-        this.id = id;
+    public String getSubject() {
+        return subject;
     }
 
     public void setSubject(String subject) {
         this.subject = subject;
     }
 
-    public void setSpecialization(String specialization) {
-        this.specialization = specialization;
-    }
-
-    public void setDefenseOrder(String defenseOrder) {
-        isDefenseOrder = defenseOrder;
-    }
-
-    public void setLifecycleContract(String lifecycleContract) {
-        isLifecycleContract = lifecycleContract;
-    }
-
-    public void setQuantityUndefined(String quantityUndefined) {
-        isQuantityUndefined = quantityUndefined;
-    }
-
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
-    }
-
-    public void setEndDate(LocalDate endDate) {
-        this.endDate = endDate;
-    }
-
-    public void setExecutionStages(String executionStages) {
-        this.executionStages = executionStages;
-    }
-
-    public void setCountry(String country) {
-        this.country = country;
-    }
-
-    public void setAddress(String address) {
-        this.address = address;
-    }
-
-    public void setAdditionalAddressInfo(String additionalAddressInfo) {
-        this.additionalAddressInfo = additionalAddressInfo;
-    }
-
-    public void setQualityGuaranteeRequired(String qualityGuaranteeRequired) {
-        this.qualityGuaranteeRequired = qualityGuaranteeRequired;
-    }
-
-    public void setWarrantyRequirements(String warrantyRequirements) {
-        this.warrantyRequirements = warrantyRequirements;
-    }
-
-    public void setManufacturerWarrantyRequirements(String manufacturerWarrantyRequirements) {
-        this.manufacturerWarrantyRequirements = manufacturerWarrantyRequirements;
-    }
-
-    public void setWarrantyPeriod(String warrantyPeriod) {
-        this.warrantyPeriod = warrantyPeriod;
-    }
-
-    public void setWarrantyGuaranteeRequired(String warrantyGuaranteeRequired) {
-        this.warrantyGuaranteeRequired = warrantyGuaranteeRequired;
-    }
-
-    public void setGuaranteeType(String guaranteeType) {
-        this.guaranteeType = guaranteeType;
-    }
-
-    public void setGuaranteePercentage(BigDecimal guaranteePercentage) {
-        this.guaranteePercentage = guaranteePercentage;
-    }
-
-    public void setGuaranteeAmount(BigDecimal guaranteeAmount) {
-        this.guaranteeAmount = guaranteeAmount;
-    }
-
-    public void setGuaranteeRequirements(String guaranteeRequirements) {
-        this.guaranteeRequirements = guaranteeRequirements;
-    }
-
-    public void setSmpSubcontractorsRequired(String smpSubcontractorsRequired) {
-        this.smpSubcontractorsRequired = smpSubcontractorsRequired;
-    }
-
-    public void setSmpSubcontractorsExempt(String smpSubcontractorsExempt) {
-        this.smpSubcontractorsExempt = smpSubcontractorsExempt;
-    }
-
-    public void setSmpSubcontractorsPercentage(BigDecimal smpSubcontractorsPercentage) {
-        this.smpSubcontractorsPercentage = smpSubcontractorsPercentage;
-    }
-
-    public void setSmpSubcontractorsLiability(String smpSubcontractorsLiability) {
-        this.smpSubcontractorsLiability = smpSubcontractorsLiability;
-    }
-
-    public void setUnilateralTerminationAllowed(String unilateralTerminationAllowed) {
-        this.unilateralTerminationAllowed = unilateralTerminationAllowed;
-    }
-
-    public void setBudgetName(String budgetName) {
-        this.budgetName = budgetName;
-    }
-
-    public void setBudgetType(String budgetType) {
-        this.budgetType = budgetType;
-    }
-
-    public void setMunicipalityCode(String municipalityCode) {
-        this.municipalityCode = municipalityCode;
-    }
-
-    public void setSelfFunded(String selfFunded) {
-        isSelfFunded = selfFunded;
-    }
-
-    public void setBankingSupportInfo(String bankingSupportInfo) {
-        this.bankingSupportInfo = bankingSupportInfo;
-    }
-
-    public void setPriceIndicationMethod(String priceIndicationMethod) {
-        this.priceIndicationMethod = priceIndicationMethod;
+    public BigDecimal getContractPrice() {
+        return contractPrice;
     }
 
     public void setContractPrice(BigDecimal contractPrice) {
         this.contractPrice = contractPrice;
     }
 
+    public BigDecimal getIncludingVat() {
+        return includingVat;
+    }
+
     public void setIncludingVat(BigDecimal includingVat) {
         this.includingVat = includingVat;
     }
 
-    public void setTreasuryGuaranteeAmount(BigDecimal treasuryGuaranteeAmount) {
-        this.treasuryGuaranteeAmount = treasuryGuaranteeAmount;
-    }
-
-    public void setPriceFormula(String priceFormula) {
-        this.priceFormula = priceFormula;
+    public String getCurrency() {
+        return currency;
     }
 
     public void setCurrency(String currency) {
         this.currency = currency;
     }
 
-    public void setContractRightPrice(BigDecimal contractRightPrice) {
-        this.contractRightPrice = contractRightPrice;
+    public LocalDate getStartDate() {
+        return startDate;
     }
 
-    public void setAdvancePaymentAvailable(String advancePaymentAvailable) {
-        this.advancePaymentAvailable = advancePaymentAvailable;
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
     }
 
-    public void setAdvancePercentage(BigDecimal advancePercentage) {
-        this.advancePercentage = advancePercentage;
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
+    public String getContractStageId() {
+        return contractStageId;
+    }
+
+    public void setContractStageId(String contractStageId) {
+        this.contractStageId = contractStageId;
+    }
+
+    public BigDecimal getAdvanceAmount() {
+        return advanceAmount;
     }
 
     public void setAdvanceAmount(BigDecimal advanceAmount) {
         this.advanceAmount = advanceAmount;
     }
 
-    public void setTaxDeductionApplied(String taxDeductionApplied) {
-        this.taxDeductionApplied = taxDeductionApplied;
+    public String getPenaltyDeductionApplied() {
+        return penaltyDeductionApplied;
     }
 
     public void setPenaltyDeductionApplied(String penaltyDeductionApplied) {
         this.penaltyDeductionApplied = penaltyDeductionApplied;
     }
 
-    public void setTotalAmount(BigDecimal totalAmount) {
-        this.totalAmount = totalAmount;
+    public String getAdditionalInfo() {
+        return additionalInfo;
     }
 
-    public void setAdvancePayment(BigDecimal advancePayment) {
-        this.advancePayment = advancePayment;
+    public void setAdditionalInfo(String additionalInfo) {
+        this.additionalInfo = additionalInfo;
     }
 
-
-
-    public void setSupplier(Supplier supplier) {
-        this.supplier = supplier;
+    public BigDecimal getTreasuryGuaranteeAmount() {
+        return treasuryGuaranteeAmount;
     }
 
-    public void setPurchase(Purchase purchase) {
-        this.purchase = purchase;
+    public void setTreasuryGuaranteeAmount(BigDecimal treasuryGuaranteeAmount) {
+        this.treasuryGuaranteeAmount = treasuryGuaranteeAmount;
+    }
+
+    public String getNationalRegimeInfo() {
+        return nationalRegimeInfo;
+    }
+
+    public void setNationalRegimeInfo(String nationalRegimeInfo) {
+        this.nationalRegimeInfo = nationalRegimeInfo;
+    }
+
+    public String getContractGuaranteeInfo() {
+        return contractGuaranteeInfo;
+    }
+
+    public void setContractGuaranteeInfo(String contractGuaranteeInfo) {
+        this.contractGuaranteeInfo = contractGuaranteeInfo;
+    }
+
+    public String getQualityGuaranteeInfo() {
+        return qualityGuaranteeInfo;
+    }
+
+    public void setQualityGuaranteeInfo(String qualityGuaranteeInfo) {
+        this.qualityGuaranteeInfo = qualityGuaranteeInfo;
+    }
+
+    public String getDeliveryPlaceInfo() {
+        return deliveryPlaceInfo;
+    }
+
+    public void setDeliveryPlaceInfo(String deliveryPlaceInfo) {
+        this.deliveryPlaceInfo = deliveryPlaceInfo;
     }
 
     public Supplier getSupplier() {
         return supplier;
     }
 
-    public Long getId() {
-        return id;
+    public void setSupplier(Supplier supplier) {
+        this.supplier = supplier;
     }
 
-
-    public void setInn(String inn) {
-        this.inn = inn;
+    public Purchase getPurchase() {
+        return purchase;
     }
 
-    public Object getContractNumber() {
-        return contractNumber;
+    public void setPurchase(Purchase purchase) {
+        this.purchase = purchase;
     }
-
-
-//    public ProcurementObject getProcurementObject() {
-//        return procurementObject;
-//    }
 }
-

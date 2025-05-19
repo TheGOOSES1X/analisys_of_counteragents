@@ -9,6 +9,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -183,6 +184,9 @@ public class PurchasesParserHead implements Parser {
             hasNextPage = shouldContinueToNextPage(currentPage, totalItems);
             currentPage++;
         }
+        if (currentPage % 50 == 0) {
+            driver.manage().deleteAllCookies();
+        }
 
         return allPurchases;
     }
@@ -261,9 +265,11 @@ public class PurchasesParserHead implements Parser {
         if (driver != null) {
             try {
                 sleep(1000);
-                driver.quit();
+                driver.quit(); // Корректное закрытие драйвера
             } catch (Exception e) {
                 handleError("Ошибка при закрытии драйвера: " + e.getMessage(), e);
+            } finally {
+                killChromeProcesses(); // Принудительное завершение процессов
             }
         }
     }
@@ -348,6 +354,22 @@ public class PurchasesParserHead implements Parser {
         } catch (Exception e) {
             System.err.println("Ошибка при получении количества записей: " + e.getMessage());
             return 0;
+        }
+    }
+    private void killChromeProcesses() {
+        try {
+            // Для Windows
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe /T");
+                Runtime.getRuntime().exec("taskkill /F /IM chrome.exe /T");
+            }
+            // Для Linux/macOS
+            else {
+                Runtime.getRuntime().exec("pkill -f chromedriver");
+                Runtime.getRuntime().exec("pkill -f chrome");
+            }
+        } catch (IOException e) {
+            System.err.println("Ошибка при завершении процессов Chrome: " + e.getMessage());
         }
     }
 

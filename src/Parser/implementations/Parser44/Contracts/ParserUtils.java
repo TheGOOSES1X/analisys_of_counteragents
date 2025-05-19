@@ -22,6 +22,24 @@ public class ParserUtils {
             return null;
         }
     }
+    public static String getValueOrNull(Map<String, String> dataMap, String key) {
+        if (dataMap == null || key == null) {
+            return null;
+        }
+        String value = dataMap.get(key);
+        return (value == null || value.trim().isEmpty()) ? null : value.trim();
+    }
+    // Вспомогательные методы
+    public static Map<String, String> getSectionData(Map<String, Object> participantData, String sectionName) {
+        Object section = participantData.get(sectionName);
+        if (section instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, String> sectionMap = (Map<String, String>) section;
+            return sectionMap;
+        }
+        return null;
+    }
+
     public static BigDecimal parseBigDecimal(String numberStr) {
         if (numberStr == null || numberStr.trim().isEmpty()) return null;
         try {

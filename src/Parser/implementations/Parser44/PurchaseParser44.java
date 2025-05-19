@@ -35,6 +35,7 @@ public class PurchaseParser44 implements Parser {
         this.customerPageParser = new CustomerPageParser();
         this.contractPageParser = new ContractPageParser();
         this.databaseService = new DatabaseService();
+
         this.litigationParser = new LitigationParser(driverSetup.setupDriver());
         this.supplierStatusParser = new SupplierStatusParser(driverSetup.setupDriver());
         this.documentParser = new DocumentParser();
@@ -44,6 +45,22 @@ public class PurchaseParser44 implements Parser {
     public void parse() {
         // Реализация если нужна
     }
+
+    private WebDriver createDriverWithCleanup() {
+        WebDriver driver = driverSetup.setupDriver();
+        // Добавляем хук для очистки при завершении работы
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (driver != null) {
+                try {
+                    driver.quit();
+                } catch (Exception e) {
+                    System.err.println("Error while quitting driver: " + e.getMessage());
+                }
+            }
+        }));
+        return driver;
+    }
+
 
     @Override
     public void parseUrlsParallel(List<String> urls, Consumer<ParseResult> callback,
@@ -111,9 +128,10 @@ public class PurchaseParser44 implements Parser {
                 }
             }
 
-            driver = driverSetup.setupDriver();
+            driver = createDriverWithCleanup(); // Используем наш метод с cleanup
+            driver.manage().deleteAllCookies(); // Очищаем куки
             driver.get(url);
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 
             return parsePurchaseUrl(url, driver, wait);
         } catch (Exception e) {

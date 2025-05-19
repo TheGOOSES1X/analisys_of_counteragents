@@ -17,39 +17,56 @@ public class SupplierStatusParser {
 
     public SupplierStatusParser(WebDriver driver) {
         this.driver = driver;
-        this.wait = new WebDriverWait(driver, Duration.ofSeconds(15));
+        this.wait = new WebDriverWait(driver, Duration.ofSeconds(5));
     }
 
     public List<String> parseSupplierStatuses(List<String> inns) {
         List<String> dishonestyLinks = new ArrayList<>();
+        if (inns == null || inns.isEmpty()) return dishonestyLinks;
 
-        if (inns == null || inns.isEmpty()) {
-            System.out.println("No INNs provided for parsing");
-            return dishonestyLinks;
-        }
+        String originalUrl = driver.getCurrentUrl();
+        Set<Cookie> originalCookies = driver.manage().getCookies();
 
-        for (String inn : inns) {
-            try {
-                List<String> linksForInn = parseSupplierStatus(inn);
-                dishonestyLinks.addAll(linksForInn);
-                if (linksForInn != null && !linksForInn.isEmpty()) {
-                    for (String url : linksForInn) {
-                        try {
-                            parseAndPrintDetails(url);
-                        } catch (Exception e) {
-                            System.err.println("Ошибка при обработке ссылки " + url + ": " + e.getMessage());
+        try {
+            for (String inn : inns) {
+                try {
+                    List<String> linksForInn = parseSupplierStatus(inn);
+                    if (linksForInn != null) {
+                        dishonestyLinks.addAll(linksForInn);
+                        for (String url : linksForInn) {
+                            try {
+                                parseAndPrintDetails(url);
+                            } catch (Exception e) {
+                                System.err.println("Ошибка при обработке ссылки " + url);
+                            }
                         }
                     }
-                } else {
-                    System.out.println("Список ссылок пуст или равен null");
+                } catch (Exception e) {
+                    System.err.println("Ошибка для INN: " + inn);
+                } finally {
+                    // Восстановление состояния после каждого INN
+                    restoreOriginalState(originalUrl, originalCookies);
                 }
-
-            } catch (Exception e) {
-                System.err.println("Failed to parse status for INN: " + inn + ". Error: " + e.getMessage());
             }
+        } finally {
+            restoreOriginalState(originalUrl, originalCookies);
         }
-
         return dishonestyLinks;
+    }
+    private void restoreOriginalState(String originalUrl, Set<Cookie> originalCookies) {
+        try {
+            driver.get(originalUrl);
+            driver.manage().deleteAllCookies();
+            originalCookies.forEach(c -> {
+                try {
+                    driver.manage().addCookie(c);
+                } catch (Exception e) {
+                    System.err.println("Не удалось восстановить куки: " + c.getName());
+                }
+            });
+        } catch (Exception e) {
+            System.err.println("Ошибка восстановления состояния: " + e.getMessage());
+        }
     }
 
     private List<String> parseSupplierStatus(String inn) {

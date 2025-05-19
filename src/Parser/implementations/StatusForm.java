@@ -66,20 +66,26 @@ public class StatusForm implements ParserStatusListener {
 
     @Override
     public void addPurchaseToTable(PurchaseItem item) {
+        allItems.add(item);
+        if (allItems.size() % 50 == 0) { // Обновляем таблицу каждые 50 записей
+            updateTableBatch();
+        }
+    }
+
+    private void updateTableBatch() {
         SwingUtilities.invokeLater(() -> {
             DefaultTableModel model = (DefaultTableModel) headersTable.getModel();
-            int rowCount = model.getRowCount();
-
-            allItems.add(item);
-            model.addRow(new Object[]{
-                    rowCount + 1,
-                    item.getNumber(),
-                    item.getPurchaseObject() + "\n" + item.getCustomer(),
-                    false
-            });
-
-            // Автоматическая подгонка ширины столбца после добавления
-            autoResizeColumn(headersTable, 2);
+            model.setRowCount(0); // Очистка таблицы
+            for (int i = 0; i < allItems.size(); i++) {
+                PurchaseItem item = allItems.get(i);
+                model.addRow(new Object[]{
+                        i + 1,
+                        item.getNumber(),
+                        item.getPurchaseObject() + "\n" + item.getCustomer(),
+                        false
+                });
+            }
+            autoResizeColumn(headersTable, 2); // Однократная подгонка
         });
     }
 
