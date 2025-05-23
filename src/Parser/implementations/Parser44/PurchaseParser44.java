@@ -1,6 +1,6 @@
 package Parser.implementations.Parser44;
 
-import Parser.Database.hooks.HibernateUtil;
+import Parser.Database.hooks.DatabaseService;
 import Parser.Database.models.*;
 import Parser.implementations.Parser223.DocumentParser;
 import Parser.interfaces.*;
@@ -26,8 +26,9 @@ public class PurchaseParser44 implements Parser {
     private final CustomerPageParser customerPageParser;
     private final ContractPageParser contractPageParser;
     private final DatabaseService databaseService;
+    private final WebDriverPool driverPool;
     private final SupplierStatusParser supplierStatusParser;
-
+    private static final Path ERROR_URLS_FILE = Paths.get("error_urls.txt");
 
     public PurchaseParser44(DriverSetup driverSetup) {
         this.driverSetup = driverSetup;
@@ -39,6 +40,16 @@ public class PurchaseParser44 implements Parser {
         this.litigationParser = new LitigationParser(driverSetup.setupDriver());
         this.supplierStatusParser = new SupplierStatusParser(driverSetup.setupDriver());
         this.documentParser = new DocumentParser();
+        this.driverPool = new WebDriverPool(driverSetup, 6);
+        // Инициализация файла для ошибок
+        try {
+            if (!Files.exists(ERROR_URLS_FILE)) {
+                Files.createFile(ERROR_URLS_FILE);
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to create error URLs file: " + e.getMessage());
+        }
+
     }
 
     @Override
@@ -128,16 +139,27 @@ public class PurchaseParser44 implements Parser {
                 }
             }
 
-            driver = createDriverWithCleanup(); // Используем наш метод с cleanup
+
+            driver = driverPool.borrowDriver();  // Используем наш метод с cleanup
             driver.manage().deleteAllCookies(); // Очищаем куки
             driver.get(url);
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 
             return parsePurchaseUrl(url, driver, wait);
         } catch (Exception e) {
+            saveErrorUrl(url); // Сохраняем URL при ошибке
             return new ParseResult(url, null, e);
         } finally {
-            if (driver != null) driver.quit();
+            if (driver != null) driverPool.returnDriver(driver);;
+        }
+    }
+
+    private synchronized void saveErrorUrl(String url) {
+        try {
+            // Открываем файл в режиме добавления (APPEND)
+            Files.write(ERROR_URLS_FILE, (url + System.lineSeparator()).getBytes(), StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            System.err.println("Failed to save error URL to file: " + e.getMessage());
         }
     }
 
@@ -183,6 +205,7 @@ public class PurchaseParser44 implements Parser {
     public void stopParser() {
         isStopped = true;
         shutdown();
+        driverPool.closeAll();
     }
 
     private void shutdown() {

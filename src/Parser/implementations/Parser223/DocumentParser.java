@@ -3,20 +3,13 @@ package Parser.implementations.Parser223;
 
 import Parser.Database.models.*;
 
-import Parser.implementations.Parser44.DatabaseService;
+import Parser.Database.hooks.DatabaseService;
 import org.openqa.selenium.*;
-import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.nio.file.Path;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.NoSuchElementException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class DocumentParser {

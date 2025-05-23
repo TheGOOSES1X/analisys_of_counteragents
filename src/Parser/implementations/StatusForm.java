@@ -65,9 +65,9 @@ public class StatusForm implements ParserStatusListener {
     }
 
     @Override
-    public void addPurchaseToTable(PurchaseItem item) {
+    public void addPurchaseToTable(PurchaseItem item, int totalItems) {
         allItems.add(item);
-        if (allItems.size() % 50 == 0) { // Обновляем таблицу каждые 50 записей
+        if (allItems.size() % 50 == 0 || allItems.size() == totalItems) {
             updateTableBatch();
         }
     }

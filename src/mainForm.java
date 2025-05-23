@@ -196,6 +196,10 @@ public class mainForm extends JFrame {
     private StatusForm statusForm;
     private JTextField textFieldFilterOkpd2;
     private JTextField textFieldFilterGroup;
+    private JTextField From;
+    private JTextField To;
+    private JButton ChooseRange;
+    private JComboBox ThreadCount;
 
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -1694,6 +1698,10 @@ public class mainForm extends JFrame {
 
         //Раздел парсинга
 
+        ThreadCount.addItem(2);
+        ThreadCount.addItem(4);
+        ThreadCount.addItem(6);
+        ThreadCount.addItem(8);
 
         statusForm = new StatusForm();
         statusForm.setStatusLabel(StatusLabel);
@@ -1703,6 +1711,7 @@ public class mainForm extends JFrame {
         QueryButton.addActionListener(e -> onQueryButtonClicked());
         StartParsing.addActionListener(e -> initStartParsingButton());
         ChooseAllElements.addActionListener(e -> initChooseAllElementsButton());
+        ChooseRange.addActionListener(e -> initChooseRangeElementsButton());
         StopParser.addActionListener(e -> stopParser());
         PauseParser.addActionListener(e -> togglePauseParser());
         StopParseringButton.addActionListener(e -> {
@@ -2701,14 +2710,14 @@ public class mainForm extends JFrame {
         PauseParsingButton.setEnabled(true);
         StopParseringButton.setEnabled(true);
         StatusLabel.setText("Парсинг запущен");
-
+        int selectedThreadCount = (Integer)ThreadCount.getSelectedItem();
         parserThread = new Thread(() -> {
             try {
                 // Этап 1: Парсинг закупок
                 currentParser.parseUrlsParallel(
                         new ArrayList<>(statusForm.selectedUrls),
                         this::handleParseResult,
-                        8,
+                        selectedThreadCount,
                         progress -> SwingUtilities.invokeLater(() -> {
                             ParserProgressBar.setValue(progress);
                             StatusLabel.setText(String.format("Обработано %d из %d (парсинг закупок)",
@@ -2784,11 +2793,6 @@ public class mainForm extends JFrame {
             return; // Завершаем выполнение метода
         }
     }
-
-    private void initializeComponents() {
-        QueryButton.addActionListener(e -> onQueryButtonClicked());
-    }
-
 
 
 
@@ -2944,6 +2948,61 @@ public class mainForm extends JFrame {
         } catch (Exception e) {
             System.err.println("Ошибка кодирования запроса: " + e.getMessage());
             return rawQuery.replace(" ", "%20"); // Фолбэк замена пробелов
+        }
+    }
+
+    private void initChooseRangeElementsButton() {
+        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
+        int rowCount = model.getRowCount();
+
+        try {
+            // Получаем значения из текстовых полей
+            int from = From.getText().isEmpty() ? 1 : Integer.parseInt(From.getText());
+            int to = To.getText().isEmpty() ? rowCount : Integer.parseInt(To.getText());
+
+            // Корректируем значения, если они выходят за границы
+            from = Math.max(1, Math.min(from, rowCount));
+            to = Math.max(1, Math.min(to, rowCount));
+
+            // Меняем местами, если from > to
+            if (from > to) {
+                int temp = from;
+                from = to;
+                to = temp;
+            }
+
+            // Проверяем, есть ли хотя бы один выбранный элемент в диапазоне
+            boolean hasSelectedItemsInRange = false;
+            for (int i = from - 1; i < to; i++) {
+                if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
+                    hasSelectedItemsInRange = true;
+                    break;
+                }
+            }
+
+            // Если есть выбранные элементы в диапазоне - снимаем все галочки в этом диапазоне
+            if (hasSelectedItemsInRange) {
+                for (int i = from - 1; i < to; i++) {
+                    model.setValueAt(false, i, 3); // Снимаем галочку
+                    PurchaseItem item = statusForm.allItems.get(i);
+                    statusForm.selectedUrls.remove(item.getUrl()); // Удаляем URL
+                }
+                System.out.println("Элементы с " + from + " по " + to + " сняты.");
+            }
+            // Если нет выбранных элементов в диапазоне - выбираем все в диапазоне
+            else {
+                for (int i = from - 1; i < to; i++) {
+                    model.setValueAt(true, i, 3); // Ставим галочку
+                    PurchaseItem item = statusForm.allItems.get(i);
+                    if (!statusForm.selectedUrls.contains(item.getUrl())) {
+                        statusForm.selectedUrls.add(item.getUrl()); // Добавляем URL
+                    }
+                }
+                System.out.println("Выбраны элементы с " + from + " по " + to +
+                        ". Текущий список: " + statusForm.selectedUrls);
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Ошибка: введите корректные числовые значения");
         }
     }
 

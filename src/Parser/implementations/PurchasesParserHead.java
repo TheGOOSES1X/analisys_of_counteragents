@@ -215,7 +215,7 @@ public class PurchasesParserHead implements Parser {
             try {
                 PurchaseItem item = extractPurchaseData(itemContainer);
                 allPurchases.add(item);
-                notifyItemProcessed(allPurchases.size(), item);
+                notifyItemProcessed(allPurchases.size(), item,allPurchases.size());
             } catch (Exception e) {
                 handleItemError("Ошибка при обработке элемента: " + e.getMessage(), e);
             }
@@ -227,10 +227,10 @@ public class PurchasesParserHead implements Parser {
         return currentPage * ITEMS_PER_PAGE < totalItems;
     }
 
-    private void notifyItemProcessed(int processedCount, PurchaseItem item) {
+    private void notifyItemProcessed(int processedCount, PurchaseItem item,int totalItems) {
         if (statusListener != null) {
             statusListener.updateCurrentRecords(processedCount);
-            statusListener.addPurchaseToTable(item);
+            statusListener.addPurchaseToTable(item,totalItems);
         }
     }
 

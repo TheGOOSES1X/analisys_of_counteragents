@@ -1,6 +1,6 @@
-package Parser.implementations.Parser44;
-import Parser.Database.hooks.HibernateUtil;
+package Parser.Database.hooks;
 import Parser.Database.models.*;
+import Parser.implementations.Parser44.PurchaseParser44;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
@@ -28,11 +28,12 @@ public class DatabaseService {
                 // 2. Обработка Supplier и Contract
                 handleSupplierAndContract(session, purchase);
 
+
+                handleProcurementObjects(session, purchase);
                 // 3. Обработка Purchase
                 handlePurchase(session, purchase);
 
-                // 4. Обработка ProcurementObjects
-                handleProcurementObjects(session, purchase);
+
 
                 transaction.commit();
             } catch (Exception e) {
@@ -93,6 +94,7 @@ public class DatabaseService {
                 .uniqueResult();
 
         if (existingContract != null) {
+            updateContract(existingContract, contract);
             purchase.setContract(existingContract);
         } else {
             session.persist(contract);
@@ -111,8 +113,14 @@ public class DatabaseService {
             purchase = existingPurchase;
         } else {
             session.persist(purchase);
+            session.flush(); // Необходимо для получения ID перед обработкой ProcurementObjects
         }
+
+        // Обрабатываем связанные объекты
+        handleSupplierAndContract(session, purchase);
+        updateProcurementObjects(session, purchase); // Заменяем handleProcurementObjects на updateProcurementObjects
     }
+
 
     private void handleProcurementObjects(Session session, Purchase purchase) {
         if (purchase.getProcurementObjects() == null || purchase.getProcurementObjects().isEmpty()) return;
@@ -189,6 +197,90 @@ public class DatabaseService {
         existing.setPhone(newData.getPhone());
 
 
+    }
+
+    private synchronized void updateContract(Contract existing, Contract newData) {
+        if (newData.getRegistryNumber() != null) {
+            existing.setRegistryNumber(newData.getRegistryNumber());
+        }
+        if (newData.getStatus() != null) {
+            existing.setStatus(newData.getStatus());
+        }
+        if (newData.getProcurementNoticeNumber() != null) {
+            existing.setProcurementNoticeNumber(newData.getProcurementNoticeNumber());
+        }
+        if (newData.getProcurementIdentificationCode() != null) {
+            existing.setProcurementIdentificationCode(newData.getProcurementIdentificationCode());
+        }
+        if (newData.getElectronicContractId() != null) {
+            existing.setElectronicContractId(newData.getElectronicContractId());
+        }
+        if (newData.getSoleSupplierBasis() != null) {
+            existing.setSoleSupplierBasis(newData.getSoleSupplierBasis());
+        }
+        if (newData.getSoleSupplierDocumentDetails() != null) {
+            existing.setSoleSupplierDocumentDetails(newData.getSoleSupplierDocumentDetails());
+        }
+        if (newData.getBankingTreasurySupportInfo() != null) {
+            existing.setBankingTreasurySupportInfo(newData.getBankingTreasurySupportInfo());
+        }
+        if (newData.getConclusionDate() != null) {
+            existing.setConclusionDate(newData.getConclusionDate());
+        }
+        if (newData.getContractNumber() != null) {
+            existing.setContractNumber(newData.getContractNumber());
+        }
+        if (newData.getSubject() != null) {
+            existing.setSubject(newData.getSubject());
+        }
+        if (newData.getContractPrice() != null) {
+            existing.setContractPrice(newData.getContractPrice());
+        }
+        if (newData.getIncludingVat() != null) {
+            existing.setIncludingVat(newData.getIncludingVat());
+        }
+        if (newData.getCurrency() != null) {
+            existing.setCurrency(newData.getCurrency());
+        }
+        if (newData.getStartDate() != null) {
+            existing.setStartDate(newData.getStartDate());
+        }
+        if (newData.getEndDate() != null) {
+            existing.setEndDate(newData.getEndDate());
+        }
+        if (newData.getContractStageId() != null) {
+            existing.setContractStageId(newData.getContractStageId());
+        }
+        if (newData.getAdvanceAmount() != null) {
+            existing.setAdvanceAmount(newData.getAdvanceAmount());
+        }
+        if (newData.getPenaltyDeductionApplied() != null) {
+            existing.setPenaltyDeductionApplied(newData.getPenaltyDeductionApplied());
+        }
+        if (newData.getAdditionalInfo() != null) {
+            existing.setAdditionalInfo(newData.getAdditionalInfo());
+        }
+        if (newData.getTreasuryGuaranteeAmount() != null) {
+            existing.setTreasuryGuaranteeAmount(newData.getTreasuryGuaranteeAmount());
+        }
+        if (newData.getNationalRegimeInfo() != null) {
+            existing.setNationalRegimeInfo(newData.getNationalRegimeInfo());
+        }
+        if (newData.getContractGuaranteeInfo() != null) {
+            existing.setContractGuaranteeInfo(newData.getContractGuaranteeInfo());
+        }
+        if (newData.getQualityGuaranteeInfo() != null) {
+            existing.setQualityGuaranteeInfo(newData.getQualityGuaranteeInfo());
+        }
+        if (newData.getDeliveryPlaceInfo() != null) {
+            existing.setDeliveryPlaceInfo(newData.getDeliveryPlaceInfo());
+        }
+        if (newData.getSupplier() != null) {
+            existing.setSupplier(newData.getSupplier());
+        }
+        if (newData.getPurchase() != null) {
+            existing.setPurchase(newData.getPurchase());
+        }
     }
 
     private synchronized void updateProcurementObjects(Session session, Purchase purchase) {
