@@ -732,7 +732,7 @@
                           <text value="Пользовательские критерии"/>
                         </properties>
                       </component>
-                      <grid id="f4e67" layout-manager="GridLayoutManager" row-count="3" column-count="2" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+                      <grid id="f4e67" layout-manager="GridLayoutManager" row-count="4" column-count="3" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
                         <margin top="0" left="0" bottom="0" right="0"/>
                         <constraints>
                           <grid row="21" column="0" row-span="1" col-span="1" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
@@ -742,20 +742,15 @@
                         <children>
                           <component id="6cbf0" class="javax.swing.JComboBox" binding="comboBoxUserCrit">
                             <constraints>
-                              <grid row="0" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="2" anchor="8" fill="1" indent="0" use-parent-layout="false"/>
+                              <grid row="0" column="0" row-span="1" col-span="3" vsize-policy="0" hsize-policy="2" anchor="8" fill="1" indent="0" use-parent-layout="false"/>
                             </constraints>
                             <properties>
                               <editable value="true"/>
                             </properties>
                           </component>
-                          <vspacer id="9cced">
-                            <constraints>
-                              <grid row="2" column="0" row-span="1" col-span="1" vsize-policy="6" hsize-policy="1" anchor="0" fill="2" indent="0" use-parent-layout="false"/>
-                            </constraints>
-                          </vspacer>
                           <component id="845e1" class="javax.swing.JButton" binding="buttonUserCritAdd">
                             <constraints>
-                              <grid row="1" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                              <grid row="1" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
                             </constraints>
                             <properties>
                               <text value="Добавить"/>
@@ -763,11 +758,25 @@
                           </component>
                           <component id="5d74c" class="javax.swing.JButton" binding="buttonUserCritShow">
                             <constraints>
-                              <grid row="1" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                              <grid row="1" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
                             </constraints>
                             <properties>
                               <text value="Показать"/>
                             </properties>
+                          </component>
+                          <component id="e61da" class="javax.swing.JButton" binding="buttonCreateProfile">
+                            <constraints>
+                              <grid row="3" column="0" row-span="1" col-span="3" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                            </constraints>
+                            <properties>
+                              <text value="Создать профиль"/>
+                            </properties>
+                          </component>
+                          <component id="12500" class="javax.swing.JComboBox" binding="comboBoxProfileCriterion">
+                            <constraints>
+                              <grid row="2" column="0" row-span="1" col-span="3" vsize-policy="0" hsize-policy="2" anchor="8" fill="1" indent="0" use-parent-layout="false"/>
+                            </constraints>
+                            <properties/>
                           </component>
                         </children>
                       </grid>
@@ -2192,6 +2201,7 @@
                 <border type="none"/>
                 <children>
                   <grid id="77fa8" layout-manager="GridLayoutManager" row-count="5" column-count="11" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+
                     <margin top="0" left="0" bottom="0" right="0"/>
                     <constraints>
                       <grid row="0" column="0" row-span="1" col-span="1" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
@@ -2202,11 +2212,13 @@
                       <vspacer id="7526c">
                         <constraints>
                           <grid row="4" column="0" row-span="1" col-span="1" vsize-policy="6" hsize-policy="1" anchor="0" fill="2" indent="0" use-parent-layout="false"/>
+                          <grid row="5" column="0" row-span="1" col-span="1" vsize-policy="6" hsize-policy="1" anchor="0" fill="2" indent="0" use-parent-layout="false"/>
                         </constraints>
                       </vspacer>
                       <component id="36b17" class="javax.swing.JLabel" binding="CurrentRecords">
                         <constraints>
                           <grid row="3" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
+                          <grid row="4" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
                         </constraints>
                         <properties>
                           <text value="Обработано: 0"/>
@@ -2232,6 +2244,7 @@
                       </hspacer>
                       <component id="ea61f" class="javax.swing.JLabel" binding="TotalRecords">
                         <constraints>
+                          <grid row="4" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
                           <grid row="3" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
                         </constraints>
                         <properties>
@@ -2260,6 +2273,7 @@
                         <margin top="0" left="0" bottom="0" right="0"/>
                         <constraints>
                           <grid row="4" column="1" row-span="1" col-span="1" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
+                          <grid row="5" column="1" row-span="1" col-span="1" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
                         </constraints>
                         <properties/>
                         <border type="none"/>
@@ -2468,6 +2482,7 @@
                         <margin top="10" left="10" bottom="10" right="10"/>
                         <constraints>
                           <grid row="4" column="2" row-span="1" col-span="8" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
+                          <grid row="5" column="2" row-span="1" col-span="8" vsize-policy="3" hsize-policy="3" anchor="0" fill="3" indent="0" use-parent-layout="false"/>
                         </constraints>
                         <properties/>
                         <border type="none"/>
@@ -2520,6 +2535,66 @@
                         <properties>
                           <enabled value="true"/>
                           <text value="Стоп"/>
+                        </properties>
+                      </component>
+                      <hspacer id="bb7ae">
+                        <constraints>
+                          <grid row="2" column="6" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                      </hspacer>
+                      <component id="1c4a5" class="javax.swing.JButton" binding="EGRUL_PDF_Parser_Start">
+                        <constraints>
+                          <grid row="3" column="2" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <text value="Сбор PDF"/>
+                        </properties>
+                      </component>
+                      <component id="95390" class="javax.swing.JButton" binding="EGRUL_PDF_Parser_Stop">
+                        <constraints>
+                          <grid row="3" column="3" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <text value="Остановить сбор"/>
+                        </properties>
+                      </component>
+                      <component id="f6b2" class="javax.swing.JButton" binding="EGRUL_PDF_To_Data">
+                        <constraints>
+                          <grid row="3" column="4" row-span="1" col-span="1" vsize-policy="0" hsize-policy="3" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <text value="Обработка PDF"/>
+                        </properties>
+                      </component>
+                      <component id="ed485" class="javax.swing.JLabel" binding="StatusLabel">
+                        <constraints>
+                          <grid row="2" column="7" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <horizontalAlignment value="10"/>
+                          <horizontalTextPosition value="11"/>
+                          <text value="Статус:"/>
+                        </properties>
+                      </component>
+                      <hspacer id="6622c">
+                        <constraints>
+                          <grid row="2" column="8" row-span="1" col-span="1" vsize-policy="1" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                      </hspacer>
+                      <component id="3fe8d" class="javax.swing.JProgressBar" binding="EGRUL_Parser_Progress_Bar">
+                        <constraints>
+                          <grid row="3" column="6" row-span="1" col-span="3" vsize-policy="0" hsize-policy="6" anchor="0" fill="1" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties/>
+                      </component>
+                      <component id="8710d" class="javax.swing.JLabel" binding="EGRUL_PDF_Bar_status">
+                        <constraints>
+                          <grid row="4" column="7" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="0" fill="0" indent="0" use-parent-layout="false"/>
+                        </constraints>
+                        <properties>
+                          <horizontalAlignment value="10"/>
+                          <horizontalTextPosition value="11"/>
+                          <text value="Статус сбора PDF"/>
                         </properties>
                       </component>
                       <grid id="6450c" layout-manager="GridLayoutManager" row-count="1" column-count="4" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">

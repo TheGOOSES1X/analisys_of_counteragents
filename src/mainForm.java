@@ -7,7 +7,12 @@ import javax.swing.table.*;
 import java.text.SimpleDateFormat;
 import javax.swing.JTable;
 import java.util.Comparator;
+import java.awt.*;
+import java.sql.PreparedStatement;
 
+import MainAnalyzer.*;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import Parser.implementations.*;
 import Parser.implementations.Parser44.PurchaseParser44;
@@ -18,7 +23,6 @@ import Parser.utils.Okpd2Converter;
 import Parser.utils.RandomUserAgent;
 import Parser.utils.StatusForm;
 import com.toedter.calendar.JDateChooser;
-
 
 import java.awt.*;
 // для json
@@ -161,6 +165,7 @@ public class mainForm extends JFrame {
     private JComboBox comboBoxCellCellSelectionIdss;
     private JButton CritDataMassEditButton;
     private JTextField CritDataMassEdit;
+    private JButton buttonCreateProfile;
     private JTextField SearchParamentInsert;
     private JButton QueryButton;
     private JTable HeadersTable;
@@ -194,6 +199,11 @@ public class mainForm extends JFrame {
     private JButton StopParser;
     private JButton PauseParsingButton;
     private JButton StopParseringButton;
+    private JButton EGRUL_PDF_Parser_Start;
+    private JButton EGRUL_PDF_Parser_Stop;
+    private JButton EGRUL_PDF_To_Data;
+    private JProgressBar EGRUL_Parser_Progress_Bar;
+    private JLabel EGRUL_PDF_Bar_status;
     private StatusForm statusForm;
     private JTextField textFieldFilterOkpd2;
     private JTextField textFieldFilterGroup;
@@ -202,6 +212,7 @@ public class mainForm extends JFrame {
     private JButton ChooseRange;
     private JComboBox ThreadCount;
 
+    private JComboBox comboBoxRoleCriterier;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
     private String CritString;
@@ -220,8 +231,41 @@ public class mainForm extends JFrame {
     private ParserState parserState = ParserState.IDLE;
 
     private Thread parserThread;
+    private Thread EGRUL_Parser_Thread;
+
+    private DatabaseManager dbManager;
+    private JComboBox<String> comboBoxProfileCriterion;
 
 
+    public enum Role {
+        USER,
+        EXPERT
+    }
+
+    public void setRole(Role role) {
+        this.currentRole = role;
+        applyRolePermissions();
+    }
+
+    private Role currentRole;
+
+    private void applyRolePermissions() {
+        boolean isExpert = currentRole == Role.EXPERT;
+
+        // Пример: отключаем/включаем кнопки
+        buttonCritEdit.setEnabled(isExpert);
+        buttonCritEditSave.setEnabled(isExpert);
+        buttonUserCritAdd.setEnabled(isExpert);
+        buttonUserCritShow.setEnabled(isExpert);
+        buttonCritEditAddPoint.setEnabled(isExpert);
+        buttonSync.setEnabled(isExpert);
+        buttonCreateProfile.setEnabled(isExpert);
+
+        // И так далее для всех элементов
+        textFieldCritEditWeight.setEditable(isExpert);
+        textFieldCritEditMin.setEditable(isExpert);
+        textFieldCritEditMax.setEditable(isExpert);
+    }
     // List<rowGoodsOrders> rowTableCritIntervalEdit;
 
     private void enableSortingForTable(JTable table, int... numericColumns) {
@@ -261,11 +305,6 @@ public class mainForm extends JFrame {
         }
     }
 
-
-
-
-
-
     // Метод для получения числового значения из объекта
     private double getNumericValue(Object obj) {
         if (obj instanceof Number) {
@@ -278,7 +317,49 @@ public class mainForm extends JFrame {
         }
     }
 
-    public mainForm() {
+
+    public mainForm(Role role) {
+        this.currentRole = role;
+        // Не вызываем initComponents()
+
+        setContentPane(MainPanel);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        pack();
+        applyRolePermissions();
+
+        // Добавляем скрытую комбинацию клавиш
+        KeyboardFocusManager.getCurrentKeyboardFocusManager().addKeyEventDispatcher(new KeyEventDispatcher() {
+            @Override
+            public boolean dispatchKeyEvent(KeyEvent e) {
+                if (e.getID() == KeyEvent.KEY_PRESSED) {
+                    // Включение режима эксперта — Ctrl + Shift + E
+                    if ((e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK) != 0 &&
+                            (e.getModifiersEx() & KeyEvent.SHIFT_DOWN_MASK) != 0 &&
+                            e.getKeyCode() == KeyEvent.VK_E) {
+
+                        String password = JOptionPane.showInputDialog("Введите пароль для эксперта:");
+                        if ("1234".equals(password)) {
+                            JOptionPane.showMessageDialog(null, "Режим эксперта активирован");
+                            setRole(Role.EXPERT);
+                            setTitle("Система (Роль: ЭКСПЕРТ)");
+                        } else {
+                            JOptionPane.showMessageDialog(null, "Неверный пароль");
+                        }
+                    }
+
+                    // Выход из режима эксперта — Ctrl + Shift + U
+                    if ((e.getModifiersEx() & KeyEvent.CTRL_DOWN_MASK) != 0 &&
+                            (e.getModifiersEx() & KeyEvent.SHIFT_DOWN_MASK) != 0 &&
+                            e.getKeyCode() == KeyEvent.VK_U) {
+
+                        setRole(Role.USER);
+                        JOptionPane.showMessageDialog(null, "Вы переключились в режим пользователя");
+                        setTitle("Система (Роль: ПОЛЬЗОВАТЕЛЬ)");
+                    }
+                }
+                return false;
+            }
+        });
         String userAgent = RandomUserAgent.getRandomUserAgent();
         this.driverSetup = new ChromeDriverSetup(userAgent);
         String __URL = "";
@@ -301,7 +382,7 @@ public class mainForm extends JFrame {
             __DB_Module = configJSON.getString("DB_Global_Module");
             __PASSWORD = configJSON.getString("PASSWORD");
 
-        //    System.out.println(configJSON);
+            //    System.out.println(configJSON);
         } catch (IOException | JSONException | NullPointerException e) {
             System.out.println("JSON failed");
         }
@@ -323,13 +404,13 @@ public class mainForm extends JFrame {
                 dbExtractor.updateTables(true, false);
 
                 // установить соединение с БД модуля и создать таблицу в случае её отсутствия)
-            //    dbExtractor.setCells(false);
+                //    dbExtractor.setCells(false);
             }
         });
 
         DefaultTableModel modelC = new DefaultTableModel(
                 new Object[][]{},
-                new String[]{"Код поставщика", "Наименование поставщика", "Деловая репутация, флаг"}
+                new String[]{"Код поставщика", "Наименование поставщика", "ИИН", "Деловая репутация, флаг"}
         ) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -391,6 +472,116 @@ public class mainForm extends JFrame {
             });
         }
 
+        class CreateProfileDialog extends JDialog {
+            private JTextField profileNameField;
+            private JButton saveButton;
+            private DatabaseManager dbManager;
+            private JComboBox<String> comboBoxProfileCriterion;
+
+            public CreateProfileDialog(DatabaseManager dbManager, JComboBox<String> comboBoxProfileCriterion) {
+                this.dbManager = dbManager;
+                this.comboBoxProfileCriterion = comboBoxProfileCriterion;
+
+                setTitle("Создание профиля");
+                setModal(true);
+                setSize(300, 150);
+                setLocationRelativeTo(null);
+                setLayout(new GridLayout(2, 2));
+
+                add(new JLabel("Название профиля:"));
+                profileNameField = new JTextField();
+                add(profileNameField);
+
+                saveButton = new JButton("Сохранить");
+                add(saveButton);
+                add(new JLabel()); // пустая ячейка
+
+                saveButton.addActionListener(e -> saveProfile());
+
+                setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+            }
+
+            private void saveProfile() {
+                String profileName = profileNameField.getText().trim();
+
+                if (profileName.isEmpty()) {
+                    JOptionPane.showMessageDialog(this, "Введите название профиля.");
+                    return;
+                }
+
+                // Проверяем, существует ли уже профиль с таким именем
+                for (int i = 0; i < comboBoxProfileCriterion.getItemCount(); i++) {
+                    if (profileName.equals(comboBoxProfileCriterion.getItemAt(i))) {
+                        JOptionPane.showMessageDialog(this, "Профиль с таким именем уже существует.");
+                        return;
+                    }
+                }
+
+                List<DatabaseManager.CriterionData> criteria = dbManager.getAllCriteria();
+
+                for (DatabaseManager.CriterionData crit : criteria) {
+                    JSONObject obj = new JSONObject();
+                    obj.put("nfunctiontype", crit.nfunctiontype);
+                    obj.put("nminval", crit.nminval);
+                    obj.put("nmaxval", crit.nmaxval);
+                    obj.put("nweight", crit.nweight);
+
+                    boolean success = dbManager.insertProfile(profileName, crit.id, obj.toString());
+
+                    if (!success) {
+                        JOptionPane.showMessageDialog(this, "Ошибка при сохранении профиля для ID " + crit.id);
+                        return;
+                    }
+                }
+
+                // Добавляем новый профиль в комбобокс
+                comboBoxProfileCriterion.addItem(profileName);
+                comboBoxProfileCriterion.setSelectedItem(profileName);
+
+                JOptionPane.showMessageDialog(this, "Профиль успешно сохранён для всех критериев.");
+                dispose();
+            }
+        }
+
+        // Использование:
+        buttonCreateProfile.addActionListener(e -> {
+            CreateProfileDialog dialog = new CreateProfileDialog(dbExtractor, comboBoxProfileCriterion);
+            dialog.setVisible(true);
+        });
+
+
+
+        DefaultTableModel modelCrit = new DefaultTableModel(
+                new Object[][]{},
+                new String[]{"Значение критерия", "Весовой коэффициент допустимости критерия, доля"}
+        ) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // Все ячейки нередактируемы
+            }
+        };
+        fillComboBoxProfile();
+
+        comboBoxProfileCriterion.addActionListener(e -> onProfileSelection());
+
+
+        comboBoxProfileCriterion.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String selectedProfile = (String) comboBoxProfileCriterion.getSelectedItem();
+
+                if (selectedProfile != null && !selectedProfile.isEmpty()) {
+                    boolean success = dbExtractor.applyProfileByName(selectedProfile);
+
+                    if (success) {
+                        JOptionPane.showMessageDialog(null, "Профиль \"" + selectedProfile + "\" успешно применён!");
+                        updateCritValues(); // если реализовано
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Ошибка при применении профиля.");
+                    }
+                }
+            }
+        });
 
         buttongetAllContras.addActionListener(new ActionListener() {
             @Override
@@ -428,15 +619,7 @@ public class mainForm extends JFrame {
             }
         });
 
-        DefaultTableModel modelCrit = new DefaultTableModel(
-                new Object[][]{},
-                new String[]{"Значение критерия", "Весовой коэффициент допустимости критерия, доля"}
-        ) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false; // Все ячейки нередактируемы
-            }
-        };
+
 
         tableCrit.setModel(modelCrit);
 
@@ -478,7 +661,6 @@ public class mainForm extends JFrame {
                 updateCritValues();
             }
         });
-
         button_statGoodQuality.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
@@ -537,9 +719,9 @@ public class mainForm extends JFrame {
 
                 List<rowCritValues> rowsCrVa;
                 if (CritId == 3) {
-                    rowsCrVa = dbExtractor.getCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                    rowsCrVa = dbExtractor.getCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
                 } else {
-                    rowsCrVa = dbExtractor.getUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                    rowsCrVa = dbExtractor.getUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
                 }
 
                 // установить соединение с БД модуля и создать таблицу в случае её отсутствия)
@@ -704,7 +886,7 @@ public class mainForm extends JFrame {
                         CritDataMassEdit.setEnabled(true);
                         tableCrit.setModel(modelCritCGValuesEdit);
 
-                        rowsCGO = dbExtractor.getCGOsUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+                        rowsCGO = dbExtractor.getCGOsUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), textFieldFilterOrder.getText(), textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
 
                         updateTableCritGCViewUserValues(rowsCGO,CritId);
                         //   rowsLotGCVa = dbExtractor.getUserCrVas(false, CritString, CritShort, "", "", "", "", "");
@@ -799,31 +981,44 @@ public class mainForm extends JFrame {
                 buttonCritViewCG.setText("Данные");
                 buttonCritViewCGSave.setEnabled(false);
                 tableCrit.setModel(modelCrit);
-                // открытие таблиц с новым критерием
-                //    System.out.println(comboBoxUserCrit.getSelectedIndex());
-                if (comboBoxUserCrit.getSelectedIndex() > -1) {
-                    // критерий выбран
-                    // установить соединение с БД модуля и создать таблицу критериев в случае её отсутствия)
-                    dbExtractor.setCritData(false);
-                    // проверить критерий в таблице критериев
-                    List<rowCritData> rowsCrData = dbExtractor.getCritData(false, comboBoxUserCrit.getSelectedIndex() + 4);
-                    if (rowsCrData.isEmpty()) {
-                        // добавить критерий в таблицу критериев, если его там нет
-                        dbExtractor.addCritData(false, comboBoxUserCrit.getSelectedIndex() + 4, comboBoxUserCrit.getSelectedItem().toString(), "0", "0", "100", "1", "{}");
-                        // добавить критерий в таблицу связей, если его ещё нет
-                        CritId = comboBoxUserCrit.getSelectedIndex() + 4;
-                        dbExtractor.alterUserCritData(false, "user_crit_" + CritId);
-                    }
-                    // если критерий уже есть или только что добавлен
 
-                    //обновить пары поставщиков и ТМЦ
-                    dbExtractor.updateCGsUserCritValues(false);
-                    // установить соединение с БД модуля и заполнить данные о критерии с учетом фильтров
-                    CritId = comboBoxUserCrit.getSelectedIndex() + 4;
-                    CritString = "user_crit_" + CritId;
-                    CritShort = "uc_" + CritId;
-                    CritName = comboBoxUserCrit.getSelectedItem().toString();
-                    updateCritValues();
+                Object selectedObj = comboBoxUserCrit.getSelectedItem();
+                rowCritData selected = null;
+
+                if (selectedObj instanceof rowCritData) {
+                    selected = (rowCritData) selectedObj;
+                } else if (selectedObj instanceof String) {
+                    String inputName = ((String) selectedObj).trim();
+
+                    if (!inputName.isEmpty()) {
+                        List<rowCritData> rowsCrData = dbExtractor.getAllCritData(false);
+
+                        // Проверяем существование критерия
+                        for (rowCritData row : rowsCrData) {
+                            if (row.getCritName().equalsIgnoreCase(inputName)) {
+                                selected = row;
+                                break;
+                            }
+                        }
+
+                        if (selected == null) {
+                            // Добавляем новый критерий
+                            dbExtractor.addUserCritData(false, inputName, "0", "0", "100", "1", "{}");
+                            long newCritId = dbExtractor.getMaxCritId(false);
+                            String newColumn = "user_crit_" + newCritId;
+                            dbExtractor.alterUserCritData(false, newColumn);
+
+                            // Обновляем модель и выбираем новый элемент
+                            updateComboBoxModel();
+                            selectCritInComboBox(newCritId);
+
+                            selected = new rowCritData(newCritId, inputName, 0, 0, 100, 1, "{}");
+                        }
+                    }
+                }
+
+                if (selected != null) {
+                    processSelectedCrit(selected);
                 }
             }
         });
@@ -893,7 +1088,9 @@ public class mainForm extends JFrame {
                         textFieldFilterGood.getText(),
                         textFieldFilterOrder.getText(),
                         textFieldFilterDate.getText(),
-                        textFieldFilterMinVolume.getText()
+                        textFieldFilterMinVolume.getText(),
+                        textFieldFilterOkpd2.getText(),
+                        textFieldFilterGroup.getText()
                 );
 
                 // Обновляем таблицу
@@ -1494,7 +1691,7 @@ public class mainForm extends JFrame {
                     String g_code = tableOptGoodsConditionsEdit.getValueAt(i, 1).toString();
                     String g_name = tableOptGoodsConditionsEdit.getValueAt(i, 2).toString();
                     int g_cond = Integer.parseInt(tableOptGoodsConditionsEdit.getValueAt(i, 3).toString());
-                    rowsGoodCond.add(new rowGoods(g_id, g_name, g_cond,g_code,0,0,0,0,0,""));
+                    rowsGoodCond.add(new rowGoods(g_id, g_name, g_cond,g_code,0,0,0,0,0,"",""));
 
                 }
 
@@ -1718,6 +1915,8 @@ public class mainForm extends JFrame {
         StopParseringButton.addActionListener(e -> {
             stopParsing();
         });
+        EGRUL_PDF_Parser_Start.addActionListener(e -> EGRUL_Parser_Start());
+        EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
 
         Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "src/currency.json");
 
@@ -1766,6 +1965,7 @@ public class mainForm extends JFrame {
                 modelContras.addRow(new Object[]{
                         rowC.getContrasCode(),
                         rowC.getContrasName(),
+                        rowC.getInn(),
                         formatValue(rowC.getContrasReputation())
                 });
             }
@@ -1903,9 +2103,9 @@ public class mainForm extends JFrame {
     private void updateCritValues() {
         List<rowCritValues> rowsCrVa;
         if (CritId == 3) {
-            rowsCrVa = dbExtractor.getCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), "", textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+            rowsCrVa = dbExtractor.getCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), "", textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
         } else {
-            rowsCrVa = dbExtractor.getUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), "", textFieldFilterDate.getText(), textFieldFilterMinVolume.getText());
+            rowsCrVa = dbExtractor.getUserCrVas(false, CritString, CritShort, textFieldFilterContras.getText(), textFieldFilterGood.getText(), "", textFieldFilterDate.getText(), textFieldFilterMinVolume.getText(), textFieldFilterOkpd2.getText());
         }
         // установить соединение с БД модуля и создать таблицу критериев в случае её отсутствия)
         dbExtractor.setCritData(false);
@@ -2466,6 +2666,7 @@ public class mainForm extends JFrame {
         }
     }
 
+
     private void updateContrasHistoryEdit(List<rowContrasWithHistory> rowsCHs) {
         if (tableContrasHistoryEdit != null) {
             DefaultTableModel modelGoodsOrders = (DefaultTableModel) tableContrasHistoryEdit.getModel();
@@ -2675,6 +2876,29 @@ public class mainForm extends JFrame {
         enableSortingForTable(tableOptVolResultPurchase,  2, 3,6,7); // Сортировка по OrderName, GoodName, PurchaseQuantity, GoodMeasure
     }
 
+    private void EGRUL_Parser_Start(){
+//        try {
+//            EGRUL_PDF_Parser_Start.setText("Парсинг...");
+//            EGRUL_PDF_Parser_Start.setEnabled(false);
+//
+//            EGRUL_Parser_Progress_Bar.setMinimum(0);
+//            EGRUL_Parser_Progress_Bar.setMaximum(Parser_EGRUL.Parser.countRemainingUrls());
+//
+//
+//
+//            Parser_EGRUL.Parser.StartParsingEGRUL();
+//        } catch (IOException e) {
+//            EGRUL_PDF_Bar_status.setText("Ошибка при сборе данных " + e.toString());
+//        }
+    }
+
+    private void EGRUL_PDF_Processing(){
+//        try {
+//            Parser_EGRUL.Parser.StartParsingEGRUL(this);
+//        } catch (IOException e) {
+//            throw new RuntimeException(e);
+//        }
+    }
 
     private void initStartParsingButton() {
         if (statusForm.selectedUrls.isEmpty()) {
@@ -2794,6 +3018,115 @@ public class mainForm extends JFrame {
             return; // Завершаем выполнение метода
         }
     }
+    private void fillComboBoxProfile() {
+        List<String> profiles = dbExtractor.getAllProfileNames();
+        for (String profile : profiles) {
+            comboBoxProfileCriterion.addItem(profile);
+        }
+    }
+
+    private void onProfileSelection() {
+        String selectedProfile = (String) comboBoxProfileCriterion.getSelectedItem();
+        String jValues = dbExtractor.getJValuesForProfile(selectedProfile);
+
+        if (jValues == null || jValues.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Профиль не содержит данных.", "Ошибка", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        try {
+            // Пытаемся распарсить как массив
+            if (jValues.trim().startsWith("[")) {
+                JSONArray jArray = new JSONArray(jValues);
+                if (jArray.length() > 0) {
+                    JSONObject firstObject = jArray.getJSONObject(0);
+                    fillCritFields(firstObject);
+                }
+            }
+            // Если это объект
+            else if (jValues.trim().startsWith("{")) {
+                JSONObject obj = new JSONObject(jValues);
+                fillCritFields(obj);
+            } else {
+                JOptionPane.showMessageDialog(this, "Неверный формат JSON.", "Ошибка", JOptionPane.ERROR_MESSAGE);
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, "Ошибка при разборе JSON-данных.", "Ошибка", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // Вынесем заполнение полей в отдельный метод
+    private void fillCritFields(JSONObject obj) {
+        textFieldCritEditMin.setText(obj.optString("nminval", ""));
+        textFieldCritEditMax.setText(obj.optString("nmaxval", ""));
+        textFieldCritEditWeight.setText(obj.optString("nweight", ""));
+    }
+
+
+    private void showCreateProfileDialog() {
+        JDialog dialog = new JDialog(this, "Создание профиля", true);
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(this);
+        dialog.setLayout(new GridLayout(5, 2, 5, 5));
+
+        JLabel labelName = new JLabel("Название профиля:");
+        JTextField textFieldName = new JTextField();
+
+        JLabel labelCriterion = new JLabel("ID критерия:");
+        JTextField textFieldCriterionId = new JTextField(); // или JComboBox, если хочешь выбор из базы
+
+        JLabel labelJValues = new JLabel("J значения:");
+        JTextField textFieldJValues = new JTextField();
+
+        JButton buttonSave = new JButton("Сохранить");
+        JButton buttonCancel = new JButton("Отмена");
+
+        dialog.add(labelName);
+        dialog.add(textFieldName);
+        dialog.add(labelCriterion);
+        dialog.add(textFieldCriterionId);
+        dialog.add(labelJValues);
+        dialog.add(textFieldJValues);
+        dialog.add(buttonSave);
+        dialog.add(buttonCancel);
+
+        // Сохранение в базу данных
+        buttonSave.addActionListener(e -> {
+            String name = textFieldName.getText().trim();
+            String critIdStr = textFieldCriterionId.getText().trim();
+            String jValues = textFieldJValues.getText().trim();
+
+            if (name.isEmpty() || critIdStr.isEmpty() || jValues.isEmpty()) {
+                JOptionPane.showMessageDialog(dialog, "Заполните все поля");
+                return;
+            }
+
+            try {
+                long critId = Long.parseLong(critIdStr);
+
+                String sql = "INSERT INTO module_profiles (prifile_name, module_criterion_id, j_values) VALUES (?, ?, ?)";
+                PreparedStatement stmt = dbManager.getConnection().prepareStatement(sql);
+                stmt.setString(1, name);
+                stmt.setLong(2, critId);
+                stmt.setString(3, jValues);
+                stmt.executeUpdate();
+
+                JOptionPane.showMessageDialog(dialog, "Профиль сохранён");
+                dialog.dispose();
+
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(dialog, "ID критерия должен быть числом");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(dialog, "Ошибка при сохранении: " + ex.getMessage());
+            }
+        });
+
+        buttonCancel.addActionListener(e -> dialog.dispose());
+
+        dialog.setVisible(true);
+    }
 
 
 
@@ -2856,6 +3189,7 @@ public class mainForm extends JFrame {
 
         // Обработка дат
         SimpleDateFormat urlDateFormat = new SimpleDateFormat("dd.MM.yyyy");
+        // Обработка даты публикации (основной фильтр даты)
         if (dateChooseFilterStart.getDate() != null) {
             params.put("publishDateFrom", urlDateFormat.format(dateChooseFilterStart.getDate()));
         }
@@ -3117,10 +3451,90 @@ public class mainForm extends JFrame {
         }
     }
 
+    private void updateComboBoxModel() {
+        // Сохраняем текущий выбранный элемент
+        Object selectedItem = comboBoxUserCrit.getSelectedItem();
+
+        List<rowCritData> crits = dbExtractor.getAllCritData(false);
+        DefaultComboBoxModel<rowCritData> model = new DefaultComboBoxModel<>();
+        for (rowCritData row : crits) {
+            model.addElement(row);
+        }
+        comboBoxUserCrit.setModel(model);
+
+        // Восстанавливаем выбор, если элемент все еще существует в новой модели
+        if (selectedItem != null) {
+            for (int i = 0; i < model.getSize(); i++) {
+                if (model.getElementAt(i).equals(selectedItem)) {
+                    comboBoxUserCrit.setSelectedIndex(i);
+                    break;
+                }
+            }
+        } else if (model.getSize() > 0) {
+            comboBoxUserCrit.setSelectedIndex(0);
+        }
+    }
+
+    private void selectCritInComboBox(long critId) {
+        DefaultComboBoxModel<rowCritData> model = (DefaultComboBoxModel<rowCritData>) comboBoxUserCrit.getModel();
+        for (int i = 0; i < model.getSize(); i++) {
+            if (model.getElementAt(i).getIdCrit() == critId) {
+                comboBoxUserCrit.setSelectedIndex(i);
+                break;
+            }
+        }
+    }
+
+    private void processSelectedCrit(rowCritData selected) {
+        long critId = selected.getIdCrit();
+        String critName = selected.getCritName();
+        String columnName = "user_crit_" + critId;
+
+        // Проверка существования записи
+        List<rowCritData> rowsCrData = dbExtractor.getCritData(false, critId);
+        if (rowsCrData.isEmpty()) {
+            dbExtractor.addUserCritData(false, critName, "0", "0", "100", "1", "{}");
+            dbExtractor.alterUserCritData(false, columnName);
+        }
+
+        dbExtractor.updateCGsUserCritValues(false);
+
+        CritId = critId;
+        CritString = columnName;
+        CritShort = "uc_" + critId;
+        CritName = critName;
+
+        updateCritValues();
+    }
+
 
 
 
     public static void main(String[] args) {
+        // Параметры по умолчанию
+        String contras = "";
+        String good = "";
+        String date = "";
+        String minVolume = "";
+        String order = "";
+
+        // Если есть аргументы командной строки, используем их
+        if (args.length >= 5) {
+            contras = args[0];  // первый аргумент (после имени программы)
+            good = args[1];     // второй аргумент
+            date = args[2];     // третий аргумент
+            minVolume = args[3]; // четвертый аргумент
+            order = args[4];    // пятый аргумент
+        }
+
+
+        final String finalContras = contras;
+        final String finalGood = good;
+        final String finalDate = date;
+        final String finalMinVolume = minVolume;
+        final String finalOrder = order;
+
+
         try {
             for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
                 if ("Nimbus".equals(info.getName())) {
@@ -3136,11 +3550,26 @@ public class mainForm extends JFrame {
             }
         }
 
-        new mainForm();
+        // Запускаем интерфейс
+        SwingUtilities.invokeLater(() -> {
+            mainForm form = new mainForm(Role.EXPERT); // ← по умолчанию роль USER
+            form.setContentPane(form.MainPanel);
+            form.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            form.pack();
+            form.setVisible(true);
+
+            form.textFieldFilterContras.setText(finalContras);
+            System.out.println(finalContras);
+            form.textFieldFilterDate.setText(finalDate);
+            form.textFieldFilterGood.setText(finalGood);
+            form.textFieldFilterMinVolume.setText(finalMinVolume);
+            form.textFieldFilterOrder.setText(finalOrder);
+        });
     }
 
     private void createUIComponents() {
         // TODO: place custom component creation code here
     }
+
 }
 

@@ -51,9 +51,9 @@ public class HibernateUtil {
                 Map<String, Object> settings = new HashMap<>();
                 settings.put(Environment.DRIVER, "org.postgresql.Driver");
                 settings.put(Environment.URL, String.format("jdbc:postgresql://%s:%s/%s",
-                        config.optString("HOST", "localhost"),
+                        config.optString("HOST", "192.168.234.237"),
                         config.optString("PORT", "5432"),
-                        config.getString("DB_Global_Marine")));
+                        config.getString("DB_Global_Module")));
                 settings.put(Environment.USER, config.getString("USER"));
                 settings.put(Environment.PASS, config.getString("PASSWORD"));
                 settings.put(Environment.DIALECT, "org.hibernate.dialect.PostgreSQLDialect");
