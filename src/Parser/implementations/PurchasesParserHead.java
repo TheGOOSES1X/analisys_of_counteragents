@@ -180,7 +180,7 @@ public class PurchasesParserHead implements Parser {
                 continue;
             }
 
-            processPageItems(itemContainers, allPurchases);
+            processPageItems(itemContainers, allPurchases,totalItems);
             hasNextPage = shouldContinueToNextPage(currentPage, totalItems);
             currentPage++;
         }
@@ -210,12 +210,14 @@ public class PurchasesParserHead implements Parser {
         return driver.findElements(By.cssSelector(".search-registry-entry-block"));
     }
 
-    private void processPageItems(List<WebElement> itemContainers, List<PurchaseItem> allPurchases) {
+    private void processPageItems(List<WebElement> itemContainers, List<PurchaseItem> allPurchases, int totalItems) {
         for (WebElement itemContainer : itemContainers) {
+            if (isStopped) break; // Проверка на остановку
+
             try {
                 PurchaseItem item = extractPurchaseData(itemContainer);
                 allPurchases.add(item);
-                notifyItemProcessed(allPurchases.size(), item,allPurchases.size());
+                notifyItemProcessed(allPurchases.size(), item, totalItems); // Передаем totalItems
             } catch (Exception e) {
                 handleItemError("Ошибка при обработке элемента: " + e.getMessage(), e);
             }
@@ -227,7 +229,7 @@ public class PurchasesParserHead implements Parser {
         return currentPage * ITEMS_PER_PAGE < totalItems;
     }
 
-    private void notifyItemProcessed(int processedCount, PurchaseItem item,int totalItems) {
+    private void notifyItemProcessed(int processedCount, PurchaseItem item, int totalItems) {
         if (statusListener != null) {
             statusListener.updateCurrentRecords(processedCount);
             statusListener.addPurchaseToTable(item,totalItems);

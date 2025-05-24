@@ -159,37 +159,37 @@ public class ContractParser223 {
             String contractNumber = mainInfo.findElement(By.cssSelector("span.cardMainInfo__purchaseLink a"))
                     .getText().trim();
             contractData.put("Номер договора (заголовок)", contractNumber);
-            System.out.println("Номер договора (заголовок): " + contractNumber);
+//            System.out.println("Номер договора (заголовок): " + contractNumber);
 
             // Статус контракта
             String contractStatus = mainInfo.findElement(By.cssSelector("span.cardMainInfo__state"))
                     .getText().trim();
             contractData.put("Статус контракта", contractStatus);
-            System.out.println("Статус контракта: " + contractStatus);
+//            System.out.println("Статус контракта: " + contractStatus);
 
             // Номер договора (в теле)
             String contractNumberBody = mainInfo.findElement(By.xpath(".//span[contains(text(),'Номер договора')]/following-sibling::span"))
                     .getText().trim();
             contractData.put("Номер договора", contractNumberBody);
-            System.out.println("Номер договора: " + contractNumberBody);
+//            System.out.println("Номер договора: " + contractNumberBody);
 
             // Заказчик
             String customer = mainInfo.findElement(By.xpath(".//span[contains(text(),'Заказчик')]/following-sibling::span/a"))
                     .getText().trim();
             contractData.put("Заказчик", customer);
-            System.out.println("Заказчик: " + customer);
+//            System.out.println("Заказчик: " + customer);
 
             // Цена договора
             String price = mainInfo.findElement(By.cssSelector("div.rightBlock__price"))
                     .getText().replace("&nbsp;", " ").trim();
             contractData.put("Цена договора", price);
-            System.out.println("Цена договора: " + price);
+//            System.out.println("Цена договора: " + price);
 
             // Дата заключения
             String conclusionDate = mainInfo.findElement(By.xpath(".//div[contains(text(),'Заключение договора')]/following-sibling::div"))
                     .getText().trim();
             contractData.put("Дата заключения", conclusionDate);
-            System.out.println("Дата заключения: " + conclusionDate);
+//            System.out.println("Дата заключения: " + conclusionDate);
 
             // Срок исполнения
             String executionPeriodFull = mainInfo.findElement(By.xpath(".//div[contains(text(),'Срок исполнения')]/following-sibling::div"))
@@ -200,7 +200,7 @@ public class ContractParser223 {
             String endDate = dates.length > 1 ? dates[dates.length - 1].trim() : executionPeriodFull;
 
             contractData.put("Срок исполнения (окончание)", endDate);
-            System.out.println("Срок исполнения: " + endDate);
+//            System.out.println("Срок исполнения: " + endDate);
 
             // Даты размещения и обновления
             List<WebElement> dateElements = mainInfo.findElements(By.cssSelector("div.rightBlock__text"));
@@ -210,8 +210,8 @@ public class ContractParser223 {
 
                 contractData.put("Дата размещения", placementDate);
                 contractData.put("Дата обновления", updateDate);
-                System.out.println("Дата размещения: " + placementDate);
-                System.out.println("Дата обновления: " + updateDate);
+//                System.out.println("Дата размещения: " + placementDate);
+//                System.out.println("Дата обновления: " + updateDate);
             }
 
             return contractData;
@@ -227,19 +227,19 @@ public class ContractParser223 {
 
     public List<ProcurementObject> parseSubjectTable(WebDriver driver) {
         List<ProcurementObject> procurementObjects = new ArrayList<>();
-        System.out.println("\n=== ПАРСИНГ ТАБЛИЦЫ ПРЕДМЕТА ДОГОВОРА ===");
+//        System.out.println("\n=== ПАРСИНГ ТАБЛИЦЫ ПРЕДМЕТА ДОГОВОРА ===");
 
         try {
             WebElement container = driver.findElement(By.cssSelector("div.container.card-common"));
             WebElement table = container.findElement(By.cssSelector("table.table"));
             List<WebElement> rows = table.findElements(By.cssSelector("tbody tr"));
 
-            System.out.println("Найдено строк в таблице: " + rows.size());
-            System.out.println("------------------------------------------------------------------------------------------------------------------------");
-            System.out.printf("%-3s | %-60s | %-20s | %-15s | %-20s | %-25s | %-25s | %-15s%n",
-                    "№", "Наименование", "ОКПД2", "Количество", "Цена за ед.",
-                    "Страна происхождения", "Страна производителя", "Сумма");
-            System.out.println("------------------------------------------------------------------------------------------------------------------------");
+//            System.out.println("Найдено строк в таблице: " + rows.size());
+//            System.out.println("------------------------------------------------------------------------------------------------------------------------");
+//            System.out.printf("%-3s | %-60s | %-20s | %-15s | %-20s | %-25s | %-25s | %-15s%n",
+//                    "№", "Наименование", "ОКПД2", "Количество", "Цена за ед.",
+//                    "Страна происхождения", "Страна производителя", "Сумма");
+//            System.out.println("------------------------------------------------------------------------------------------------------------------------");
 
             for (WebElement row : rows) {
                 try {
@@ -321,15 +321,15 @@ public class ContractParser223 {
                 String totalAmount = totalElement.getText()
                         .replaceAll("[^\\d,.]", "")
                         .replace(",", ".").trim();
-                System.out.println("------------------------------------------------------------------------------------------------------------------------");
-                System.out.printf("%-3s | %-60s | %-20s | %-15s | %-20s | %-25s | %-25s | %-15s%n",
-                        "", "ИТОГО:", "", "", "", "", "", totalAmount);
-                System.out.println("------------------------------------------------------------------------------------------------------------------------");
+//                System.out.println("------------------------------------------------------------------------------------------------------------------------");
+//                System.out.printf("%-3s | %-60s | %-20s | %-15s | %-20s | %-25s | %-25s | %-15s%n",
+//                        "", "ИТОГО:", "", "", "", "", "", totalAmount);
+//                System.out.println("------------------------------------------------------------------------------------------------------------------------");
             } catch (Exception e) {
                 System.out.println("Не удалось найти итоговую сумму: " + e.getMessage());
             }
 
-            System.out.println("=== ПАРСИНГ ЗАВЕРШЁН. НАЙДЕНО ОБЪЕКТОВ: " + procurementObjects.size() + " ===");
+//            System.out.println("=== ПАРСИНГ ЗАВЕРШЁН. НАЙДЕНО ОБЪЕКТОВ: " + procurementObjects.size() + " ===");
 
         } catch (NoSuchElementException e) {
             System.out.println("Таблица предмета договора не найдена на странице");
@@ -361,8 +361,8 @@ public class ContractParser223 {
                     }
 
                     found = true;
-                    System.out.println("\nНайден блок 'Общая информация':");
-                    System.out.println("--------------------------------");
+//                    System.out.println("\nНайден блок 'Общая информация':");
+//                    System.out.println("--------------------------------");
 
                     List<WebElement> sections = block.findElements(By.xpath(".//section[contains(@class, 'section')]"));
                     for (WebElement section : sections) {
@@ -375,12 +375,12 @@ public class ContractParser223 {
                                 WebElement link = section.findElement(By.xpath(".//span[contains(@class, 'section__info')]//a"));
                                 value = link.getText().trim();
                                 generalInfo.put(key, value);
-                                System.out.printf("%-30s: %s (ссылка)%n", key, value);
+//                                System.out.printf("%-30s: %s (ссылка)%n", key, value);
                             } catch (NoSuchElementException e) {
                                 value = section.findElement(By.xpath(".//span[contains(@class, 'section__info')]"))
                                         .getText().trim();
                                 generalInfo.put(key, value);
-                                System.out.printf("%-30s: %s%n", key, value);
+//                                System.out.printf("%-30s: %s%n", key, value);
                             }
                         } catch (Exception e) {
                             System.err.println("Ошибка при парсинге секции: " + e.getMessage());
@@ -397,9 +397,9 @@ public class ContractParser223 {
                 System.out.println("Блок 'Общая информация' не найден на странице");
             }
 
-            System.out.println("--------------------------------");
-            System.out.println("Всего извлечено полей: " + generalInfo.size());
-            System.out.println("=== ПАРСИНГ ЗАВЕРШЁН ===\n");
+//            System.out.println("--------------------------------");
+//            System.out.println("Всего извлечено полей: " + generalInfo.size());
+//            System.out.println("=== ПАРСИНГ ЗАВЕРШЁН ===\n");
 
         } catch (TimeoutException e) {
             System.err.println("Таймаут при поиске блоков информации: " + e.getMessage());

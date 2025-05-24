@@ -1,4 +1,4 @@
-package Parser.implementations;
+package Parser.utils;
 
 import Parser.interfaces.ParserStatusListener;
 import Parser.interfaces.PurchaseItem;
@@ -66,7 +66,10 @@ public class StatusForm implements ParserStatusListener {
 
     @Override
     public void addPurchaseToTable(PurchaseItem item, int totalItems) {
+        if (item == null) return;
+
         allItems.add(item);
+        // Обновляем таблицу каждые 50 записей или при достижении общего количества
         if (allItems.size() % 50 == 0 || allItems.size() == totalItems) {
             updateTableBatch();
         }
@@ -74,8 +77,11 @@ public class StatusForm implements ParserStatusListener {
 
     private void updateTableBatch() {
         SwingUtilities.invokeLater(() -> {
+            if (headersTable == null) return;
+
             DefaultTableModel model = (DefaultTableModel) headersTable.getModel();
             model.setRowCount(0); // Очистка таблицы
+
             for (int i = 0; i < allItems.size(); i++) {
                 PurchaseItem item = allItems.get(i);
                 model.addRow(new Object[]{
@@ -85,7 +91,11 @@ public class StatusForm implements ParserStatusListener {
                         false
                 });
             }
-            autoResizeColumn(headersTable, 2); // Однократная подгонка
+
+            // Подгоняем ширину столбца только если есть элементы
+            if (allItems.size() > 0) {
+                autoResizeColumn(headersTable, 2);
+            }
         });
     }
 

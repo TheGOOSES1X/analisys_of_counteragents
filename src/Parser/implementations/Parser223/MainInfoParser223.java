@@ -201,10 +201,10 @@ public class MainInfoParser223 {
                 result.put("complaintLink", null);
             }
 
-            // Для отладки можно вывести результаты
-            System.out.println("=== Парсинг карточки закупки ===");
-            result.forEach((key, value) -> System.out.println(key + ": " + value));
-            System.out.println("===============================");
+//            // Для отладки можно вывести результаты
+//            System.out.println("=== Парсинг карточки закупки ===");
+//            result.forEach((key, value) -> System.out.println(key + ": " + value));
+//            System.out.println("===============================");
 
         } catch (Exception e) {
             System.out.println("Ошибка при парсинге карточки закупки: " + e.getMessage());
@@ -300,10 +300,10 @@ public class MainInfoParser223 {
                     System.out.println("Ошибка при обработке контейнера: " + e.getMessage());
                 }
             }
-
-            System.out.println("\n=== ИТОГОВЫЕ ДАННЫЕ ===");
-            result.forEach((key, value) -> System.out.printf("%-50s: %s%n", key, value));
-            System.out.println("=======================");
+//
+//            System.out.println("\n=== ИТОГОВЫЕ ДАННЫЕ ===");
+//            result.forEach((key, value) -> System.out.printf("%-50s: %s%n", key, value));
+//            System.out.println("=======================");
 
         } catch (Exception e) {
             System.out.println("Ошибка при сборе данных: " + e.getMessage());
