@@ -70,7 +70,9 @@ public class StatusForm implements ParserStatusListener {
 
         allItems.add(item);
         // Обновляем таблицу каждые 50 записей или при достижении общего количества
-        if (allItems.size() % 50 == 0 || allItems.size() == totalItems) {
+        if (allItems.size() % 50 == 0 ||
+                allItems.size() == totalItems ||
+                totalItems < 50) {
             updateTableBatch();
         }
     }
