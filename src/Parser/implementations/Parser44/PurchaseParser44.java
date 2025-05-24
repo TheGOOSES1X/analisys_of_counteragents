@@ -167,8 +167,10 @@ public class PurchaseParser44 implements Parser {
         try {
             // Если URL содержит "notice223", обрабатываем только через documentParser
             if (url.contains("notice223")) {
-                documentParser.parseDocumentInfo(url, driver, wait);
-                return new ParseResult(url, null, null); // Возвращаем пустой результат, так как данные о закупке не парсятся
+
+
+//                documentParser.parseDocumentInfo(url, driver, wait);
+//                return new ParseResult(url, null, null); // Возвращаем пустой результат, так как данные о закупке не парсятся
             }
 
             // Если URL не содержит "notice223", обрабатываем стандартными методами

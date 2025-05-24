@@ -41,13 +41,11 @@ public class PurchasePageParser {
 //            System.out.println("=======================================\n");
 
             // Парсим объекты закупки
-            List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
-            procurementObjects.forEach(purchase::addProcurementObject);
 
 
 
             // Выводим информацию о количестве найденных объектов
-            System.out.println("Найдено объектов закупки: " + procurementObjects.size());
+//            System.out.println("Найдено объектов закупки: " + procurementObjects.size());
 
             // 4. Заполняем поля закупки из собранных данных
 
@@ -82,6 +80,8 @@ public class PurchasePageParser {
             int complaintsCount = complaintsCounter.countComplaintsByRegNumber(url, driver, wait);
             purchase.setComplaints(complaintsCount);
 
+            List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
+            procurementObjects.forEach(purchase::addProcurementObject);
 
             return purchase;
 

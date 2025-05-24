@@ -28,10 +28,9 @@ public class DatabaseService {
                 // 2. Обработка Supplier и Contract
                 handleSupplierAndContract(session, purchase);
 
-
-                handleProcurementObjects(session, purchase);
-                // 3. Обработка Purchase
                 handlePurchase(session, purchase);
+//
+//                handleProcurementObjects(session, purchase);
 
 
 
