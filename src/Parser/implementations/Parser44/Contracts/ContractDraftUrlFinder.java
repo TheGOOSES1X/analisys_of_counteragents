@@ -1,14 +1,10 @@
 package Parser.implementations.Parser44.Contracts;
 
-import Parser.Database.models.*;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static Parser.implementations.Parser44.Contracts.ParserUtils.extractRegNumber;
+import static Parser.utils.ParserUtils.extractRegNumber;
 
 
 public class ContractDraftUrlFinder {

@@ -10,7 +10,8 @@ import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.NoSuchElementException;
-import java.util.stream.Collectors;
+
+import static Parser.utils.ParserUtils.parsePrice;
 
 public class PurchasePageParser {
     private final ComplaintsURLGetter complaintsCounter;
@@ -89,6 +90,8 @@ public class PurchasePageParser {
             throw new RuntimeException("Ошибка парсинга страницы закупки: " + e.getMessage(), e);
         }
     }
+
+
     private void parseCardMainInfo( WebDriverWait wait, Purchase purchase) {
         try {
             // 1. Ожидаем загрузки всей секции
@@ -342,15 +345,7 @@ public class PurchasePageParser {
             return null;
         }
     }
-    private BigDecimal parsePrice(String priceStr) {
-        if (priceStr == null || priceStr.trim().isEmpty()) return null;
-        try {
-            return new BigDecimal(priceStr.replaceAll("[^\\d.]", ""));
-        } catch (Exception e) {
-            System.out.println("Ошибка парсинга цены: " + priceStr);
-            return null;
-        }
-    }
+
 
     // Метод для создания скринш
 }

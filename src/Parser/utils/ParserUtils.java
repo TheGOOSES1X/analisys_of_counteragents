@@ -1,4 +1,4 @@
-package Parser.implementations.Parser44.Contracts;
+package Parser.utils;
 
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -91,6 +91,16 @@ public class ParserUtils {
             return fullText;
         } catch (Exception e) {
             System.out.println("Не удалось извлечь stateContractId: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public static BigDecimal parsePrice(String priceStr) {
+        if (priceStr == null || priceStr.trim().isEmpty()) return null;
+        try {
+            return new BigDecimal(priceStr.replaceAll("[^\\d.]", ""));
+        } catch (Exception e) {
+            System.out.println("Ошибка парсинга цены: " + priceStr);
             return null;
         }
     }

@@ -18,12 +18,16 @@ public class Parser44Application {
 
     public static void main(String[] args) {
         List<String> selectedUrls = new ArrayList<>(Arrays.asList(
-                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0329400001725000037",
-                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000031",
-                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
-                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000032",
-                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0172200002523000160",
-                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0122300017023000012"
+                "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18342761",
+                "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18344947",
+"https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18345067"
+
+//                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0329400001725000037",
+//                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000031",
+//                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
+//                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000032",
+//                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0172200002523000160",
+//                "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=0122300017023000012"
 //                "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=17984400",
 //                "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18049823",
 //                "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18015273",

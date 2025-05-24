@@ -148,7 +148,7 @@ public class CustomerPageParser {
         return sectionData;
     }
 
-    private Customer parseCustomerPage(String customerUrl, WebDriver driver) {
+    public Customer parseCustomerPage(String customerUrl, WebDriver driver) {
         if (customerUrl == null) {
             System.out.println("URL заказчика не предоставлен");
             return null;

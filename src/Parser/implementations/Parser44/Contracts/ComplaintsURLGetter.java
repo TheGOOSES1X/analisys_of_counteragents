@@ -4,7 +4,7 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import static Parser.implementations.Parser44.Contracts.ParserUtils.extractRegNumber;
+import static Parser.utils.ParserUtils.extractRegNumber;
 
 public class ComplaintsURLGetter {
 

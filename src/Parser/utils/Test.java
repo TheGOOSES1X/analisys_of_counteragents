@@ -43,7 +43,7 @@ public class Test {
 //        extractor.parseAndPrintGeneralContractData("https://zakupki.gov.ru/epz/contract/contractCard/common-info.html?reestrNumber=4780551456224000016",
 //                driver,wait);
         MainInfoParser223 purchaseParser223 = new MainInfoParser223();
-        purchaseParser223.parsePurchasePage("https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18345067",driver,wait);
+//        purchaseParser223.parsePurchasePage("https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18345067",driver,wait);
 
 
 //        ComplaintsURLGetter getter = new ComplaintsURLGetter();

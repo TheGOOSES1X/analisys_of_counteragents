@@ -11,35 +11,78 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.*;
 
+import static Parser.utils.ParserUtils.parseBigDecimal;
+import static Parser.utils.ParserUtils.parseDate;
+
 public class ContractParser223 {
 
 
     public Contract parseContractInfo(String originalUrl, WebDriver driver, WebDriverWait wait) {
         try {
             Contract contract = new Contract();
-            String contractUrl = findContractUrl( originalUrl, driver);
-            System.out.println("finding contract URL: " + contractUrl );
+            String contractUrl = findContractUrl(originalUrl, driver);
+            System.out.println("Finding contract URL: " + contractUrl);
 
             if (contractUrl != null) {
                 driver.get(contractUrl);
                 Map<String, String> contractDetails = parseContractDetails(driver, wait);
-                parseGeneralInfo(driver,wait);
-
-                String subjectUrl = convertContractInfoUrlToSubjectUrl(contractUrl);
-                if (subjectUrl != null) {
-                    driver.get(subjectUrl);
-                    // Здесь можно добавить парсинг страницы с предметом договора
-                    System.out.println("Перешли на страницу предмета договора: " + subjectUrl);
-                    parseSubjectTable(driver);
-                }
-                // Далее можно использовать contractDetails для других целей
+                Map<String, String>  mainInfo = parseGeneralInfo(driver, wait);
+                fillContractModel(contract, contractDetails,mainInfo);
+                parseGeneralInfo(driver, wait);
             }
             return contract;
         } catch (Exception e) {
+            System.err.println("Error parsing contract info: " + e.getMessage());
             return null;
         }
     }
 
+    public List<ProcurementObject> parseContractSubjects(String originalUrl, WebDriver driver, WebDriverWait wait) {
+        try {
+            String contractUrl = findContractUrl(originalUrl, driver);
+            if (contractUrl == null) {
+                return Collections.emptyList();
+            }
+
+            String subjectUrl = convertContractInfoUrlToSubjectUrl(contractUrl);
+            if (subjectUrl == null) {
+                return Collections.emptyList();
+            }
+
+            driver.get(subjectUrl);
+            System.out.println("Navigated to subject page: " + subjectUrl);
+            return parseSubjectTable(driver);
+        } catch (Exception e) {
+            System.err.println("Error parsing contract subjects: " + e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+    public void fillContractModel(Contract contract, Map<String, String> contractDetails,Map<String, String> mainInfo) {
+        try {
+            // Заполняем основные поля контракта
+            contract.setRegistryNumber(contractDetails.get("Номер договора (заголовок)"));
+            contract.setProcurementIdentificationCode(contractDetails.get("Номер договора"));
+            contract.setStatus(contractDetails.get("Статус контракта"));
+            contract.setSoleSupplierDocumentDetails(contractDetails.get("Заказчик"));
+            contract.setContractPrice(parseBigDecimal(contractDetails.get("Цена договора")));
+            contract.setStartDate(parseDate(contractDetails.get("Дата заключения")));
+            contract.setEndDate(parseDate(contractDetails.get("Срок исполнения (окончание)")));
+            contract.setStartDate(parseDate(contractDetails.get("Дата обновления")));
+
+            // Заполняем данные из блока "Общая информация"
+
+            contract.setSubject(mainInfo.get("Предмет договора"));
+            contract.setBankingTreasurySupportInfo(mainInfo.get("Способ закупки"));
+
+
+
+            // Установка валюты (предполагаем рубль, если не указано иное)
+            contract.setCurrency("₽");
+
+        } catch (Exception e) {
+            throw new RuntimeException("Ошибка заполнения модели контракта: " + e.getMessage(), e);
+        }
+    }
 
 
     public String convertContractInfoUrlToSubjectUrl(String contractInfoUrl) {

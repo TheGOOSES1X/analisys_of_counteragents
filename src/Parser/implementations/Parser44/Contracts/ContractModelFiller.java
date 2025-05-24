@@ -2,12 +2,9 @@ package Parser.implementations.Parser44.Contracts;
 
 import Parser.Database.models.*;
 
-import java.math.BigDecimal;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static Parser.implementations.Parser44.Contracts.ParserUtils.*;
+import static Parser.utils.ParserUtils.*;
 
 public class ContractModelFiller {
     public void fillContractModel(Contract contract, Map<String, Object> participantData) {

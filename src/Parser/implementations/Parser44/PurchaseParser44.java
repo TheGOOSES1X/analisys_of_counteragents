@@ -3,6 +3,7 @@ package Parser.implementations.Parser44;
 import Parser.Database.hooks.DatabaseService;
 import Parser.Database.models.*;
 import Parser.implementations.Parser223.DocumentParser;
+import Parser.implementations.Parser223.MainInfoParser223;
 import Parser.interfaces.*;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -25,6 +26,7 @@ public class PurchaseParser44 implements Parser {
     private final PurchasePageParser purchasePageParser;
     private final CustomerPageParser customerPageParser;
     private final ContractPageParser contractPageParser;
+    private  final MainInfoParser223 mainInfoParser223;
     private final DatabaseService databaseService;
     private final WebDriverPool driverPool;
     private final SupplierStatusParser supplierStatusParser;
@@ -35,6 +37,7 @@ public class PurchaseParser44 implements Parser {
         this.purchasePageParser = new PurchasePageParser();
         this.customerPageParser = new CustomerPageParser();
         this.contractPageParser = new ContractPageParser();
+        this.mainInfoParser223 = new MainInfoParser223();
         this.databaseService = new DatabaseService();
 
         this.litigationParser = new LitigationParser(driverSetup.setupDriver());
@@ -165,26 +168,39 @@ public class PurchaseParser44 implements Parser {
 
     private ParseResult parsePurchaseUrl(String url, WebDriver driver, WebDriverWait wait) {
         try {
-            // Если URL содержит "notice223", обрабатываем только через documentParser
+            Purchase purchase;
+            Customer customer;
+            Contract contract;
+            List<ProcurementObject> procurementObjects;
+
             if (url.contains("notice223")) {
+                // Обработка для 223-ФЗ
+                purchase = mainInfoParser223.parsePurchaseMainInfo(url, driver);
+                customer = mainInfoParser223.parsePurchaseCustomer(url, driver);
+                contract = mainInfoParser223.parsePurchaseContract(url, driver, wait);
+                procurementObjects = mainInfoParser223.parsePurchaseSubjects(url, driver, wait);
+                if (procurementObjects != null) {
+                    procurementObjects.forEach(purchase::addProcurementObject);
+                }
+                // Дополнительный парсинг документов, если нужно
+                // documentParser.parseDocumentInfo(url, driver, wait);
+            } else {
+                // Обработка для других типов закупок
+                purchase = purchasePageParser.parsePurchasePage(url, driver, wait);
+                customer = customerPageParser.parseCustomerInfo(driver);
+                contract = contractPageParser.parseContractInfo(url, driver, wait);
 
-
-//                documentParser.parseDocumentInfo(url, driver, wait);
-//                return new ParseResult(url, null, null); // Возвращаем пустой результат, так как данные о закупке не парсятся
             }
 
-            // Если URL не содержит "notice223", обрабатываем стандартными методами
-            Purchase purchase = purchasePageParser.parsePurchasePage(url, driver, wait);
-            Customer customer = customerPageParser.parseCustomerInfo(driver);
-            Contract contract = contractPageParser.parseContractInfo(url, driver, wait);
+
 
             if (contract != null) {
                 contract.setPurchase(purchase);
                 purchase.setContract(contract);
             }
 
-            purchase.setCustomer(customer);
             if (customer != null) {
+                purchase.setCustomer(customer);
                 customer.getPurchases().add(purchase);
             }
 

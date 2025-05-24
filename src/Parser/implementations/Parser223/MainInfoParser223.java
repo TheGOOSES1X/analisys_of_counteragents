@@ -3,38 +3,138 @@
 package Parser.implementations.Parser223;
 
 import Parser.Database.models.*;
+import Parser.implementations.Parser44.CustomerPageParser;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import java.time.*;
-import java.time.format.DateTimeFormatter;
-import java.math.BigDecimal;
 import java.util.*;
+
+import static Parser.utils.ParserUtils.parseDate;
+import static Parser.utils.ParserUtils.parsePrice;
 
 public class MainInfoParser223 {
     private final ContractParser223 contractParser223;
+    private final CustomerPageParser customerPageParser;
 
     private String currentUrl;
     private String contractUrl;
 
     public MainInfoParser223() {
+        this.customerPageParser = new CustomerPageParser();
         this.contractParser223 = new ContractParser223();
     }
-
-    public Purchase parsePurchasePage(String url, WebDriver driver, WebDriverWait wait) {
+    public Purchase parsePurchaseMainInfo(String url, WebDriver driver) {
         driver.get(url);
-        this.currentUrl = url;
-        WebElement purchaseCard = driver.findElement(By.cssSelector(".search-results.item"));
-        Map<String, String> data = collectCommonTextData(driver);
-        String customerUrl = data.get("Сведения о заказчике > Ссылка на заказчика");
-        System.out.println(customerUrl);
-        Map<String, String> purchaseData = parsePurchaseCard(purchaseCard);
-        Purchase purchase = new Purchase();
-        this.contractUrl = purchaseData.get("contractLink");
-        contractParser223.parseContractInfo( this.contractUrl, driver,wait);
 
-        return purchase;
+        WebElement purchaseCard = driver.findElement(By.cssSelector(".search-results.item"));
+
+        Map<String, String> commonData = collectCommonTextData(driver);
+        Map<String, String> purchaseData = parsePurchaseCard(purchaseCard);
+
+        return parsePurchasePageFromDataFiller(purchaseData, commonData);
+
+    }
+    public Contract parsePurchaseContract(String url, WebDriver driver, WebDriverWait wait) {
+        driver.get(url);
+        WebElement purchaseCard = driver.findElement(By.cssSelector(".search-results.item"));
+        Map<String, String> purchaseData = parsePurchaseCard(purchaseCard);
+
+        if (purchaseData.containsKey("contractLink")) {
+            return contractParser223.parseContractInfo(purchaseData.get("contractLink"), driver, wait);
+        }
+        return null;
+    }
+    public List<ProcurementObject> parsePurchaseSubjects(String url, WebDriver driver, WebDriverWait wait) {
+        driver.get(url);
+        WebElement purchaseCard = driver.findElement(By.cssSelector(".search-results.item"));
+        Map<String, String> purchaseData = parsePurchaseCard(purchaseCard);
+
+        if (purchaseData.containsKey("contractLink")) {
+            return contractParser223.parseContractSubjects(purchaseData.get("contractLink"), driver, wait);
+        }
+        return Collections.emptyList();
+    }
+    public Customer parsePurchaseCustomer(String url, WebDriver driver) {
+        driver.get(url);
+        Map<String, String> commonData = collectCommonTextData(driver);
+        String customerUrl = commonData.get("Сведения о заказчике > Ссылка на заказчика");
+
+        if (customerUrl != null && !customerUrl.isEmpty()) {
+            driver.get(customerUrl);
+            return customerPageParser.parseCustomerPage(customerUrl, driver);
+        }
+        return null;
+    }
+
+//    public Purchase parsePurchasePage(String url, WebDriver driver, WebDriverWait wait) {
+//        driver.get(url);
+//        //Закупка
+//        Purchase purchase = new Purchase();
+//        this.currentUrl = url;
+//        WebElement purchaseCard = driver.findElement(By.cssSelector(".search-results.item"));
+//        Map<String, String> data = collectCommonTextData(driver);
+//        String customerUrl = data.get("Сведения о заказчике > Ссылка на заказчика");
+//        System.out.println(customerUrl);
+//        Map<String, String> purchaseData = parsePurchaseCard(purchaseCard);
+//
+//
+//        parsePurchasePageFromData(purchase, purchaseData,data);
+//        //Контракты
+//        this.contractUrl = purchaseData.get("contractLink");
+//        contractParser223.parseContractInfo( this.contractUrl, driver,wait);
+//        //Предмет закупки
+//        contractParser223.parseContractSubjects( this.contractUrl, driver,wait);
+//        //Заказчик
+//        driver.get(customerUrl);
+//        Customer customer = customerPageParser.parseCustomerPage(customerUrl, driver);
+//
+//        return purchase;
+//    }
+
+    public Purchase parsePurchasePageFromDataFiller(Map<String, String> commonData, Map<String, String> purchaseData) {
+        try {
+            Purchase purchase = new Purchase();
+
+            // Заполняем данные из purchaseData (парсинг карточки закупки)
+            if (commonData.containsKey("updateDate")) {
+                purchase.setUpdateDate(parseDate(commonData.get("updateDate")));
+            }
+            if (commonData.containsKey("initialPrice")) {
+                purchase.setInitialMaxPrice(parsePrice(commonData.get("initialPrice")));
+            }
+            if (commonData.containsKey("applicationEndDate") && commonData.get("applicationEndDate") != null) {
+                purchase.setApplicationEndDate(parseDate(commonData.get("applicationEndDate")));
+            }
+            if (commonData.containsKey("purchaseStatus")) {
+                purchase.setProcurementStage(commonData.get("purchaseStatus"));
+            }
+
+            if (commonData.containsKey("purchaseObject")) {
+                purchase.setPurchaseObject(commonData.get("purchaseObject"));
+            }
+            if (commonData.containsKey("publicationDate")) {
+                purchase.setPublicationDate(parseDate(commonData.get("publicationDate")));
+            }
+            if (commonData.containsKey("purchaseType")) {
+                purchase.setLaw(commonData.get("purchaseType"));
+            }
+            if (commonData.containsKey("purchaseNumber")) {
+                purchase.setPurchaseNumber(commonData.get("purchaseNumber"));
+            }
+            if (purchaseData.containsKey("Сведения о закупке -> Способ осуществления закупки")) {
+                purchase.setProcurementMethod(purchaseData.get("Сведения о закупке -> Способ осуществления закупки"));
+            }
+
+
+            // Если есть данные об объектах закупки, можно их добавит
+
+            return purchase;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Ошибка парсинга данных закупки: " + e.getMessage(), e);
+        }
     }
 
     private Map<String, String> parsePurchaseCard(WebElement cardElement) {
@@ -224,11 +324,4 @@ public class MainInfoParser223 {
         return false;
     }
 
-    private LocalDate parseDate(String dateStr) {
-        return null;
-    }
-
-    private BigDecimal parsePrice(String priceStr) {
-        return null;
-    }
 }
