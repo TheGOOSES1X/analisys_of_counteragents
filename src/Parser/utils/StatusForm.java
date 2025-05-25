@@ -101,6 +101,14 @@ public class StatusForm implements ParserStatusListener {
         });
     }
 
+    public void clearAllItems() {
+        allItems.clear();
+        if (headersTable != null) {
+            ((DefaultTableModel) headersTable.getModel()).setRowCount(0);
+        }
+        selectedUrls.clear();
+    }
+
     private void autoResizeColumn(JTable table, int column) {
         TableColumn tableColumn = table.getColumnModel().getColumn(column);
         int preferredWidth = tableColumn.getMinWidth();

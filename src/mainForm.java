@@ -11,14 +11,12 @@ import java.awt.*;
 import java.sql.PreparedStatement;
 
 import MainAnalyzer.*;
+import Parser.interfaces.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import Parser.implementations.*;
 import Parser.implementations.Parser44.PurchaseParser44;
-import Parser.interfaces.DriverSetup;
-import Parser.interfaces.Parser;
-import Parser.interfaces.PurchaseItem;
 import Parser.utils.Okpd2Converter;
 import Parser.utils.RandomUserAgent;
 import Parser.utils.StatusForm;
@@ -211,6 +209,8 @@ public class mainForm extends JFrame {
     private JTextField To;
     private JButton ChooseRange;
     private JComboBox ThreadCount;
+    private volatile PurchaseListParser listParser;
+    private volatile PurchaseDetailsParser detailsParser;
 
     private JComboBox comboBoxRoleCriterier;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
@@ -222,7 +222,7 @@ public class mainForm extends JFrame {
     private final DriverSetup driverSetup;
     private final JDateChooser dateChooseFilterStart = new JDateChooser();
     private final JDateChooser dateChooserFilterEnd = new JDateChooser();
-    private volatile Parser currentParser;
+
 
     private enum ParserState {
         IDLE, RUNNING, PAUSED, STOPPED
@@ -2908,6 +2908,7 @@ public class mainForm extends JFrame {
                     JOptionPane.WARNING_MESSAGE);
             return;
         }
+        detailsParser = new PurchaseParser44(driverSetup);
 
         // Если парсер на паузе - возобновляем
         if (parserState == ParserState.PAUSED) {
@@ -2926,7 +2927,7 @@ public class mainForm extends JFrame {
         ParserProgressBar.setValue(0);
         ParserProgressBar.setStringPainted(true);
 
-        currentParser = new PurchaseParser44(driverSetup);
+
         parserState = ParserState.RUNNING;
 
         StartParsing.setText("Парсинг...");
@@ -2939,7 +2940,7 @@ public class mainForm extends JFrame {
         parserThread = new Thread(() -> {
             try {
                 // Этап 1: Парсинг закупок
-                currentParser.parseUrlsParallel(
+                detailsParser.parseUrlsParallel(
                         new ArrayList<>(statusForm.selectedUrls),
                         this::handleParseResult,
                         selectedThreadCount,
@@ -2961,9 +2962,9 @@ public class mainForm extends JFrame {
                     ParserProgressBar.setValue(statusForm.selectedUrls.size() + 1);
                 });
 
-                currentParser.parseSupplierLitigations();
-                currentParser.parseSupplierStatuses();
-//                currentParser.cleanupDownloadDirectory();
+                detailsParser.parseSupplierLitigations();
+                detailsParser.parseSupplierStatuses();
+//                detailsParser.cleanupDownloadDirectory();
 
             } finally {
                 SwingUtilities.invokeLater(() -> {
@@ -3224,9 +3225,13 @@ public class mainForm extends JFrame {
     private void onQueryButtonClicked() {
         // Сбрасываем UI перед запуском нового парсера
         resetParserUI();
+        statusForm.clearAllItems(); //
 
         Map<String, String> params = buildFinalParams();
-        clearTable(HeadersTable);
+        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
+
+        // Очищаем все строки
+        model.setRowCount(0);
         // Логируем все параметры
         System.out.println("Формируемые параметры:");
         params.forEach((k, v) -> System.out.println(k + " = " + v));
@@ -3242,10 +3247,10 @@ public class mainForm extends JFrame {
         CurrentRecords.setText("Обработано: 0");
         StatusLabel.setText("Статус: запуск парсера...");
 
-        currentParser = new PurchasesParserHead(driverSetup, null, params, statusForm);
+        listParser = new PurchasesParserHead(driverSetup, null, params, statusForm);
 
         new Thread(() -> {
-            currentParser.parse();
+            listParser.parse();
             SwingUtilities.invokeLater(() -> {
                 // После завершения парсинга сбрасываем кнопки
                 PauseParser.setEnabled(true);  // "Пауза" активна
@@ -3376,8 +3381,8 @@ public class mainForm extends JFrame {
     }
 
     private void togglePauseParser() {
-        if (currentParser != null) {
-            PurchasesParserHead parser = (PurchasesParserHead) currentParser;
+        if (listParser != null) {
+            PurchasesParserHead parser = (PurchasesParserHead) listParser;
 
             if (parser.isPaused) {
                 // Если парсер на паузе — возобновляем
@@ -3394,8 +3399,8 @@ public class mainForm extends JFrame {
     }
 
     private void stopParser() {
-        if (currentParser != null) {
-            PurchasesParserHead parser = (PurchasesParserHead) currentParser;
+        if (listParser != null) {
+            PurchasesParserHead parser = (PurchasesParserHead) listParser;
 
             parser.stopParser();
             StopParser.setEnabled(false);
@@ -3406,8 +3411,8 @@ public class mainForm extends JFrame {
     }
 
     private void pauseParsering() {
-        if (currentParser != null && parserState == ParserState.RUNNING) {
-            currentParser.pauseParser();
+        if (detailsParser != null && parserState == ParserState.RUNNING) {
+            detailsParser.pauseParser();
             parserState = ParserState.PAUSED;
             PauseParsingButton.setText("Продолжить");
             StatusLabel.setText("Парсинг на паузе" +
@@ -3419,8 +3424,8 @@ public class mainForm extends JFrame {
     }
 
     private void resumeParsing() {
-        if (currentParser != null && parserState == ParserState.PAUSED) {
-            currentParser.resumeParser();
+        if (detailsParser != null && parserState == ParserState.PAUSED) {
+            detailsParser.resumeParser();
             parserState = ParserState.RUNNING;
             PauseParsingButton.setText("Пауза");
             StatusLabel.setText("Парсинг возобновлен" +
@@ -3430,8 +3435,8 @@ public class mainForm extends JFrame {
     }
 
     private void stopParsing() {
-        if (currentParser != null && (parserState == ParserState.RUNNING || parserState == ParserState.PAUSED)) {
-            currentParser.stopParser();
+        if (detailsParser != null && (parserState == ParserState.RUNNING || parserState == ParserState.PAUSED)) {
+            detailsParser.stopParser();
             parserState = ParserState.STOPPED;
             statusForm.selectedUrls.clear();
             if (parserThread != null) {
