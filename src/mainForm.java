@@ -914,7 +914,8 @@ public class mainForm extends JFrame {
                     String c_code = tableCrit.getValueAt(i, 1).toString();
                     String c_name = tableCrit.getValueAt(i, 2).toString();
                     Long g_id = Long.parseLong(tableCrit.getValueAt(i, 3).toString());
-                    String g_code = tableCrit.getValueAt(i, 4).toString();
+                    String g_code_raw = tableCrit.getValueAt(i, 4) == null ? "" : tableCrit.getValueAt(i, 4).toString();
+                    String g_code = g_code_raw.trim(); // можно еще trim(), чтобы убрать случайные пробелы
                     String g_name = tableCrit.getValueAt(i, 5).toString();
 
                     // Обрабатываем ввод пользователя (заменяем запятую на точку)

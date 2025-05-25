@@ -28,7 +28,10 @@ public class RatingCalculator {
             String contrasFilter, String goodFilter, String orderFilter,
             String dateFilter, String minVolumeFilter, String okpd2, String group) {
 
-        // Получаем строки, соответствующие фильтрам
+        /** Получаем строки, соответствующие фильтрам !!!
+         * СМОТРИ getCGOwesAsUserCrit, можно с ним что-то придумать
+         * (Дополнительный критерии для рейтинга)
+        */
         List<rowContrasGoodsOrdersWithWeights> rowsCGOws = dbExtractor.getCGOwesAsUserCrit(
                 false, contrasFilter, goodFilter, orderFilter, dateFilter, minVolumeFilter, okpd2);
 

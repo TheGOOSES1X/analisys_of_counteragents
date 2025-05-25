@@ -2339,6 +2339,7 @@ public class DatabaseManager {
                     String g_name = resultSet.getString("g_name").trim();
                     double r_rat = resultSet.getDouble("r_rat");
 
+                    //СМОТРИ USERCRITS (Дополнительный критерии для рейтинга)
                     ratedCGOwes.add(new rowContrasGoodsOrdersWithWeights(
                             c_id, c_name, g_id, g_name, o_id, o_name,
                             0, 1.0D, 0.0D, 1.0D, 0.0D, 1.0D, 0.0D, 1.0D, null, r_rat));
