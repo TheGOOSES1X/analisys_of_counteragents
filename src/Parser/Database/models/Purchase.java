@@ -40,7 +40,7 @@ public class Purchase {
     private Customer customer;
 
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "contract_id") // внешний ключ в таблице purchases
+    @JoinColumn(name = "contract_id", unique = true) // добавьте unique=true
     private Contract contract;
 
     @Column(name = "executor", columnDefinition = "text")

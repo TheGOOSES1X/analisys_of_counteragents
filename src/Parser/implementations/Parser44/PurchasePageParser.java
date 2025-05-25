@@ -115,14 +115,18 @@ public class PurchasePageParser {
 
             // 5. Парсим объект закупки (может отсутствовать)
             try {
-                purchase.setPurchaseObject(sectionMainInfo.findElement(
-                                By.xpath(".//div[contains(@class,'cardMainInfo__section')]" +
-                                        "[.//span[contains(@class,'cardMainInfo__title') and " +
-                                        "contains(text(),'Объект закупки')]]"))
-                        .findElement(By.cssSelector("span.cardMainInfo__content"))
-                        .getText().trim());
-            } catch (NoSuchElementException e) {
-                System.out.println("Объект закупки не указан");
+                WebElement purchaseObjectElement = sectionMainInfo.findElement(
+                        By.xpath(".//div[contains(@class,'cardMainInfo__section')]" +
+                                "[.//span[contains(@class,'cardMainInfo__title') and " +
+                                "contains(text(),'Объект закупки')]]//span[@class='cardMainInfo__content']"));
+
+                if (purchaseObjectElement != null) {
+                    purchase.setPurchaseObject(purchaseObjectElement.getText().trim());
+                } else {
+                    purchase.setPurchaseObject(null);
+                }
+            } catch (Exception e) {
+                System.out.println("Объект закупки не указан или не найден: " + e.getMessage());
                 purchase.setPurchaseObject(null);
             }
 
