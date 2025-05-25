@@ -39,7 +39,7 @@ public class DatabaseService {
                 if (transaction != null) {
                     transaction.rollback();
                 }
-                throw new RuntimeException("Failed to save to database", e);
+                throw new RuntimeException("Найдена ошибка ", e);
             }
         }
     }
@@ -85,22 +85,30 @@ public class DatabaseService {
 
         // Обработка Contract
         Contract contract = purchase.getContract();
-        contract.setPurchase(purchase);
-
         Contract existingContract = session.createQuery(
-                        "FROM Contract WHERE contractNumber = :contractNumber", Contract.class)
-                .setParameter("contractNumber", contract.getContractNumber())
+                        "FROM Contract WHERE electronicContractId = :electronicContractId", Contract.class)
+                .setParameter("electronicContractId", contract.getElectronicContractId())
                 .uniqueResult();
 
         if (existingContract != null) {
             updateContract(existingContract, contract);
             purchase.setContract(existingContract);
         } else {
+            // Проверяем, не связан ли уже этот контракт с другой закупкой
+            if (contract.getId() != null) {
+                Contract attachedContract = session.find(Contract.class, contract.getId());
+                if (attachedContract != null && attachedContract.getPurchase() != null) {
+                    // Создаем новый контракт, если текущий уже привязан к другой закупке
+                    Contract newContract = new Contract();
+                    // Копируем все поля из contract в newContract
+                    updateContract(newContract, contract);
+                    contract = newContract;
+                }
+            }
             session.persist(contract);
         }
         session.flush();
     }
-
     private void handlePurchase(Session session, Purchase purchase) {
         Purchase existingPurchase = session.createQuery(
                         "FROM Purchase WHERE purchaseNumber = :purchaseNumber", Purchase.class)

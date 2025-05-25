@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
-public class PurchasesParserHead implements Parser {
+public class PurchasesParserHead implements PurchaseListParser {
     public volatile boolean isPaused = false;
     private volatile boolean isStopped = false;
     private final DriverSetup driverSetup;
@@ -42,20 +42,6 @@ public class PurchasesParserHead implements Parser {
         isPaused = false;
     }
 
-    @Override
-    public void parseSupplierLitigations() {
-
-    }
-
-    @Override
-    public void parseSupplierStatuses() {
-
-    }
-
-    @Override
-    public void cleanupDownloadDirectory() {
-
-    }
 
     @Override
     public void stopParser() {
@@ -134,11 +120,6 @@ public class PurchasesParserHead implements Parser {
         return params;
     }
 
-
-    @Override
-    public void parseUrlsParallel(List<String> urls, Consumer<PurchaseParser44.ParseResult> callback, int threadCount, Consumer<Integer> progressCallback) {
-
-    }
 
 
 

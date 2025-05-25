@@ -16,7 +16,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
-public class PurchaseParser44 implements Parser {
+public class PurchaseParser44 implements PurchaseDetailsParser {
     private final DriverSetup driverSetup;
     private final DocumentParser documentParser;
     private ExecutorService executor;
@@ -55,10 +55,7 @@ public class PurchaseParser44 implements Parser {
 
     }
 
-    @Override
-    public void parse() {
-        // Реализация если нужна
-    }
+
 
     private WebDriver createDriverWithCleanup() {
         WebDriver driver = driverSetup.setupDriver();
