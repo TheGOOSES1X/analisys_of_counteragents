@@ -192,6 +192,8 @@ public class mainForm extends JFrame {
     private JButton EGRUL_PDF_To_Data;
     private JProgressBar EGRUL_Parser_Progress_Bar;
     private JLabel EGRUL_PDF_Bar_status;
+    private JLabel EGRUL_Parser_left;
+    private JLabel EGRUL_PDF_left;
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -2856,19 +2858,41 @@ public class mainForm extends JFrame {
     }
 
     private void EGRUL_Parser_Start(){
-//        try {
-//            EGRUL_PDF_Parser_Start.setText("Парсинг...");
-//            EGRUL_PDF_Parser_Start.setEnabled(false);
-//
-//            EGRUL_Parser_Progress_Bar.setMinimum(0);
-//            EGRUL_Parser_Progress_Bar.setMaximum(Parser_EGRUL.Parser.countRemainingUrls());
-//
-//
-//
-//            Parser_EGRUL.Parser.StartParsingEGRUL();
-//        } catch (IOException e) {
-//            EGRUL_PDF_Bar_status.setText("Ошибка при сборе данных " + e.toString());
-//        }
+        new Thread(() -> {
+
+            EGRUL_PDF_Parser_Start.setText("Парсинг...");
+            EGRUL_PDF_Parser_Start.setEnabled(false);
+
+            EGRUL_Parser_left.setText("Осталось: " + Parser_EGRUL.Parser.countRemainingUrls());
+            EGRUL_PDF_Bar_status.setText("Парсинг PDF");
+
+            EGRUL_Parser_Progress_Bar.setMinimum(0);
+            EGRUL_Parser_Progress_Bar.setMaximum(Parser_EGRUL.Parser.countRemainingUrls());
+
+            try {
+                Parser_EGRUL.Parser.StartParsingEGRUL(new Parser_EGRUL.Parser.ProgressUpdater() {
+                    @Override
+                    public void incrementProgress() {
+                        SwingUtilities.invokeLater(() -> {
+                            EGRUL_Parser_Progress_Bar.setValue(EGRUL_Parser_Progress_Bar.getValue() + 1);
+                        });
+                    }
+                    @Override
+                    public void updateStatus(int fileNumber) {
+                        SwingUtilities.invokeLater(() -> {
+                            EGRUL_Parser_left.setText("Осталось: " + fileNumber);
+                        });
+                    }
+                });
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            EGRUL_PDF_Bar_status.setText("Парсинг завершён");
+            EGRUL_Parser_left.setText("Осталось: 0");
+            EGRUL_PDF_Parser_Start.setText("Сбор PDF");
+            EGRUL_PDF_Parser_Start.setEnabled(true);
+        }).start();
     }
 
     private void EGRUL_PDF_Processing(){
