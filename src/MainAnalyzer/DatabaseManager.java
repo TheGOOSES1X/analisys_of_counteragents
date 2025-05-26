@@ -611,6 +611,28 @@ public class DatabaseManager {
             var4.printStackTrace();
         }
 
+        query = "CREATE TABLE IF NOT EXISTS public.supplier_summary (\n" +
+                "    contract_id bigint PRIMARY KEY,\n" +
+                "    start_date date,\n" +
+                "    end_date date,\n" +
+                "    contract_duration_days integer,\n" +
+                "    inn varchar,\n" +
+                "    name varchar,\n" +
+                "    max_complaints integer,\n" +
+                "    reason varchar,\n" +
+                "    status varchar,\n" +
+                "    total_judicial_proceedings bigint,\n" +
+                "    proceedings_descriptions text,\n" +
+                "    okpd2_codes text\n" +
+                ");";
+
+        try {
+            this.executeQueryNoResult(db_module, query);
+        } catch (SQLException var4) {
+            var4.printStackTrace();
+        }
+
+
     }
 
     public void updateTables(boolean db_main, boolean db_module) {
@@ -646,18 +668,18 @@ public class DatabaseManager {
         }
 
         // 2. Загрузка данных из suppliers
-        String supplierQuery = "SELECT id, country_name, country_code, inn FROM public.suppliers";
+        String supplierQuery = "SELECT id, name, inn FROM public.suppliers";
         try {
             ResultSet supplierSet = this.executeQuery(db_module, supplierQuery);
             try {
                 while (supplierSet.next()) {
                     long id = supplierSet.getLong("id") + 10_000_000;
-                    String name = supplierSet.getString("country_name"); // scaption
-                    String code = supplierSet.getString("country_code"); // scode
+                    String name = supplierSet.getString("name"); // scaption
+                    String code = supplierSet.getString("inn"); // scode
                     String inn = supplierSet.getString("inn"); // sinn
                     double c_rep = 1.0;
                     int globalStatus = 0;
-                    rowCs.add(new rowContras(id, name, c_rep, code, inn, globalStatus));
+                    rowCs.add(new rowContras(id, name, c_rep, "ИИН: " + code, inn, globalStatus));
                 }
             } finally {
                 if (supplierSet != null) {
@@ -685,6 +707,8 @@ public class DatabaseManager {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        transferSupplierSummaryData();
+
 
         List<rowGoods> rowGs = new ArrayList();
         query = "SELECT DISTINCT bs.id as id_g, bs.sname as name_g, bs.sarticle as code_g, bs.jtypesizeattrs ->> 'width' as w_g, bs.jtypesizeattrs ->> 'length' as l_g, bs.jtypesizeattrs ->> 'height' as h_g, bs.jtypesizeattrs ->> 'diameter' as d_g, bs.jtypesizeattrs ->> 'thickness' as t_g, bg_mi.sheadline as measure_g FROM public.bs_goods bs ";
@@ -1006,7 +1030,7 @@ public class DatabaseManager {
                 + "    0.0 AS nprc, "
                 + "    0.0 AS nqtysale, "
                 + "    0.0 AS nprcsale, "
-                + "    1.0 AS ngoodquality, "
+                + "    ss.max_complaints AS ngoodquality, "
                 + "    0.0 AS ncontrasdelay "
                 + "FROM public.supplier_summary ss "
                 + "JOIN public.purchases p ON ss.contract_id = p.contract_id "
@@ -1028,8 +1052,8 @@ public class DatabaseManager {
                      n_qty = resultSet2.getDouble("nqty");
                      nprc = resultSet2.getDouble("nprc");
                      n_qty_b = resultSet2.getDouble("nqtysale");
-                    double nprc_b = resultSet2.getDouble("nprcsale");
-                    double g_qual = 1.0;  // Хорошее качество товара (по умолчанию 1.0)
+                    double nprc_b = 0.0;
+                    double g_qual = resultSet2.getDouble("ngoodquality");  // Хорошее качество товара (по умолчанию 1.0)
                     double c_del = 0.0;   // Задержка контрагента (по умолчанию 0.0)
 
                     // Добавляем новый объект rowLot в список
@@ -1138,21 +1162,16 @@ public class DatabaseManager {
         }
 
         query =
-                "UPDATE public.module_lotcriterion mlc " +
-                        "SET ndeliverytime = ( " +
-                        "    SELECT pl.ndeliverytime " +
-                        "    FROM prs_lot pl " +
-                        "    WHERE pl.id_contras = mlc.id_contras " +
-                        "      AND pl.id_goods = mlc.id_goods " +
-                        "    LIMIT 1 " +
-                        ") " +
-                        "WHERE mlc.id_contras > 10000000 " +
-                        "  AND mlc.id_goods > 10000000 " +
-                        "  AND EXISTS ( " +
-                        "    SELECT 1 FROM prs_lot pl2 " +
-                        "    WHERE pl2.id_contras = mlc.id_contras " +
-                        "      AND pl2.id_goods = mlc.id_goods " +
-                        ");";
+                "UPDATE public.module_lotcriterion mlc\n" +
+                        "SET \n" +
+                        "    ndeliverytime = pl.ndeliverytime,\n" +
+                        "    ngoodquality = pl.ngoodquality\n" +
+                        "FROM prs_lot pl\n" +
+                        "WHERE \n" +
+                        "    mlc.id_contras = pl.id_contras\n" +
+                        "    AND mlc.id_goods = pl.id_goods\n" +
+                        "    AND mlc.id_contras >= 10000000\n" +
+                        "    AND mlc.id_goods >= 10000000;";
 
         try {
             this.executeQueryNoResult(db_module, query);
@@ -1881,7 +1900,6 @@ public class DatabaseManager {
                 "JOIN bs_goods bg ON mw.id_goods = bg.id " +
                 "JOIN prs_lot pl ON bg.id = pl.id_goods " +
                 "JOIN bs_contras bc ON pl.id_contras = bc.id " +
-                "WHERE bc.id >= 10000000 " +
                 "ON CONFLICT (id_contras, id_goods) DO NOTHING";
 
         try {
@@ -3699,6 +3717,70 @@ public class DatabaseManager {
         }
 
         return list;
+    }
+
+    public void transferSupplierSummaryData() {
+        // 1. Сначала получаем данные из исходных таблиц
+        String selectQuery = "SELECT " +
+                "c.id AS contract_id, " +
+                "c.start_date, " +
+                "c.end_date, " +
+                "(c.end_date - c.start_date) AS contract_duration_days, " +
+                "s.inn, " +
+                "s.name AS name, " +
+                "MAX(p.complaints) AS max_complaints, " +
+                "sr.reason, " +
+                "sr.status, " +
+                "COUNT(DISTINCT jp.id) AS total_judicial_proceedings, " +
+                "STRING_AGG(DISTINCT jp.description, '; ') AS proceedings_descriptions, " +
+                "STRING_AGG(DISTINCT po.ktru_okpd2_codes, '; ') AS okpd2_codes " +
+                "FROM public.contracts c " +
+                "LEFT JOIN public.suppliers s ON c.supplier_id = s.id " +
+                "LEFT JOIN public.purchases p ON c.id = p.contract_id " +
+                "LEFT JOIN public.supplier_reliability sr ON c.supplier_id = sr.supplier_id " +
+                "LEFT JOIN public.judicial_proceedings jp ON c.supplier_id = jp.supplier_id " +
+                "LEFT JOIN public.procurement_objects po ON p.id = po.purchase_id " +
+                "GROUP BY c.id, c.start_date, c.end_date, s.inn, s.name, sr.reason, sr.status";
+
+        // 2. Затем вставляем полученные данные в целевую таблицу
+        String insertQuery = "INSERT INTO public.supplier_summary " +
+                "(contract_id, start_date, end_date, contract_duration_days, " +
+                "inn, name, max_complaints, reason, status, " +
+                "total_judicial_proceedings, proceedings_descriptions, okpd2_codes) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+                "ON CONFLICT (contract_id) DO NOTHING";
+
+        try (Connection connection = getConnection(false);
+             Statement selectStmt = connection.createStatement();
+             ResultSet resultSet = selectStmt.executeQuery(selectQuery);
+             PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+
+            connection.setAutoCommit(false);
+
+            // Обрабатываем ResultSet и добавляем в batch
+            while (resultSet.next()) {
+                insertStmt.setLong(1, resultSet.getLong("contract_id"));
+                insertStmt.setDate(2, resultSet.getDate("start_date"));
+                insertStmt.setDate(3, resultSet.getDate("end_date"));
+                insertStmt.setInt(4, resultSet.getInt("contract_duration_days"));
+                insertStmt.setString(5, resultSet.getString("inn"));
+                insertStmt.setString(6, resultSet.getString("name"));
+                insertStmt.setInt(7, resultSet.getInt("max_complaints"));
+                insertStmt.setString(8, resultSet.getString("reason"));
+                insertStmt.setString(9, resultSet.getString("status"));
+                insertStmt.setLong(10, resultSet.getLong("total_judicial_proceedings"));
+                insertStmt.setString(11, resultSet.getString("proceedings_descriptions"));
+                insertStmt.setString(12, resultSet.getString("okpd2_codes"));
+                insertStmt.addBatch();
+            }
+
+            insertStmt.executeBatch();
+            connection.commit();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // Обработка ошибки
+        }
     }
 
     public class CriterionData {

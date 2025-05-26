@@ -1065,7 +1065,7 @@ public class mainForm extends JFrame {
 
         DefaultTableModel modelCGOws = new DefaultTableModel(
                 new Object[][]{},
-                new String[]{"Наименование заказа", "Наименование поставщика", "Наименование ТМЦ", "Срок поставки, день", "Вес срока поставки", "Минимальная партия поставки, ед.", "Вес минимальной партии", "Уровень качества ТМЦ, %", "Вес уровня качества ТМЦ", "Деловая репутация, флаг", "Вес деловой репутации", "Рейтинг"}
+                new String[]{"Наименование заказа", "Наименование поставщика", "Наименование ТМЦ", "Срок поставки, день", "Минимальная партия поставки, ед.", "Уровень качества ТМЦ по жалобам", "Деловая репутация", "Рейтинг"}
         ) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -2454,20 +2454,16 @@ public class mainForm extends JFrame {
                         rowCGOw.getContrasName(),
                         rowCGOw.getGoodName(),
                         formatValue(rowCGOw.getDeliveryTime()),
-                        formatValue(rowCGOw.getDeliveryTimeFinalWeight()),
                         formatValue(rowCGOw.getMinVolume()),
-                        formatValue(rowCGOw.getMinVolumeFinalWeight()),
                         formatValue(rowCGOw.getGoodQuality()),
-                        formatValue(rowCGOw.getGoodQualityFinalWeight()),
                         formatValue(rowCGOw.getContrasReputation()),
-                        formatValue(rowCGOw.getContrasReputationFinalWeight()),
                         formatValue(rowCGOw.getRatingComplete())
                 });
             }
 
             // Включаем сортировку после обновления данных
             try {
-                enableSortingForTable(tableRating, 3, 4, 5, 6, 7, 8, 9, 10, 11); // Указываем числовые столбцы для корректной сортировки
+                enableSortingForTable(tableRating, 3, 4, 5, 6, 7); // Указываем числовые столбцы для корректной сортировки
             } catch (Exception e) {
                 System.err.println("Ошибка при применении сортировки: " + e.getMessage());
             }
