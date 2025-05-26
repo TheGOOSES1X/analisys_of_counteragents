@@ -5,6 +5,7 @@ package Parser.utils;
 import Parser.implementations.ChromeDriverSetup;
 import Parser.implementations.Parser223.DocumentDraftUrlFinder;
 import Parser.implementations.Parser223.ExtractInfoFromDocument;
+import Parser.implementations.Parser223.MainInfoParser223;
 import Parser.implementations.Parser44.Contracts.ComplaintsURLGetter;
 import Parser.implementations.Parser44.Contracts.ContractDataExtractor;
 import Parser.implementations.Parser44.Contracts.ContractDraftUrlFinder;
@@ -41,10 +42,13 @@ public class Test {
 //        ContractDataExtractor extractor = new ContractDataExtractor();
 //        extractor.parseAndPrintGeneralContractData("https://zakupki.gov.ru/epz/contract/contractCard/common-info.html?reestrNumber=4780551456224000016",
 //                driver,wait);
+        MainInfoParser223 purchaseParser223 = new MainInfoParser223();
+//        purchaseParser223.parsePurchasePage("https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18345067",driver,wait);
 
-        ComplaintsURLGetter getter = new ComplaintsURLGetter();
-        int result = getter.countComplaintsByRegNumber( "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
-                driver,wait);
+
+//        ComplaintsURLGetter getter = new ComplaintsURLGetter();
+//        int result = getter.countComplaintsByRegNumber( "https://zakupki.gov.ru/epz/order/notice/ea20/view/common-info.html?regNumber=1200700002724000022",
+//                driver,wait);
 
 
 //        System.out.println(" поиске жалобы: " + result);

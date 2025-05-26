@@ -4,7 +4,7 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import static Parser.implementations.Parser44.Contracts.ParserUtils.extractRegNumber;
+import static Parser.utils.ParserUtils.extractRegNumber;
 
 public class ComplaintsURLGetter {
 
@@ -59,36 +59,27 @@ public class ComplaintsURLGetter {
         }
 
     public int countComplaintsByRegNumber(String originalUrl, WebDriver driver, WebDriverWait wait) {
-        String regNumber = extractRegNumber(originalUrl);
-        if (regNumber == null) {
-            System.out.println("Не удалось извлечь номер закупки из URL: " + originalUrl);
-            return 0;
-        }
-
+        String originalPage = driver.getCurrentUrl();
         try {
-            // Формируем URL для поиска жалоб
+            // Основная логика
+            String regNumber = extractRegNumber(originalUrl);
+            if (regNumber == null) return 0;
+
             String searchUrl = "https://zakupki.gov.ru/epz/complaint/search/search_eis.html?" +
-                    "searchString=" + regNumber +
-                    "&strictEqual=on&fz94=on&cancelled=on&considered=on&regarded=on";
+                    "searchString=" + regNumber + "&strictEqual=on&fz94=on&cancelled=on&considered=on&regarded=on";
 
-            // Открываем страницу поиска жалоб
             driver.get(searchUrl);
-
-            // Ждем появления блока с количеством результатов
             wait.until(ExpectedConditions.presenceOfElementLocated(
                     By.cssSelector("div.search-results__total")));
 
-            // Получаем и возвращаем количество жалоб
-            int totalComplaints = extractTotalItems(driver);
-            System.out.println("Найдено жалоб по номеру " + regNumber + ": " + totalComplaints);
-            return totalComplaints;
-
-        } catch (TimeoutException e) {
-            System.out.println("Таймаут при поиске жалоб по номеру: " + regNumber);
-            return 0;
-        } catch (Exception e) {
-            System.out.println("Ошибка при подсчёте жалоб: " + e.getMessage());
-            return 0;
+            return extractTotalItems(driver);
+        } finally {
+            // Всегда возвращаемся на исходную страницу
+            try {
+                driver.get(originalPage);
+            } catch (Exception e) {
+                System.err.println("Error returning to original page: " + e.getMessage());
+            }
         }
     }
 

@@ -22,14 +22,14 @@ import jakarta.persistence.*;
 
     private BigDecimal quantity;
 
-    @Column(name = "unit", length = 200)
+    @Column(name = "unit",columnDefinition = "TEXT")
     private String unit;
 
     @Column(name = "price_per_unit", precision = 19, scale = 2)
 
     private BigDecimal pricePerUnit;
 
-    @Column(name = "vat_rate", precision = 5, scale = 2)
+    @Column(name = "vat_rate", columnDefinition = "TEXT")
 
     private String vatRate;
 

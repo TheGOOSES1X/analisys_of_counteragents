@@ -9,6 +9,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +19,7 @@ import java.util.regex.Pattern;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
-public class PurchasesParserHead implements Parser {
+public class PurchasesParserHead implements PurchaseListParser {
     public volatile boolean isPaused = false;
     private volatile boolean isStopped = false;
     private final DriverSetup driverSetup;
@@ -41,20 +42,6 @@ public class PurchasesParserHead implements Parser {
         isPaused = false;
     }
 
-    @Override
-    public void parseSupplierLitigations() {
-
-    }
-
-    @Override
-    public void parseSupplierStatuses() {
-
-    }
-
-    @Override
-    public void cleanupDownloadDirectory() {
-
-    }
 
     @Override
     public void stopParser() {
@@ -134,11 +121,6 @@ public class PurchasesParserHead implements Parser {
     }
 
 
-    @Override
-    public void parseUrlsParallel(List<String> urls, Consumer<PurchaseParser44.ParseResult> callback, int threadCount, Consumer<Integer> progressCallback) {
-
-    }
-
 
 
     @Override
@@ -179,9 +161,12 @@ public class PurchasesParserHead implements Parser {
                 continue;
             }
 
-            processPageItems(itemContainers, allPurchases);
+            processPageItems(itemContainers, allPurchases,totalItems);
             hasNextPage = shouldContinueToNextPage(currentPage, totalItems);
             currentPage++;
+        }
+        if (currentPage % 50 == 0) {
+            driver.manage().deleteAllCookies();
         }
 
         return allPurchases;
@@ -206,12 +191,14 @@ public class PurchasesParserHead implements Parser {
         return driver.findElements(By.cssSelector(".search-registry-entry-block"));
     }
 
-    private void processPageItems(List<WebElement> itemContainers, List<PurchaseItem> allPurchases) {
+    private void processPageItems(List<WebElement> itemContainers, List<PurchaseItem> allPurchases, int totalItems) {
         for (WebElement itemContainer : itemContainers) {
+            if (isStopped) break; // Проверка на остановку
+
             try {
                 PurchaseItem item = extractPurchaseData(itemContainer);
                 allPurchases.add(item);
-                notifyItemProcessed(allPurchases.size(), item);
+                notifyItemProcessed(allPurchases.size(), item, totalItems); // Передаем totalItems
             } catch (Exception e) {
                 handleItemError("Ошибка при обработке элемента: " + e.getMessage(), e);
             }
@@ -223,10 +210,10 @@ public class PurchasesParserHead implements Parser {
         return currentPage * ITEMS_PER_PAGE < totalItems;
     }
 
-    private void notifyItemProcessed(int processedCount, PurchaseItem item) {
+    private void notifyItemProcessed(int processedCount, PurchaseItem item, int totalItems) {
         if (statusListener != null) {
             statusListener.updateCurrentRecords(processedCount);
-            statusListener.addPurchaseToTable(item);
+            statusListener.addPurchaseToTable(item,totalItems);
         }
     }
 
@@ -261,9 +248,11 @@ public class PurchasesParserHead implements Parser {
         if (driver != null) {
             try {
                 sleep(1000);
-                driver.quit();
+                driver.quit(); // Корректное закрытие драйвера
             } catch (Exception e) {
                 handleError("Ошибка при закрытии драйвера: " + e.getMessage(), e);
+            } finally {
+                killChromeProcesses(); // Принудительное завершение процессов
             }
         }
     }
@@ -348,6 +337,22 @@ public class PurchasesParserHead implements Parser {
         } catch (Exception e) {
             System.err.println("Ошибка при получении количества записей: " + e.getMessage());
             return 0;
+        }
+    }
+    private void killChromeProcesses() {
+        try {
+            // Для Windows
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe /T");
+                Runtime.getRuntime().exec("taskkill /F /IM chrome.exe /T");
+            }
+            // Для Linux/macOS
+            else {
+                Runtime.getRuntime().exec("pkill -f chromedriver");
+                Runtime.getRuntime().exec("pkill -f chrome");
+            }
+        } catch (IOException e) {
+            System.err.println("Ошибка при завершении процессов Chrome: " + e.getMessage());
         }
     }
 

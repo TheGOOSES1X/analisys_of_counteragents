@@ -1,8 +1,9 @@
 package Parser.implementations.Parser44;
 
-import Parser.Database.hooks.HibernateUtil;
+import Parser.Database.hooks.DatabaseService;
 import Parser.Database.models.*;
 import Parser.implementations.Parser223.DocumentParser;
+import Parser.implementations.Parser223.MainInfoParser223;
 import Parser.interfaces.*;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -15,7 +16,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
-public class PurchaseParser44 implements Parser {
+public class PurchaseParser44 implements PurchaseDetailsParser {
     private final DriverSetup driverSetup;
     private final DocumentParser documentParser;
     private ExecutorService executor;
@@ -25,25 +26,52 @@ public class PurchaseParser44 implements Parser {
     private final PurchasePageParser purchasePageParser;
     private final CustomerPageParser customerPageParser;
     private final ContractPageParser contractPageParser;
+    private  final MainInfoParser223 mainInfoParser223;
     private final DatabaseService databaseService;
+    private final WebDriverPool driverPool;
     private final SupplierStatusParser supplierStatusParser;
-
+    private static final Path ERROR_URLS_FILE = Paths.get("error_urls.txt");
 
     public PurchaseParser44(DriverSetup driverSetup) {
         this.driverSetup = driverSetup;
         this.purchasePageParser = new PurchasePageParser();
         this.customerPageParser = new CustomerPageParser();
         this.contractPageParser = new ContractPageParser();
+        this.mainInfoParser223 = new MainInfoParser223();
         this.databaseService = new DatabaseService();
+
         this.litigationParser = new LitigationParser(driverSetup.setupDriver());
         this.supplierStatusParser = new SupplierStatusParser(driverSetup.setupDriver());
         this.documentParser = new DocumentParser();
+        this.driverPool = new WebDriverPool(driverSetup, 6);
+        // Инициализация файла для ошибок
+        try {
+            if (!Files.exists(ERROR_URLS_FILE)) {
+                Files.createFile(ERROR_URLS_FILE);
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to create error URLs file: " + e.getMessage());
+        }
+
     }
 
-    @Override
-    public void parse() {
-        // Реализация если нужна
+
+
+    private WebDriver createDriverWithCleanup() {
+        WebDriver driver = driverSetup.setupDriver();
+        // Добавляем хук для очистки при завершении работы
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (driver != null) {
+                try {
+                    driver.quit();
+                } catch (Exception e) {
+                    System.err.println("Error while quitting driver: " + e.getMessage());
+                }
+            }
+        }));
+        return driver;
     }
+
 
     @Override
     public void parseUrlsParallel(List<String> urls, Consumer<ParseResult> callback,
@@ -111,38 +139,65 @@ public class PurchaseParser44 implements Parser {
                 }
             }
 
-            driver = driverSetup.setupDriver();
+
+            driver = driverPool.borrowDriver();  // Используем наш метод с cleanup
+            driver.manage().deleteAllCookies(); // Очищаем куки
             driver.get(url);
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
 
             return parsePurchaseUrl(url, driver, wait);
         } catch (Exception e) {
+            saveErrorUrl(url); // Сохраняем URL при ошибке
             return new ParseResult(url, null, e);
         } finally {
-            if (driver != null) driver.quit();
+            if (driver != null) driverPool.returnDriver(driver);;
+        }
+    }
+
+    private synchronized void saveErrorUrl(String url) {
+        try {
+            // Открываем файл в режиме добавления (APPEND)
+            Files.write(ERROR_URLS_FILE, (url + System.lineSeparator()).getBytes(), StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            System.err.println("Failed to save error URL to file: " + e.getMessage());
         }
     }
 
     private ParseResult parsePurchaseUrl(String url, WebDriver driver, WebDriverWait wait) {
         try {
-            // Если URL содержит "notice223", обрабатываем только через documentParser
+            Purchase purchase;
+            Customer customer;
+            Contract contract;
+            List<ProcurementObject> procurementObjects;
+
             if (url.contains("notice223")) {
-                documentParser.parseDocumentInfo(url, driver, wait);
-                return new ParseResult(url, null, null); // Возвращаем пустой результат, так как данные о закупке не парсятся
+                // Обработка для 223-ФЗ
+                purchase = mainInfoParser223.parsePurchaseMainInfo(url, driver);
+                customer = mainInfoParser223.parsePurchaseCustomer(url, driver);
+                contract = mainInfoParser223.parsePurchaseContract(url, driver, wait);
+                procurementObjects = mainInfoParser223.parsePurchaseSubjects(url, driver, wait);
+                if (procurementObjects != null) {
+                    procurementObjects.forEach(purchase::addProcurementObject);
+                }
+                // Дополнительный парсинг документов, если нужно
+                // documentParser.parseDocumentInfo(url, driver, wait);
+            } else {
+                // Обработка для других типов закупок
+                purchase = purchasePageParser.parsePurchasePage(url, driver, wait);
+                customer = customerPageParser.parseCustomerInfo(driver);
+                contract = contractPageParser.parseContractInfo(url, driver, wait);
+
             }
 
-            // Если URL не содержит "notice223", обрабатываем стандартными методами
-            Purchase purchase = purchasePageParser.parsePurchasePage(url, driver, wait);
-            Customer customer = customerPageParser.parseCustomerInfo(driver);
-            Contract contract = contractPageParser.parseContractInfo(url, driver, wait);
+
 
             if (contract != null) {
                 contract.setPurchase(purchase);
                 purchase.setContract(contract);
             }
 
-            purchase.setCustomer(customer);
             if (customer != null) {
+                purchase.setCustomer(customer);
                 customer.getPurchases().add(purchase);
             }
 
@@ -165,6 +220,7 @@ public class PurchaseParser44 implements Parser {
     public void stopParser() {
         isStopped = true;
         shutdown();
+        driverPool.closeAll();
     }
 
     private void shutdown() {
