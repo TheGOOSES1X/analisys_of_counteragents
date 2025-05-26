@@ -1918,7 +1918,7 @@ public class mainForm extends JFrame {
         EGRUL_PDF_Parser_Start.addActionListener(e -> EGRUL_Parser_Start());
         EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
 
-        Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "src/currency.json");
+        Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "resources/currency.json");
 
         // Кнопка паузы/продолжения
         PauseParsingButton.addActionListener(e -> {
@@ -1937,11 +1937,10 @@ public class mainForm extends JFrame {
         initHeadersTable();
         customizeTableRenderers();
         try {
-            Okpd2Converter.loadFromJson("src/okpd2_full.json");
+            Okpd2Converter.loadFromJson("resources/okpd2_full.json");
         } catch (IOException e) {
             System.err.println("Ошибка загрузки файла ОКПД2: " + e.getMessage());
             e.printStackTrace();
-            // Можно показать диалоговое окно с ошибкой
             JOptionPane.showMessageDialog(null,
                     "Не удалось загрузить справочник ОКПД2",
                     "Ошибка",
@@ -3215,8 +3214,19 @@ public class mainForm extends JFrame {
         }
 
         // Валюта
-        params.put("currencyIdGeneral",
-                comboBoxCurrency.getSelectedItem() != null ? "1" : "-1");
+        if (comboBoxCurrency.getSelectedItem() != null) {
+            String currencyName = comboBoxCurrency.getSelectedItem().toString();
+            String currencyId = Okpd2Converter.getCurrencyIdByName(currencyName);
+            if (currencyId != null) {
+                params.put("currencyIdGeneral", currencyId);
+            } else {
+                params.put("currencyIdGeneral", "-1");
+            }
+        } else {
+            params.put("currencyIdGeneral", "-1");
+        }
+//        params.put("currencyIdGeneral",
+//                comboBoxCurrency.getSelectedItem() != null ? "1" : "-1");
 
         System.out.println("Final URL params: " + params);
         return params;
