@@ -26,13 +26,20 @@ public class Data_Extractor {
     private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Parser_EGRUL", "PDF_files");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
-    public static void readAllInfoFromFiles() {
+    public interface ProgressUpdater {
+        void incrementProgress();
+        void updateStatus(String text);
+        void defineBarMaximum(int fileNumber);
+    }
+
+    public static void readAllInfoFromFiles(Data_Extractor.ProgressUpdater updater) {
         try {
             List<Path> pdfFiles = findAllPdfFiles();
             List<List<Object>> Activity_Data_list = new ArrayList<>();
             List<String> INN_list = ConnectToDB_Start.CollectINNFromDB();;
 
             int countdown = pdfFiles.size();
+            updater.defineBarMaximum(countdown);
 
             for (Path pdfFile : pdfFiles) {
                 try{
@@ -40,6 +47,13 @@ public class Data_Extractor {
                 }
                 catch (Exception e) {
                     continue;
+                }
+                updater.incrementProgress();
+                if ((countdown-1) != 0){
+                    updater.updateStatus("Осталось: " + (countdown-1));
+                }
+                else {
+                    updater.updateStatus("");
                 }
                 System.out.println("Осталось обработать " + countdown + " pdf файлов");
                 countdown -= 1;

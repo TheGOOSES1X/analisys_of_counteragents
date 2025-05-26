@@ -21,6 +21,7 @@ import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONException;
@@ -187,13 +188,17 @@ public class mainForm extends JFrame {
     private JButton StopParser;
     private JButton PauseParsingButton;
     private JButton StopParseringButton;
+
     private JButton EGRUL_PDF_Parser_Start;
     private JButton EGRUL_PDF_Parser_Stop;
+    private AtomicBoolean EGRUL_Parser_isStopped = new AtomicBoolean(false);
+
     private JButton EGRUL_PDF_To_Data;
-    private JProgressBar EGRUL_Parser_Progress_Bar;
+    private JProgressBar EGRUL_Progress_Bar;
     private JLabel EGRUL_PDF_Bar_status;
     private JLabel EGRUL_Parser_left;
     private JLabel EGRUL_PDF_left;
+
     private StatusForm statusForm;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -213,8 +218,8 @@ public class mainForm extends JFrame {
     private ParserState parserState = ParserState.IDLE;
 
     private Thread parserThread;
-    private Thread EGRUL_Parser_Thread;
-
+    private Thread EGRUL_Thread;
+    private Thread PDF_to_Data_Thread;
 
     // List<rowGoodsOrders> rowTableCritIntervalEdit;
 
@@ -1901,6 +1906,13 @@ public class mainForm extends JFrame {
             stopParsing();
         });
         EGRUL_PDF_Parser_Start.addActionListener(e -> EGRUL_Parser_Start());
+        EGRUL_PDF_Parser_Stop.addActionListener(e -> {
+            try {
+                EGRUL_Parser_Stop();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
         EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
 
         // Кнопка паузы/продолжения
@@ -2858,29 +2870,41 @@ public class mainForm extends JFrame {
     }
 
     private void EGRUL_Parser_Start(){
-        new Thread(() -> {
+        if (EGRUL_Thread != null && EGRUL_Thread.isAlive()) {
+            return;
+        }
+
+        EGRUL_Parser_isStopped.set(false);
+
+        EGRUL_Thread = new Thread(() -> {
 
             EGRUL_PDF_Parser_Start.setText("Парсинг...");
             EGRUL_PDF_Parser_Start.setEnabled(false);
-
-            EGRUL_Parser_left.setText("Осталось: " + Parser_EGRUL.Parser.countRemainingUrls());
+            EGRUL_PDF_To_Data.setEnabled(false);
+            EGRUL_PDF_Parser_Stop.setEnabled(true);
             EGRUL_PDF_Bar_status.setText("Парсинг PDF");
-
-            EGRUL_Parser_Progress_Bar.setMinimum(0);
-            EGRUL_Parser_Progress_Bar.setMaximum(Parser_EGRUL.Parser.countRemainingUrls());
+            EGRUL_Progress_Bar.setMinimum(0);
 
             try {
-                Parser_EGRUL.Parser.StartParsingEGRUL(new Parser_EGRUL.Parser.ProgressUpdater() {
+                Parser_EGRUL.Parser.StartParsingEGRUL(EGRUL_Parser_isStopped, new Parser_EGRUL.Parser.ProgressUpdater() {
                     @Override
                     public void incrementProgress() {
                         SwingUtilities.invokeLater(() -> {
-                            EGRUL_Parser_Progress_Bar.setValue(EGRUL_Parser_Progress_Bar.getValue() + 1);
+                            EGRUL_Progress_Bar.setValue(EGRUL_Progress_Bar.getValue() + 1);
                         });
                     }
+
                     @Override
-                    public void updateStatus(int fileNumber) {
+                    public void updateStatus(String text) {
                         SwingUtilities.invokeLater(() -> {
-                            EGRUL_Parser_left.setText("Осталось: " + fileNumber);
+                            EGRUL_Parser_left.setText(text);
+                        });
+                    }
+
+                    @Override
+                    public void defineBarMaximum(int number) {
+                        SwingUtilities.invokeLater(() -> {
+                            EGRUL_Progress_Bar.setMaximum(number);
                         });
                     }
                 });
@@ -2888,19 +2912,82 @@ public class mainForm extends JFrame {
                 throw new RuntimeException(e);
             }
 
-            EGRUL_PDF_Bar_status.setText("Парсинг завершён");
-            EGRUL_Parser_left.setText("Осталось: 0");
-            EGRUL_PDF_Parser_Start.setText("Сбор PDF");
-            EGRUL_PDF_Parser_Start.setEnabled(true);
-        }).start();
+            // Восстанавливаем UI
+            SwingUtilities.invokeLater(() -> {
+                EGRUL_PDF_Bar_status.setText("Парсинг остановлен");
+                EGRUL_PDF_Parser_Start.setText("Сбор PDF");
+                EGRUL_PDF_Parser_Start.setEnabled(true);
+                EGRUL_PDF_To_Data.setEnabled(true);
+                EGRUL_PDF_Parser_Stop.setEnabled(false);
+            });
+
+        });
+        EGRUL_Thread.start();
+    }
+
+    private void EGRUL_Parser_Stop() throws InterruptedException {
+        EGRUL_Parser_isStopped.set(true);  // Устанавливаем флаг остановки
+
+        if (EGRUL_Thread != null && EGRUL_Thread.isAlive()) {
+            EGRUL_Thread.interrupt();
+        }
+
+        try {
+            Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe /T");
+            Runtime.getRuntime().exec("taskkill /F /IM chrome.exe /T");
+        } catch (IOException e) {
+            System.err.println("Ошибка при закрытии Chrome: " + e.getMessage());
+        }
+
+        System.out.println("Обработка остановлена");
     }
 
     private void EGRUL_PDF_Processing(){
-//        try {
-//            Parser_EGRUL.Parser.StartParsingEGRUL(this);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
+        if (PDF_to_Data_Thread != null && PDF_to_Data_Thread.isAlive()) {
+            return;
+        }
+
+        PDF_to_Data_Thread = new Thread(() -> {
+
+            EGRUL_PDF_To_Data.setText("Обрабатываем...");
+            EGRUL_PDF_Parser_Start.setEnabled(false);
+            EGRUL_PDF_To_Data.setEnabled(false);
+            EGRUL_PDF_Bar_status.setText("Обработка PDF");
+            EGRUL_Progress_Bar.setMinimum(0);
+            EGRUL_Progress_Bar.setValue(0);
+
+            Parser_EGRUL.Data_Extractor.readAllInfoFromFiles(new Parser_EGRUL.Data_Extractor.ProgressUpdater() {
+                @Override
+                public void incrementProgress() {
+                    SwingUtilities.invokeLater(() -> {
+                        EGRUL_Progress_Bar.setValue(EGRUL_Progress_Bar.getValue() + 1);
+                    });
+                }
+
+                @Override
+                public void updateStatus(String text) {
+                    SwingUtilities.invokeLater(() -> {
+                        EGRUL_PDF_left.setText(text);
+                    });
+                }
+
+                @Override
+                public void defineBarMaximum(int number) {
+                    SwingUtilities.invokeLater(() -> {
+                        EGRUL_Progress_Bar.setMaximum(number);
+                    });
+                }
+            });
+
+            SwingUtilities.invokeLater(() -> {
+                EGRUL_PDF_Bar_status.setText("Обработка завершена");
+                EGRUL_PDF_Parser_Start.setEnabled(true);
+                EGRUL_PDF_To_Data.setEnabled(true);
+                EGRUL_PDF_To_Data.setText("Обработка PDF");
+            });
+
+        });
+        PDF_to_Data_Thread.start();
     }
 
     private void initStartParsingButton() {
