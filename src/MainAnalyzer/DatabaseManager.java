@@ -2182,10 +2182,21 @@ public class DatabaseManager {
         return filteredCGOwes;
     }
 
-    public List<rowContrasGoodsOrdersWithWeights> getCGOwesAsUserCrit(boolean db_module, String filterContrasName, String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
+    public List<rowContrasGoodsOrdersWithWeights> getCGOwesAsUserCrit(boolean db_module, String filterContrasName,
+                                                                      String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
+
+        // Сначала получаем список всех пользовательских критериев
         List<rowContrasGoodsOrdersWithWeights> filteredCGOwes = new ArrayList<>();
 
-        // Базовый запрос
+        // Сначала получаем список всех пользовательских критериев
+        List<Long> userCriteriaIds = getAllUserCriteriaIds(db_module);
+
+        // Формируем часть запроса для пользовательских критериев
+        StringBuilder userCritsSelect = new StringBuilder();
+        for (Long critId : userCriteriaIds) {
+            userCritsSelect.append(", module_lotcriterion.user_crit_").append(critId).append(" AS user_crit_").append(critId);
+        }
+
         String query = "SELECT DISTINCT bs_order.id AS o_id, bs_order.scaption AS o_name, " +
                 "bs_contras.id AS c_id, bs_contras.scaption AS c_name, " +
                 "bs_goods.id AS g_id, bs_goods.sname AS g_name, " +
@@ -2193,7 +2204,8 @@ public class DatabaseManager {
                 "module_lotcriterion.nqty AS min_vol, " +
                 "module_lotcriterion.ngoodquality AS g_qual, " +
                 "bs_contras.ncontrasreliability AS c_rep, " +
-                "bs_goods.okpd2 AS g_okpd2 " +
+                "bs_goods.okpd2 AS g_okpd2 " + // Добавляем выборку поля okpd2
+                userCritsSelect.toString() + " " +
                 "FROM bs_order " +
                 "JOIN mes_workorder ON bs_order.id = mes_workorder.id_order " +
                 "JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id " +
@@ -2201,81 +2213,126 @@ public class DatabaseManager {
                 "JOIN bs_contras ON module_lotcriterion.id_contras = bs_contras.id " +
                 "WHERE 1=1";
 
-        List<String> conditions = new ArrayList<>();
-        List<Object> params = new ArrayList<>();
-
+        // Добавляем фильтры
         if (!filterContrasName.isEmpty()) {
-            conditions.add("bs_contras.scaption ILIKE ?");
-            params.add("%" + filterContrasName.trim() + "%");
+            query += " AND bs_contras.scaption ILIKE '%" + filterContrasName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterGoodName.isEmpty()) {
-            conditions.add("bs_goods.sname ILIKE ?");
-            params.add("%" + filterGoodName.trim() + "%");
+            query += " AND bs_goods.sname ILIKE '%" + filterGoodName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterOrderName.isEmpty()) {
-            conditions.add("bs_order.scaption ILIKE ?");
-            params.add("%" + filterOrderName.trim() + "%");
+            query += " AND bs_order.scaption ILIKE '%" + filterOrderName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterCGDateSupply.isEmpty()) {
-            conditions.add("module_lotcriterion.ndeliverytime = ?");
-            params.add(Integer.parseInt(filterCGDateSupply));
+            query += " AND module_lotcriterion.ndeliverytime = " + filterCGDateSupply;
         }
-
         if (!filterCGMinVolume.isEmpty()) {
-            conditions.add("module_lotcriterion.nqty = ?");
-            params.add(Double.parseDouble(filterCGMinVolume));
+            query += " AND module_lotcriterion.nqty = " + filterCGMinVolume;
+        }
+        // Добавляем фильтр по okpd2 с точным совпадением
+        if (okpd2 != null && !okpd2.isEmpty()) {
+            query += " AND bs_goods.okpd2 = '" + okpd2.trim().replace("'", "''") + "'";
         }
 
-        if (!okpd2.isEmpty()) {
-            conditions.add("bs_goods.okpd2 = ?");
-            params.add(okpd2);
-        }
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+            while (resultSet.next()) {
+                long o_id = resultSet.getLong("o_id");
+                long c_id = resultSet.getLong("c_id");
+                long g_id = resultSet.getLong("g_id");
+                String o_name = resultSet.getString("o_name");
+                String c_name = resultSet.getString("c_name");
+                String g_name = resultSet.getString("g_name");
+                int deliveryTime = resultSet.getInt("date_supply");
+                double minQuantity = resultSet.getDouble("min_vol");
+                double g_quality = resultSet.getDouble("g_qual");
+                double c_rep = resultSet.getDouble("c_rep");
 
-        if (!conditions.isEmpty()) {
-            query += " AND " + String.join(" AND ", conditions);
-        }
+                rowContrasGoodsOrdersWithWeights row = new rowContrasGoodsOrdersWithWeights(
+                        c_id, c_name, g_id, g_name, o_id, o_name,
+                        deliveryTime, 1.0, minQuantity, 1.0,
+                        g_quality, 1.0, c_rep, 1.0, null, 1.0
+                );
 
-        try (Connection conn = getConnection(db_module);
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-
-            for (int i = 0; i < params.size(); i++) {
-                if (params.get(i) instanceof Integer) {
-                    stmt.setInt(i + 1, (Integer) params.get(i));
-                } else if (params.get(i) instanceof Double) {
-                    stmt.setDouble(i + 1, (Double) params.get(i));
-                } else {
-                    stmt.setString(i + 1, (String) params.get(i));
+                // Загружаем пользовательские критерии
+                for (Long critId : userCriteriaIds) {
+                    String columnName = "user_crit_" + critId;
+                    if (resultSet.getObject(columnName) != null) {
+                        double critValue = resultSet.getDouble(columnName);
+                        row.setUserCritValue(critId, critValue);
+                    }
                 }
+
+                filteredCGOwes.add(row);
             }
-
-            try (ResultSet resultSet = stmt.executeQuery()) {
-                while (resultSet.next()) {
-                    long o_id = resultSet.getLong("o_id");
-                    long c_id = resultSet.getLong("c_id");
-                    long g_id = resultSet.getLong("g_id");
-                    String o_name = resultSet.getString("o_name");
-                    String c_name = resultSet.getString("c_name");
-                    String g_name = resultSet.getString("g_name");
-                    int deliveryTime = resultSet.getInt("date_supply");
-                    double minQuantity = resultSet.getDouble("min_vol");
-                    double g_quality = resultSet.getDouble("g_qual");
-                    double c_rep = resultSet.getDouble("c_rep");
-
-                    filteredCGOwes.add(new rowContrasGoodsOrdersWithWeights(
-                            c_id, c_name, g_id, g_name, o_id, o_name,
-                            deliveryTime, 1.0, minQuantity, 1.0,
-                            g_quality, 1.0, c_rep, 1.0, null, 1.0
-                    ));
-                }
+            if (resultSet != null) {
+                resultSet.close();
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
         return filteredCGOwes;
+    }
+
+    private List<Long> getAllUserCriteriaIds(boolean db_module) {
+        List<Long> criteriaIds = new ArrayList<>();
+        String query = "SELECT id FROM module_criterion WHERE id > 3"; // ID > 3 считаем пользовательскими
+
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+            try {
+                while (resultSet.next()) {
+                    criteriaIds.add(resultSet.getLong("id"));
+                }
+            } catch (Throwable t) {
+                if (resultSet != null) {
+                    try {
+                        resultSet.close();
+                    } catch (Throwable t1) {
+                        t.addSuppressed(t1);
+                    }
+                }
+                throw t;
+            }
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return criteriaIds;
+    }
+
+    public List<Long> getAllCriteriaIds(boolean db_module) {
+        List<Long> criteriaIds = new ArrayList<>();
+        String query = "SELECT id FROM module_criterion";
+
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+            try {
+                while (resultSet.next()) {
+                    criteriaIds.add(resultSet.getLong("id"));
+                }
+            } catch (Throwable t) {
+                if (resultSet != null) {
+                    try {
+                        resultSet.close();
+                    } catch (Throwable t1) {
+                        t.addSuppressed(t1);
+                    }
+                }
+                throw t;
+            }
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return criteriaIds;
     }
 
 

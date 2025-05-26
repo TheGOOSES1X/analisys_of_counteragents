@@ -1,63 +1,52 @@
 package MainAnalyzer;
-
-import java.util.List;
+import java.util.*;
 import org.json.JSONObject;
-import java.util.Comparator;
-import java.util.ArrayList;
 
 /**
- * Класс отвечает за расчет итогового рейтинга для комбинаций "контрагент-товар-заказ"
- * на основе набора критериев (срок поставки, минимальная партия и т.д.)
+ * Класс для расчета рейтингов поставщиков на основе заданных критериев.
+ * Использует взвешенную сумму нормализованных значений критериев.
  */
 public class RatingCalculator {
-
-    private final DatabaseManager dbExtractor;
+    private final DatabaseManager dbExtractor; // Менеджер для работы с базой данных
 
     /**
-     * Конструктор. Принимает ссылку на менеджер базы данных
+     * Конструктор инициализирует калькулятор с указанным менеджером БД
+     * @param dbExtractor - менеджер для работы с базой данных
      */
     public RatingCalculator(DatabaseManager dbExtractor) {
         this.dbExtractor = dbExtractor;
     }
 
     /**
-     * Основной метод расчета рейтингов.
-     * Возвращает список строк с вычисленными весами и итоговым рейтингом.
+     * Основной метод расчета рейтингов
+     * @param contrasFilter - фильтр по контрагентам
+     * @param goodFilter - фильтр по товарам
+     * @param orderFilter - фильтр по заказам
+     * @param dateFilter - фильтр по датам
+     * @param minVolumeFilter - фильтр по минимальному объему
+     * @param okpd2 - фильтр по ОКДП2
+     * @return список строк с рассчитанными рейтингами
      */
     public List<rowContrasGoodsOrdersWithWeights> calculateRatings(
             String contrasFilter, String goodFilter, String orderFilter,
-            String dateFilter, String minVolumeFilter, String okpd2, String group) {
+            String dateFilter, String minVolumeFilter, String okpd2) {
 
-        /** Получаем строки, соответствующие фильтрам !!!
-         * СМОТРИ getCGOwesAsUserCrit, можно с ним что-то придумать
-         * (Дополнительный критерии для рейтинга)
-        */
+        // 1. Получаем данные из БД с учетом фильтров
         List<rowContrasGoodsOrdersWithWeights> rowsCGOws = dbExtractor.getCGOwesAsUserCrit(
                 false, contrasFilter, goodFilter, orderFilter, dateFilter, minVolumeFilter, okpd2);
 
-        double[] sumWeight = new double[] {0.0}; // Сумма всех весов критериев (через массив для передачи по ссылке)
+        // 2. Получаем все ID критериев из БД
+        List<Long> allCriteriaIds = dbExtractor.getAllCriteriaIds(false);
+        double[] sumWeight = new double[] {0.0}; // Массив для накопления суммы весов
 
-        // Обработка каждого критерия
-        processCriterion(rowsCGOws, 0, sumWeight); // Критерий: Срок поставки
-        processCriterion(rowsCGOws, 1, sumWeight); // Критерий: Минимальная партия
-        processCriterion(rowsCGOws, 2, sumWeight); // Критерий: Качество товара
-        processCriterion(rowsCGOws, 3, sumWeight); // Критерий: Репутация контрагента
+        // 3. Обрабатываем каждый критерий
+        for (Long critId : allCriteriaIds) {
+            processCriterion(rowsCGOws, critId, sumWeight);
+        }
 
-        // Расчет итогового рейтинга
+        // 4. Рассчитываем итоговый рейтинг для каждой строки
         for (rowContrasGoodsOrdersWithWeights row : rowsCGOws) {
-            double rating = 0.0;
-
-            if (sumWeight[0] > 0) {
-                rating = (
-                        row.getDeliveryTimeFinalWeight() +
-                                row.getMinVolumeFinalWeight() +
-                                row.getGoodQualityFinalWeight() +
-                                row.getContrasReputationFinalWeight()
-                ) / sumWeight[0];
-            }
-
-            // На всякий случай отсекаем бесконечности/NaN
-            if (!Double.isFinite(rating)) rating = 0.0;
+            double rating = calculateFinalRating(row, sumWeight[0]);
             row.setRatingComplete(rating);
         }
 
@@ -65,127 +54,200 @@ public class RatingCalculator {
     }
 
     /**
-     * Метод обработки одного критерия.
-     * Нормализует значения и пересчитывает веса по выбранной функции.
+     * Обрабатывает один критерий: нормализует значения и рассчитывает веса
+     * @param rowsCGOws - список строк данных
+     * @param critId - ID критерия
+     * @param sumWeight - массив для накопления суммы весов (используем массив для передачи по ссылке)
      */
     private void processCriterion(List<rowContrasGoodsOrdersWithWeights> rowsCGOws,
-                                  int critId, double[] sumWeight) {
+                                  long critId, double[] sumWeight) {
 
-        // Получаем данные по критерию (вес, тип функции и диапазон)
+        // 1. Получаем данные о критерии из БД
         List<rowCritData> critDataList = dbExtractor.getCritData(false, critId);
-        if (critDataList.isEmpty()) return;
+        if (critDataList.isEmpty()) return; // Если нет данных - пропускаем
 
         rowCritData critData = critDataList.get(0);
-        double weight = critData.getCritWeight();
-        sumWeight[0] += weight;
+        double weight = critData.getCritWeight(); // Вес критерия
+        sumWeight[0] += weight; // Увеличиваем общую сумму весов
 
+        int funType = critData.getCritFunction(); // Тип функции нормализации
+
+        // 2. Выбираем способ обработки в зависимости от типа функции
+        if (funType < 4) {
+            processRangeCriterion(rowsCGOws, critId, critData, weight); // Для стандартных функций
+        } else {
+            processDataPointsCriterion(rowsCGOws, critId, critData, weight); // Для пользовательских функций
+        }
+    }
+
+    /**
+     * Обрабатывает критерий с диапазонной функцией (линейная, S-образная и т.д.)
+     * @param rowsCGOws - список строк данных
+     * @param critId - ID критерия
+     * @param critData - данные критерия
+     * @param weight - вес критерия
+     */
+    private void processRangeCriterion(List<rowContrasGoodsOrdersWithWeights> rowsCGOws,
+                                       long critId, rowCritData critData, double weight) {
+
+        // Получаем параметры функции
+        double minV = critData.getMinVal();
+        double maxV = critData.getMaxVal();
         int funType = critData.getCritFunction();
 
-        // Если тип функции 0-3 — работаем с диапазоном (min/max)
-        if (funType < 4) {
-            double minV = critData.getMinVal();
-            double maxV = critData.getMaxVal();
-
-            for (rowContrasGoodsOrdersWithWeights row : rowsCGOws) {
-                double val = getCriterionValue(row, critId);
-                double normalizedWeight = calcWeight(val, minV, maxV, funType) * weight;
-                setCriterionWeight(row, critId, normalizedWeight);
-            }
-        } else {
-            // Если тип функции > 3 — используем набор точек (data points)
-            JSONObject json = new JSONObject(critData.getJsonDataPoints());
-            List<rowCritValues> points = new ArrayList<>();
-
-            for (String key : json.keySet()) {
-                points.add(new rowCritValues(Double.parseDouble(key), json.getDouble(key)));
-            }
-
-            // Сортируем точки по значению критерия
-            points.sort(Comparator.comparingDouble(rowCritValues::getCritVal));
-
-            for (rowContrasGoodsOrdersWithWeights row : rowsCGOws) {
-                double val = getCriterionValue(row, critId);
-                double normalizedWeight = calcWeightDataPoints(val, points) * weight;
-                setCriterionWeight(row, critId, normalizedWeight);
-            }
+        // Для каждой строки рассчитываем нормализованный вес
+        for (rowContrasGoodsOrdersWithWeights row : rowsCGOws) {
+            double val = getCriterionValue(row, critId); // Получаем значение критерия
+            double normalizedWeight = calcWeight(val, minV, maxV, funType) * weight; // Нормализуем и умножаем на вес
+            setCriterionWeight(row, critId, normalizedWeight); // Сохраняем результат
         }
     }
 
     /**
-     * Извлечение конкретного значения критерия из строки по его ID
+     * Обрабатывает критерий с пользовательской функцией (заданной точками)
+     * @param rowsCGOws - список строк данных
+     * @param critId - ID критерия
+     * @param critData - данные критерия
+     * @param weight - вес критерия
      */
-    private double getCriterionValue(rowContrasGoodsOrdersWithWeights row, int critId) {
-        switch (critId) {
-            case 0: return row.getDeliveryTime();
-            case 1: return row.getMinVolume();
-            case 2: return row.getGoodQuality();
-            case 3: return row.getContrasReputation();
-            default: return 0.0;
+    private void processDataPointsCriterion(List<rowContrasGoodsOrdersWithWeights> rowsCGOws,
+                                            long critId, rowCritData critData, double weight) {
+
+        // 1. Парсим JSON с точками функции
+        JSONObject json = new JSONObject(critData.getJsonDataPoints());
+        List<rowCritValues> points = new ArrayList<>();
+
+        // 2. Заполняем список точек
+        for (String key : json.keySet()) {
+            points.add(new rowCritValues(Double.parseDouble(key), json.getDouble(key)));
+        }
+
+        // 3. Сортируем точки по значению критерия
+        points.sort(Comparator.comparingDouble(rowCritValues::getCritVal));
+
+        // 4. Для каждой строки рассчитываем вес через интерполяцию
+        for (rowContrasGoodsOrdersWithWeights row : rowsCGOws) {
+            double val = getCriterionValue(row, critId);
+            double normalizedWeight = calcWeightDataPoints(val, points) * weight;
+            setCriterionWeight(row, critId, normalizedWeight);
         }
     }
 
     /**
-     * Установка рассчитанного веса критерия в строку
+     * Рассчитывает итоговый рейтинг для одной строки
+     * @param row - строка данных
+     * @param sumWeight - сумма всех весов критериев
+     * @return рассчитанный рейтинг
      */
-    private void setCriterionWeight(rowContrasGoodsOrdersWithWeights row, int critId, double weight) {
-        switch (critId) {
-            case 0: row.setDeliveryTimeFinalWeight(weight); break;
-            case 1: row.setMinVolumeFinalWeight(weight); break;
-            case 2: row.setGoodQualityFinalWeight(weight); break;
-            case 3: row.setContrasReputationFinalWeight(weight); break;
+    private double calculateFinalRating(rowContrasGoodsOrdersWithWeights row, double sumWeight) {
+        if (sumWeight <= 0) return 0.0; // Защита от деления на ноль
+
+        // 1. Суммируем веса основных критериев
+        double sumNumerator = row.getDeliveryTimeFinalWeight() +
+                row.getMinVolumeFinalWeight() +
+                row.getGoodQualityFinalWeight() +
+                row.getContrasReputationFinalWeight();
+
+        // 2. Добавляем веса пользовательских критериев
+        for (Map.Entry<Long, Double> entry : row.getAllUserCritWeights().entrySet()) {
+            sumNumerator += entry.getValue();
+        }
+
+        // 3. Рассчитываем рейтинг как взвешенную сумму
+        double rating = sumNumerator / sumWeight;
+        return Double.isFinite(rating) ? rating : 0.0; // Проверка на корректность значения
+    }
+
+    /**
+     * Получает значение критерия для строки
+     * @param row - строка данных
+     * @param critId - ID критерия
+     * @return значение критерия
+     */
+    private double getCriterionValue(rowContrasGoodsOrdersWithWeights row, long critId) {
+        // Ветвление в зависимости от типа критерия
+        switch (String.valueOf(critId)) {
+            case "0": return row.getDeliveryTime(); // Срок поставки
+            case "1": return row.getMinVolume(); // Минимальный объем
+            case "2": return row.getGoodQuality(); // Качество товара
+            case "3": return row.getContrasReputation(); // Репутация поставщика
+            default: return row.getUserCritValue(critId); // Пользовательский критерий
         }
     }
 
     /**
-     * Нормализация значения критерия по выбранной функции (0-3)
+     * Устанавливает рассчитанный вес критерия для строки
+     * @param row - строка данных
+     * @param critId - ID критерия
+     * @param weight - вес критерия
+     */
+    private void setCriterionWeight(rowContrasGoodsOrdersWithWeights row, long critId, double weight) {
+        // Ветвление в зависимости от типа критерия
+        switch (String.valueOf(critId)) {
+            case "0": row.setDeliveryTimeFinalWeight(weight); break; // Срок поставки
+            case "1": row.setMinVolumeFinalWeight(weight); break; // Минимальный объем
+            case "2": row.setGoodQualityFinalWeight(weight); break; // Качество товара
+            case "3": row.setContrasReputationFinalWeight(weight); break; // Репутация поставщика
+            default: row.setUserCritWeight(critId, weight); break; // Пользовательский критерий
+        }
+    }
+
+    /**
+     * Вычисляет нормализованный вес для стандартных функций
+     * @param val - текущее значение
+     * @param min - минимальное значение диапазона
+     * @param max - максимальное значение диапазона
+     * @param type - тип функции (0-3)
+     * @return нормализованный вес
      */
     private double calcWeight(double val, double min, double max, int type) {
-        if (min == max) return 0.0;
-        double norm = (val - min) / (max - min);
+        if (min == max) return 0.0; // Защита от деления на ноль
+        double norm = (val - min) / (max - min); // Нормализованное значение [0..1]
 
         switch (type) {
-            case 0: // Линейная — чем больше значение, тем лучше
+            case 0: // Линейная возрастающая
                 return val < min ? 0 : (val > max ? 1 : norm);
-            case 1: // Обратная — чем меньше значение, тем лучше
+            case 1: // Линейная убывающая
                 return val < min ? 1 : (val > max ? 0 : 1 - norm);
-            case 2: // S-функция — плавное увеличение до max
+            case 2: // S-образная функция
                 if (val < min) return 0;
                 if (val < (min + max) / 2) return 2 * Math.pow(norm, 2);
-                if (val < max) return 1 - 2 * Math.pow((val - max) / (max - min), 2);
+                if (val < max) return 1 - 2 * Math.pow(norm, 2);
                 return 1;
-            case 3: // Z-функция — лучшее значение посередине диапазона
+            case 3: // Z-образная функция
                 if (val < min) return 1;
                 if (val < (min + max) / 2) return 1 - 2 * Math.pow(norm, 2);
-                if (val < max) return 2 * Math.pow((val - max) / (max - min), 2);
+                if (val < max) return 2 * Math.pow(norm, 2);
                 return 0;
             default: return 0;
         }
     }
 
     /**
-     * Интерполяция веса по таблице значений (data points)
+     * Вычисляет вес через линейную интерполяцию между точками
+     * @param val - текущее значение
+     * @param points - список точек функции
+     * @return интерполированный вес
      */
     private double calcWeightDataPoints(double val, List<rowCritValues> points) {
         if (points.isEmpty()) return 0.0;
 
-        // Ниже минимальной точки
+        // Если значение за границами - возвращаем крайние значения
         if (val <= points.get(0).getCritVal()) return points.get(0).getCritWeight();
-        // Выше максимальной точки
         if (val >= points.get(points.size() - 1).getCritVal())
             return points.get(points.size() - 1).getCritWeight();
 
-        // Линейная интерполяция между ближайшими точками
+        // Ищем интервал для интерполяции
         for (int i = 1; i < points.size(); i++) {
-            double x1 = points.get(i - 1).getCritVal();
-            double x2 = points.get(i).getCritVal();
-            double y1 = points.get(i - 1).getCritWeight();
-            double y2 = points.get(i).getCritWeight();
-
-            if (val >= x1 && val <= x2) {
+            if (val >= points.get(i - 1).getCritVal() && val <= points.get(i).getCritVal()) {
+                // Линейная интерполяция: y = y1 + (x - x1) * (y2 - y1) / (x2 - x1)
+                double x1 = points.get(i - 1).getCritVal();
+                double x2 = points.get(i).getCritVal();
+                double y1 = points.get(i - 1).getCritWeight();
+                double y2 = points.get(i).getCritWeight();
                 return y1 + (val - x1) * (y2 - y1) / (x2 - x1);
             }
         }
-
         return 0.0;
     }
 }

@@ -1090,8 +1090,7 @@ public class mainForm extends JFrame {
                         textFieldFilterOrder.getText(),
                         textFieldFilterDate.getText(),
                         textFieldFilterMinVolume.getText(),
-                        textFieldFilterOkpd2.getText(),
-                        textFieldFilterGroup.getText()
+                        textFieldFilterOkpd2.getText()
                 );
 
                 // Обновляем таблицу
