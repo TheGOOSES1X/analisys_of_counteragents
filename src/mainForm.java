@@ -237,6 +237,7 @@ public class mainForm extends JFrame {
 
     private DatabaseManager dbManager;
     private JComboBox<String> comboBoxProfileCriterion;
+    private JPanel ParserPanel;
 
 
     public enum Role {
@@ -262,6 +263,7 @@ public class mainForm extends JFrame {
         buttonCritEditAddPoint.setEnabled(isExpert);
         buttonSync.setEnabled(isExpert);
         buttonCreateProfile.setEnabled(isExpert);
+        ParserPanel.setVisible(isExpert);
 
         // И так далее для всех элементов
         textFieldCritEditWeight.setEditable(isExpert);
