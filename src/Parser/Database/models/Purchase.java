@@ -40,7 +40,7 @@ public class Purchase {
     private Customer customer;
 
     @OneToOne(cascade = CascadeType.ALL, orphanRemoval = true)
-    @JoinColumn(name = "contract_id") // внешний ключ в таблице purchases
+    @JoinColumn(name = "contract_id", unique = true) // добавьте unique=true
     private Contract contract;
 
     @Column(name = "executor", columnDefinition = "text")
@@ -57,6 +57,9 @@ public class Purchase {
 
     @Column(name = "auction_date")
     private LocalDate auctionDate;
+
+    @Column(name = "complaints")
+    private Integer complaints;
 
     @Column(name = "procurement_stage", columnDefinition = "text")
     private String procurementStage;
@@ -186,10 +189,16 @@ public class Purchase {
         return procurementStage;
     }
 
+    public Integer getComplaints() {
+        return complaints;
+    }
+
     public void setProcurementStage(String procurementStage) {
         this.procurementStage = procurementStage;
     }
-
+    public void setComplaints(Integer Complaints) {
+        this.complaints = Complaints;
+    }
     public Contract getContract() {
         return contract;
     }

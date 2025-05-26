@@ -56,7 +56,6 @@ public class JudicialProceeding {
     @Column(name = "outcome", columnDefinition = "TEXT")
     private String outcome;
 
-
     @Transient
     private static final Pattern DURATION_PATTERN = Pattern.compile(
             "(?:(\\d+) год(?:а|ов)?)?\\s*(?:(\\d+) месяц(?:а|ев)?)?\\s*(?:(\\d+) д(?:ень|ня|ней))?"

@@ -1,5 +1,7 @@
 package Parser.utils;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -23,11 +25,13 @@ public class Okpd2Converter {
     private static final ObjectMapper mapper = new ObjectMapper();
 
     // Загрузка данных из JSON файла
-    public static void loadFromJson(String filePath) throws IOException {
-        okpd2Data = mapper.readValue(
-                new File(filePath),
-                new TypeReference<Map<String, Okpd2Entry>>(){}
-        );
+    public static void loadFromJson(String resourcePath) throws IOException {
+        try (InputStream inputStream = Okpd2Converter.class.getClassLoader().getResourceAsStream(resourcePath)) {
+            if (inputStream == null) {
+                throw new IOException("Resource not found: " + resourcePath);
+            }
+            okpd2Data = mapper.readValue(inputStream, new TypeReference<Map<String, Okpd2Entry>>(){});
+        }
     }
 
     // Получение ID по коду ОКПД2
@@ -53,19 +57,23 @@ public class Okpd2Converter {
 
         return null;
     }
-    public static void fillComboBoxWithCurrencies(JComboBox<String> comboBox, String jsonFilePath) {
+    public static void fillComboBoxWithCurrencies(JComboBox<String> comboBox, String resourcePath) {
         try {
             comboBox.removeAllItems();
 
-            String content = new String(Files.readAllBytes(Paths.get(jsonFilePath)));
-            JsonArray currencies = JsonParser.parseString(content).getAsJsonArray();
+            try (InputStream inputStream = Okpd2Converter.class.getClassLoader().getResourceAsStream(resourcePath)) {
+                if (inputStream == null) {
+                    throw new IOException("Resource not found: " + resourcePath);
+                }
+                String content = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+                JsonArray currencies = JsonParser.parseString(content).getAsJsonArray();
 
-            for (JsonElement element : currencies) {
-                JsonObject currency = element.getAsJsonObject();
-                String name = currency.get("name").getAsString();
-                comboBox.addItem(name);
+                for (JsonElement element : currencies) {
+                    JsonObject currency = element.getAsJsonObject();
+                    String name = currency.get("name").getAsString();
+                    comboBox.addItem(name);
+                }
             }
-
         } catch (Exception e) {
             e.printStackTrace();
             JOptionPane.showMessageDialog(null,
@@ -76,8 +84,11 @@ public class Okpd2Converter {
     }
 
     public static String getCurrencyIdByName(String currencyName) {
-        try {
-            String content = new String(Files.readAllBytes(Paths.get("src/currency.json")));
+        try (InputStream inputStream = Okpd2Converter.class.getClassLoader().getResourceAsStream("resources/currency.json")) {
+            if (inputStream == null) {
+                return null;
+            }
+            String content = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
             JsonArray currencies = JsonParser.parseString(content).getAsJsonArray();
 
             for (JsonElement element : currencies) {

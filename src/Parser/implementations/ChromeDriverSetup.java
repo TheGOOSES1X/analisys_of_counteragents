@@ -26,6 +26,7 @@ public class ChromeDriverSetup implements DriverSetup {
         options.addArguments("--disable-gpu");
         options.addArguments("--headless");
         options.addArguments("--window-size=1920,1080");
+        options.setExperimentalOption("detach", false); // Закрывать браузер при завершении
 
         // Добавляем динамически заданный user-agent
         if (userAgent != null && !userAgent.isEmpty()) {

@@ -3,11 +3,12 @@ import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import static Parser.implementations.Parser44.Contracts.ParserUtils.parseStateContractId;
+import static Parser.utils.ParserUtils.parseStateContractId;
 import static Parser.implementations.Parser44.Contracts.WebTableParserContract.*;
 
 public class ContractDataExtractor {
@@ -155,6 +156,171 @@ public class ContractDataExtractor {
         }
 
         return contractData;
+    }
+
+
+    public Map<String, Object> parseAndPrintGeneralContractData(String contractDraftUrl,WebDriver driver, WebDriverWait wait) {
+        Map<String, Object> contractData = new LinkedHashMap<>();
+
+        try {
+            driver.get(contractDraftUrl);
+
+            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("div.container")));
+
+            // Получаем все блоки с информацией
+            List<WebElement> infoBlocks = driver.findElements(By.cssSelector("div.blockInfo"));
+
+            for (WebElement block : infoBlocks) {
+                // Извлекаем заголовок блока
+                String blockTitle = getElementTextSafely(block, "h2.blockInfo__title, h2.blockInfo__title_sub");
+
+                // Парсим все секции в блоке
+                List<WebElement> sections = block.findElements(By.cssSelector("section.blockInfo__section"));
+                Map<String, String> sectionData = new LinkedHashMap<>();
+
+                for (WebElement section : sections) {
+                    String title = getElementTextSafely(section, "span.section__title");
+                    String value = getElementTextSafely(section, "span.section__info")
+                            .replace("&nbsp;", " ") // Заменяем HTML-пробелы
+                            .trim();
+
+                    if (!title.isEmpty() && !value.isEmpty()) {
+                        sectionData.put(title, value);
+                    } else if (title.isEmpty() && !value.isEmpty()) {
+                        // Для секций без заголовка (как в блоке национального режима)
+                        sectionData.put("Информация", value);
+                    }
+                }
+
+                // Обработка таблиц внутри блоков
+                try {
+                    WebElement table = block.findElement(By.cssSelector("table.blockInfo__table"));
+                    Map<String, String> tableData = parseSimpleTable(table);
+                    sectionData.putAll(tableData);
+                } catch (NoSuchElementException e) {
+                    // Таблица не найдена - это нормально
+                }
+
+                // Добавляем данные блока в общий результат
+                if (!sectionData.isEmpty()) {
+                    if (blockTitle != null && !blockTitle.isEmpty()) {
+                        contractData.put(blockTitle, sectionData);
+                    } else {
+                        contractData.putAll(sectionData);
+                    }
+                }
+            }
+
+            // Вывод результата в консоль
+//            System.out.println("=== Результат парсинга общих данных контракта ===");
+//            for (Map.Entry<String, Object> entry : contractData.entrySet()) {
+//                System.out.println("\n" + entry.getKey() + ":");
+//                if (entry.getValue() instanceof Map) {
+//                    Map<?, ?> subMap = (Map<?, ?>) entry.getValue();
+//                    subMap.forEach((k, v) -> System.out.println("  " + k + ": " + v));
+//                } else {
+//                    System.out.println("  " + entry.getValue());
+//                }
+//            }
+
+        } catch (Exception e) {
+            System.out.println("Ошибка при парсинге общих данных контракта: " + e.getMessage());
+        }
+
+        return contractData;
+    }
+
+    public Map<String, Object> parseSuppliersInfo(String url, WebDriver driver, WebDriverWait wait) {
+        Map<String, Object> suppliersData = new LinkedHashMap<>();
+        driver.get(url);
+
+        try {
+            wait.until(ExpectedConditions.presenceOfElementLocated(
+                    By.xpath("//h2[contains(text(), 'Информация о поставщиках')]")));
+
+            List<WebElement> tables = driver.findElements(
+                    By.xpath("//h2[contains(text(), 'Информация о поставщиках')]/following::table[contains(@class, 'blockInfo__table')]"));
+
+            List<Map<String, String>> suppliersList = new ArrayList<>();
+
+            for (WebElement table : tables) {
+                List<WebElement> rows = table.findElements(By.cssSelector("tbody tr.tableBlock__row"));
+
+                for (WebElement row : rows) {
+                    Map<String, String> supplierInfo = new LinkedHashMap<>();
+
+                    // Получаем все ячейки в строке (6 колонок, последняя пустая)
+                    List<WebElement> cells = row.findElements(By.cssSelector("td"));
+
+                    // 1. Организация и ИНН (первая колонка)
+                    WebElement orgCell = cells.get(0);
+                    String orgText = orgCell.getText();
+                    String[] orgLines = orgText.split("\n");
+
+                    supplierInfo.put("Организация", orgLines[0].trim());
+
+                    // ИНН
+                    try {
+                        String inn = orgCell.findElement(By.xpath(".//span[contains(@class,'grey-main-light') and contains(text(),'ИНН:')]/following-sibling::span"))
+                                .getText().trim();
+                        supplierInfo.put("ИНН", inn);
+                    } catch (NoSuchElementException e) {
+                        supplierInfo.put("ИНН", null);
+                    }
+
+                    // КПП
+                    try {
+                        String kpp = orgCell.findElement(By.xpath(".//span[contains(@class,'grey-main-light') and contains(text(),'КПП:')]/following-sibling::span"))
+                                .getText().trim();
+                        supplierInfo.put("КПП", kpp);
+                    } catch (NoSuchElementException e) {
+                        supplierInfo.put("КПП", null);
+                    }
+
+                    // 2. Страна и код страны (вторая колонка)
+                    if (cells.size() > 1) {
+                        String countryText = cells.get(1).getText().trim();
+                        String[] countryParts = countryText.split("\n");
+                        supplierInfo.put("Страна", countryParts[0].trim());
+                        if (countryParts.length > 1) {
+                            supplierInfo.put("Код страны", countryParts[1].trim());
+                        }
+                    }
+
+                    // 3. Адрес места нахождения (третья колонка)
+                    if (cells.size() > 2) {
+                        supplierInfo.put("Адрес места нахождения", cells.get(2).getText().trim());
+                    }
+
+                    // 4. Почтовый адрес (четвертая колонка)
+                    if (cells.size() > 3) {
+                        supplierInfo.put("Почтовый адрес", cells.get(3).getText().trim());
+                    }
+
+                    // 5. Контактная информация (пятая колонка)
+                    if (cells.size() > 4) {
+                        String contactsText = cells.get(4).getText().trim();
+                        String[] contacts = contactsText.split("\n");
+                        if (contacts.length > 0) {
+                            supplierInfo.put("Телефон", contacts[0].trim());
+                        }
+                        if (contacts.length > 1) {
+                            supplierInfo.put("Email", contacts[1].trim());
+                        }
+                    }
+
+                    suppliersList.add(supplierInfo);
+                }
+            }
+
+            suppliersData.put("Поставщики", suppliersList);
+
+        } catch (Exception e) {
+            System.out.println("Ошибка при парсинге информации о поставщиках: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return suppliersData;
     }
 
     // Вспомогательный метод для безопасного получения текста элемента

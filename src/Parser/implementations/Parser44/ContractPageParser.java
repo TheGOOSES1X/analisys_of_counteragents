@@ -26,61 +26,44 @@ public class ContractPageParser {
         this.modelFiller = new ContractModelFiller();
     }
     public Contract parseContractInfo(String originalUrl, WebDriver driver, WebDriverWait wait) {
+        String originalPage = driver.getCurrentUrl();
         try {
-            String contractDraftUrl = urlExtractor.findContractDraftUrl(originalUrl, driver, wait);
-            if (contractDraftUrl == null) {
-                System.out.println("Не удалось найти URL черновика контракта");
-                return null;
-            }
+            // Сохраняем текущее состояние
 
-            String currentUrl = driver.getCurrentUrl();
             Set<Cookie> cookies = driver.manage().getCookies();
 
             try {
-                Map<String, Object> contractDetails;
+                // Основная логика парсинга
+                String contractInfoUrl = urlExtractor.findContractUrlByRegNumber(originalUrl, driver, wait);
+                if (contractInfoUrl == null) return null;
 
-                if (contractDraftUrl.contains("contract-draft.html")) {
-                    contractDetails = dataExtractor.parseContractDraft(contractDraftUrl, driver, wait);
-                } else if (contractDraftUrl.contains("common-info.html")) {
-                    contractDetails = dataExtractor.parseCommonInfoContract(contractDraftUrl, driver, wait);
-                } else {
-                    System.out.println("Неизвестный тип страницы контракта: " + contractDraftUrl);
-                    return null;
-                }
-
+                Map<String, Object> contractDetails = dataExtractor.parseAndPrintGeneralContractData(contractInfoUrl, driver, wait);
                 Contract contract = new Contract();
                 Supplier supplier = new Supplier();
 
-                if (contractDraftUrl.contains("contract-draft.html")) {
-                    modelFiller.fillContractModel(contract, contractDetails);
-                    modelFiller.fillSupplierModel(supplier, contractDetails);
-                }
-                if (contractDraftUrl.contains("common-info.html")) {
-                    modelFiller.fillContractModelFromCommonInfo(contract, contractDetails);
-                    modelFiller.fillSupplierModelFromCommonInfo(supplier, contractDetails);
-                }
-
-//                modelFiller.fillSupplierModel(supplier, contractDetails);
+                Map<String, Object> suppliersData = dataExtractor.parseSuppliersInfo(contractInfoUrl, driver, wait);
+                modelFiller.fillSupplierModel(supplier, suppliersData);
+                modelFiller.fillContractModel(contract, contractDetails);
                 contract.setSupplier(supplier);
 
                 return contract;
             } finally {
-                // Восстановление состояния браузера
+                // Всегда возвращаемся на исходную страницу
                 try {
-                    driver.get(currentUrl);
+                    driver.get(originalPage);
                     cookies.forEach(cookie -> {
                         try {
                             driver.manage().addCookie(cookie);
                         } catch (Exception e) {
-                            System.out.println("Ошибка при восстановлении куки: " + e.getMessage());
+                            System.err.println("Error restoring cookie: " + cookie.getName());
                         }
                     });
                 } catch (Exception e) {
-                    System.out.println("Ошибка при восстановлении состояния браузера: " + e.getMessage());
+                    System.err.println("Error restoring original page state: " + e.getMessage());
                 }
             }
         } catch (Exception e) {
-            System.out.println("Ошибка при парсинге контракта: " + e.getMessage());
+            System.err.println("Contract parsing error: " + e.getMessage());
             return null;
         }
     }

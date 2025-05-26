@@ -13,17 +13,17 @@ public class Supplier {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "type")
+    @Column(name = "type", columnDefinition = "TEXT")
     private String type;
 
     @NaturalId
     @Column(name = "name", columnDefinition = "TEXT", unique = true)
     private String name;
 
-    @Column(name = "country_name")
+    @Column(name = "country_name", columnDefinition = "TEXT")
     private String countryName;
 
-    @Column(name = "country_code", length = 3)
+    @Column(name = "country_code", columnDefinition = "TEXT")
     private String countryCode;
 
     @Column(name = "address", columnDefinition = "TEXT")
@@ -41,16 +41,16 @@ public class Supplier {
     @Column(name = "kpp", length = 9)
     private String kpp;
 
-    @Column(name = "status")
+    @Column(name = "status", columnDefinition = "TEXT")
     private String status;
 
-    @Column(name = "email")
+    @Column(name = "email", columnDefinition = "TEXT")
     private String email;
 
-    @Column(name = "phone")
+    @Column(name = "phone" , columnDefinition = "TEXT")
     private String phone;
 
-    @OneToMany(mappedBy = "supplier")
+    @OneToMany(mappedBy = "supplier", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Contract> contracts = new ArrayList<>();
 
 

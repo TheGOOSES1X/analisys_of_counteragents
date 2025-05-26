@@ -1,6 +1,7 @@
 package Parser.implementations.Parser44;
 
 import Parser.Database.models.*;
+import Parser.implementations.Parser44.Contracts.ComplaintsURLGetter;
 import org.openqa.selenium.*;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -9,15 +10,22 @@ import java.time.format.DateTimeFormatter;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.NoSuchElementException;
-import java.util.stream.Collectors;
+
+import static Parser.utils.ParserUtils.parsePrice;
 
 public class PurchasePageParser {
+    private final ComplaintsURLGetter complaintsCounter;
+
+    public PurchasePageParser() {
+        this.complaintsCounter = new ComplaintsURLGetter();
+    }
+
     public Purchase parsePurchasePage(String url, WebDriver driver, WebDriverWait wait) {
         try {
 
             Purchase purchase = new Purchase();
 
-            parseCardMainInfo(driver, wait, purchase);
+            parseCardMainInfo(wait, purchase);
             // 2. Собираем все данные со страницы
             Map<String, String> allData = collectAllSectionData(driver);
 
@@ -34,11 +42,11 @@ public class PurchasePageParser {
 //            System.out.println("=======================================\n");
 
             // Парсим объекты закупки
-            List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
-            procurementObjects.forEach(purchase::addProcurementObject);
+
+
 
             // Выводим информацию о количестве найденных объектов
-            System.out.println("Найдено объектов закупки: " + procurementObjects.size());
+//            System.out.println("Найдено объектов закупки: " + procurementObjects.size());
 
             // 4. Заполняем поля закупки из собранных данных
 
@@ -70,13 +78,21 @@ public class PurchasePageParser {
                 purchase.setUpdateDate(parseDate(dateData.get("Обновлено")));
             }
 
+            int complaintsCount = complaintsCounter.countComplaintsByRegNumber(url, driver, wait);
+            purchase.setComplaints(complaintsCount);
+
+            List<ProcurementObject> procurementObjects = parseProcurementObjectsTable(driver);
+            procurementObjects.forEach(purchase::addProcurementObject);
+
             return purchase;
 
         } catch (Exception e) {
             throw new RuntimeException("Ошибка парсинга страницы закупки: " + e.getMessage(), e);
         }
     }
-    private void parseCardMainInfo(WebDriver driver, WebDriverWait wait, Purchase purchase) {
+
+
+    private void parseCardMainInfo( WebDriverWait wait, Purchase purchase) {
         try {
             // 1. Ожидаем загрузки всей секции
             WebElement sectionMainInfo = wait.until(ExpectedConditions.presenceOfElementLocated(
@@ -99,14 +115,18 @@ public class PurchasePageParser {
 
             // 5. Парсим объект закупки (может отсутствовать)
             try {
-                purchase.setPurchaseObject(sectionMainInfo.findElement(
-                                By.xpath(".//div[contains(@class,'cardMainInfo__section')]" +
-                                        "[.//span[contains(@class,'cardMainInfo__title') and " +
-                                        "contains(text(),'Объект закупки')]]"))
-                        .findElement(By.cssSelector("span.cardMainInfo__content"))
-                        .getText().trim());
-            } catch (NoSuchElementException e) {
-                System.out.println("Объект закупки не указан");
+                WebElement purchaseObjectElement = sectionMainInfo.findElement(
+                        By.xpath(".//div[contains(@class,'cardMainInfo__section')]" +
+                                "[.//span[contains(@class,'cardMainInfo__title') and " +
+                                "contains(text(),'Объект закупки')]]//span[@class='cardMainInfo__content']"));
+
+                if (purchaseObjectElement != null) {
+                    purchase.setPurchaseObject(purchaseObjectElement.getText().trim());
+                } else {
+                    purchase.setPurchaseObject(null);
+                }
+            } catch (Exception e) {
+                System.out.println("Объект закупки не указан или не найден: " + e.getMessage());
                 purchase.setPurchaseObject(null);
             }
 
@@ -121,7 +141,7 @@ public class PurchasePageParser {
         Map<String, Integer> titleCounts = new HashMap<>();
 
         try {
-            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+            WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(10));
             List<WebElement> containers = wait.until(ExpectedConditions
                     .presenceOfAllElementsLocatedBy(By.cssSelector("div.container")));
 
@@ -239,29 +259,42 @@ public class PurchasePageParser {
             // Ищем таблицу внутри этого контейнера
             WebElement table = container.findElement(By.cssSelector("table.blockInfo__table.tableBlock"));
 
-            // Остальной код парсинга остается таким же
-            List<WebElement> rows = table.findElements(By.cssSelector("tbody.tableBlock__body tr.tableBlock__row"));
+            // Получаем все строки таблицы, но исключаем скрытые строки с дополнительной информацией
+            List<WebElement> rows = table.findElements(By.cssSelector("tbody.tableBlock__body tr.tableBlock__row:not([style*='display: none'])"));
 
             for (WebElement row : rows) {
                 try {
+                    // Пропускаем строки, которые являются заголовками дополнительной информации
+                    if (row.getAttribute("class") != null && row.getAttribute("class").startsWith("truInfo_")) {
+                        continue;
+                    }
+
                     ProcurementObject obj = new ProcurementObject();
-                    List<WebElement> cells = row.findElements(By.tagName("td"));
+                    List<WebElement> cells = row.findElements(By.cssSelector("td.tableBlock__col:not([colspan])"));
 
-                    // Парсинг данных из ячеек
-                    if (cells.size() > 1) obj.setKtruOkpd2Codes(cells.get(1).getText().trim());
-                    if (cells.size() > 2) obj.setName(cells.get(2).getText().trim());
-                    if (cells.size() > 3) obj.setUnit(cells.get(3).getText().trim());
+                    // Парсинг данных из ячеек только если есть достаточное количество ячеек
+                    if (cells.size() >= 7) {
+                        // Код позиции (удаляем лишние пробелы и переносы строк)
+                        String code = cells.get(1).getText().replaceAll("\\s+", " ").trim();
+                        obj.setKtruOkpd2Codes(code);
 
-                    if (cells.size() > 4) {
+                        // Наименование товара
+                        String name = cells.get(2).getText().replaceAll("\\s+", " ").trim();
+                                obj.setName(name);
+
+                        // Единица измерения
+                        String unit = cells.get(3).getText().trim();
+                        obj.setUnit(unit);
+
+                        // Количество
                         String quantityStr = cells.get(4).getText().trim().replace(",", ".");
                         try {
                             obj.setQuantity(new BigDecimal(quantityStr));
                         } catch (Exception e) {
                             System.out.println("Ошибка парсинга количества: " + quantityStr);
                         }
-                    }
 
-                    if (cells.size() > 5) {
+                        // Цена за единицу
                         String priceStr = cells.get(5).getText()
                                 .replaceAll("[^\\d.]", "")
                                 .trim();
@@ -270,9 +303,8 @@ public class PurchasePageParser {
                         } catch (Exception e) {
                             System.out.println("Ошибка парсинга цены: " + priceStr);
                         }
-                    }
 
-                    if (cells.size() > 6) {
+                        // Сумма
                         String amountStr = cells.get(6).getText()
                                 .replaceAll("[^\\d.]", "")
                                 .trim();
@@ -281,44 +313,31 @@ public class PurchasePageParser {
                         } catch (Exception e) {
                             System.out.println("Ошибка парсинга суммы: " + amountStr);
                         }
+
+                        if (isValidProcurementObject(obj)) {
+                            procurementObjects.add(obj);
+                        }
                     }
-
-                    procurementObjects.add(obj);
-
-                    // Логирование для отладки
-//                    System.out.println("Добавлен объект закупки:");
-//                    System.out.println("Код: " + obj.getKtruOkpd2Codes());
-//                    System.out.println("Наименование: " + obj.getName());
-//                    System.out.println("Ед.изм: " + obj.getUnit());
-//                    System.out.println("Количество: " + obj.getQuantity());
-//                    System.out.println("Цена за ед.: " + obj.getPricePerUnit());
-//                    System.out.println("Стоимость: " + obj.getTotalAmount());
-//                    System.out.println("----------------------");
-
                 } catch (Exception e) {
                     System.out.println("Ошибка при парсинге строки таблицы: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
-
-            // Парсим итоговую сумму
-            try {
-                WebElement footer = table.findElement(By.cssSelector("tfoot.tableBlock__foot"));
-                String totalAmountStr = footer.findElement(By.cssSelector("span.cost"))
-                        .getText()
-                        .replaceAll("[^\\d.]", "")
-                        .trim();
-//                System.out.println("Итоговая сумма: " + totalAmountStr);
-            } catch (Exception e) {
-                System.out.println("Не удалось распарсить итоговую сумму: " + e.getMessage());
-            }
-
-        } catch (NoSuchElementException e) {
-            System.out.println("Не найден контейнер с объектами закупки (positionKTRU)");
         } catch (Exception e) {
-            System.out.println("Ошибка при парсинге таблицы объектов закупки: " + e.getMessage());
+            System.out.println("Ошибка при поиске таблицы с объектами закупки: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return procurementObjects;
+    }
+
+    private boolean isValidProcurementObject(ProcurementObject obj) {
+        return obj.getKtruOkpd2Codes() != null ||
+                obj.getName() != null ||
+                obj.getUnit() != null ||
+                obj.getQuantity() != null ||
+                obj.getPricePerUnit() != null ||
+                obj.getTotalAmount() != null;
     }
     private LocalDate parseDate(String dateStr) {
         if (dateStr == null || dateStr.trim().isEmpty()) return null;
@@ -330,15 +349,7 @@ public class PurchasePageParser {
             return null;
         }
     }
-    private BigDecimal parsePrice(String priceStr) {
-        if (priceStr == null || priceStr.trim().isEmpty()) return null;
-        try {
-            return new BigDecimal(priceStr.replaceAll("[^\\d.]", ""));
-        } catch (Exception e) {
-            System.out.println("Ошибка парсинга цены: " + priceStr);
-            return null;
-        }
-    }
+
 
     // Метод для создания скринш
 }
