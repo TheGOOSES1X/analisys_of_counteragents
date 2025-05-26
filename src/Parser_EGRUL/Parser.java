@@ -22,6 +22,7 @@ import java.util.List;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class Parser {
@@ -38,19 +39,21 @@ public class Parser {
 
     public interface ProgressUpdater {
         void incrementProgress();
-        void updateStatus(int fileNumber);
+        void updateStatus(String text);
+        void defineBarMaximum(int fileNumber);
     }
 
-    public static void asyncEGRULParse(List<String> list, ChromeOptions options, ProgressUpdater updater) throws IOException {
-        // Создаем пул потоков
+    public static void asyncEGRULParse(List<String> list, ChromeOptions options, ProgressUpdater updater, AtomicBoolean isStopped) throws IOException {
         ExecutorService executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
-        // Создаем список Future для отслеживания результатов
         List<Future<?>> futures = new ArrayList<>();
-        // Разделяем список на части для каждого потока
+
         for (String key : list) {
+            if (isStopped.get()) {  // Проверяем флаг
+                break;
+            }  // Проверяем флаг
             futures.add(executor.submit(() -> {
                 try {
-                    innEGRULParse(key, options, updater);
+                    innEGRULParse(key, options, updater, isStopped);
                 } catch (InterruptedException e) {
                     log.error("e: ", e);
                     throw new RuntimeException(e);
@@ -59,26 +62,43 @@ public class Parser {
         }
 
         for (Future<?> future : futures) {
+            if (isStopped.get()) {
+                break;
+            }
             try {
                 future.get();
             } catch (InterruptedException | ExecutionException e) {
                 System.out.println("Ошибка в потоке: " + e.getMessage());
             }
+
         }
 
         executor.shutdown();
 
-        if (countRemainingUrls() > 1){
+
+        if (!isStopped.get() && countRemainingUrls() > 1){
             list = Files.readAllLines(Paths.get(CSV_FILE));
             System.out.println("Ссылки ещё остались, продолжаем");
-            asyncEGRULParse(list, options, updater);
+            asyncEGRULParse(list, options, updater, isStopped);
         }
+
     }
 
-    private static void innEGRULParse(String key, ChromeOptions options, ProgressUpdater updater) throws InterruptedException {
+    private static void innEGRULParse(String key, ChromeOptions options, ProgressUpdater updater, AtomicBoolean isStopped) throws InterruptedException {
+        if (isStopped.get()) {
+            //System.out.println("Остановлено по запросу внутри самого парсинга");
+            return;
+        }
+
         WebDriver driver = null;
         try {
             driver = new ChromeDriver(options);
+
+            if (Thread.currentThread().isInterrupted()) {
+                System.out.println("Внутри WebDriver остановлен");
+                throw new InterruptedException();
+            }
+
             WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(TIMEOUT_SECONDS));
 
             driver.get(url);
@@ -97,12 +117,13 @@ public class Parser {
                 }
                 endButton = wait.until(ExpectedConditions.elementToBeClickable(endButton));
                 endButton.click();
-                Thread.sleep(5000);
+
+                safeSleep(5000);
                 System.out.println("Успешно обработан " + key);
+
                 removeUrlFromCSV(key);
                 updater.incrementProgress();
-                updater.updateStatus(countRemainingUrls()+1);
-                //System.out.println("Осталось обработать " + (countRemainingUrls()+1));
+                updater.updateStatus("Осталось: " + countRemainingUrls());
             } catch (TimeoutException e) {
                 try {
                     List<WebElement> infoFileButtons = wait.until(ExpectedConditions.presenceOfAllElementsLocatedBy(
@@ -116,12 +137,11 @@ public class Parser {
                     for (WebElement button : infoFileButtons) {
                         WebElement clickableButton = wait.until(ExpectedConditions.elementToBeClickable(button));
                         clickableButton.click();
-                        Thread.sleep(5000);
+                        safeSleep(5000);
                         System.out.println("Успешно обработан: " + key);  // key можно заменить на что-то осмысленное
                         removeUrlFromCSV(key);
                         updater.incrementProgress();
-                        updater.updateStatus(countRemainingUrls()+1);
-                        //System.out.println("Осталось обработать " + (countRemainingUrls()+1));
+                        updater.updateStatus("Осталось: " + countRemainingUrls());
                     }
                 } catch (TimeoutException ex) {
                     System.out.println("Ни одна из кнопок не появилась в течение " + TIMEOUT_SECONDS + " секунд для: " + key);
@@ -132,12 +152,12 @@ public class Parser {
         } finally {
             if (driver != null) {
                 driver.quit();
-                Thread.sleep(3000);
+                safeSleep(3000);
             }
         }
     }
 
-    public static void StartParsingEGRUL (ProgressUpdater updater) throws IOException {
+    public static void StartParsingEGRUL (AtomicBoolean isStopped, ProgressUpdater updater) throws IOException {
         List<String> INN_list;
 
         // Проверяем существование файла
@@ -172,11 +192,14 @@ public class Parser {
             }
         }
 
+        updater.defineBarMaximum(INN_list.size());
+        updater.updateStatus("Осталось: " + INN_list.size());
+
         System.setProperty("webdriver.chrome.silentOutput", "true");
         WebDriverManager.chromedriver().setup();
         ChromeOptions options = getChromeOptions();
 
-        asyncEGRULParse(INN_list, options, updater);
+        asyncEGRULParse(INN_list, options, updater, isStopped);
 
         System.out.println("Сбор PDF файлов по ИНН завершён");
     }
@@ -234,5 +257,13 @@ public class Parser {
         options.setExperimentalOption("excludeSwitches", new String[]{"enable-automation"});
 
         return options;
+    }
+    public static void safeSleep(long millis) throws InterruptedException {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw e;  // Пробрасываем исключение дальше
+        }
     }
 }
