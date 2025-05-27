@@ -1608,7 +1608,9 @@ public class DatabaseManager {
             boolean db_module, String CritString, String CritShort,
             String filterContrasName, String filterGoodName,
             String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
-
+        if (CritString == null || CritString.trim().isEmpty()) {
+            throw new IllegalArgumentException("Некорректное имя столбца критерия");
+        }
         List<rowCritValues> filteredCrVa = new ArrayList<>();
 
         // Базовый запрос с использованием StringBuilder для безопасности

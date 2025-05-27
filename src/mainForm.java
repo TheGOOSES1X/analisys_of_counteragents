@@ -572,17 +572,31 @@ public class mainForm extends JFrame {
         comboBoxProfileCriterion.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String selectedProfile = (String) comboBoxProfileCriterion.getSelectedItem();
+                try {
+                    String selectedProfile = (String) comboBoxProfileCriterion.getSelectedItem();
 
-                if (selectedProfile != null && !selectedProfile.isEmpty()) {
+                    if (selectedProfile == null || selectedProfile.isEmpty()) {
+                        return;
+                    }
+
                     boolean success = dbExtractor.applyProfileByName(selectedProfile);
 
                     if (success) {
                         JOptionPane.showMessageDialog(null, "Профиль \"" + selectedProfile + "\" успешно применён!");
-                        updateCritValues(); // если реализовано
+
+                        // Проверяем, установлены ли CritString/CritShort перед обновлением
+                        if (CritString != null && !CritString.isEmpty() &&
+                                CritShort != null && !CritShort.isEmpty()) {
+                            updateCritValues();
+                        }
                     } else {
                         JOptionPane.showMessageDialog(null, "Ошибка при применении профиля.");
                     }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(null,
+                            "Ошибка при обработке профиля: " + ex.getMessage(),
+                            "Ошибка", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
                 }
             }
         });
@@ -2427,33 +2441,51 @@ public class mainForm extends JFrame {
         return 0;
     }
 
+    // В конструкторе или при объявлении поля:
     private void updateTableContrasGoodsOrdersWes(List<rowContrasGoodsOrdersWithWeights> rowsCGOws) {
         if (tableRating != null) {
-            // Очищаем таблицу перед обновлением данных
             clearTable(tableRating);
 
-            DefaultTableModel modelContrasGoodsOrdersWeights = (DefaultTableModel) tableRating.getModel();
+            DefaultTableModel model = new DefaultTableModel();
+            model.addColumn("Заказ");
+            model.addColumn("Контрагент");
+            model.addColumn("Товар");
+            model.addColumn("Срок поставки");
+            model.addColumn("Вес. срок поставки");
+            model.addColumn("Мин. объем");
+            model.addColumn("Вес. мин. объем");
+            model.addColumn("Качество товара");
+            model.addColumn("Вес. качество товара");
+            model.addColumn("Репутация контрагента");
+            model.addColumn("Вес. репутация контрагента");
+            model.addColumn("Итоговый рейтинг");
+            model.addColumn("Категория"); // 13-я колонка
 
-            for (rowContrasGoodsOrdersWithWeights rowCGOw : rowsCGOws) {
-                modelContrasGoodsOrdersWeights.addRow(new Object[]{
-                        rowCGOw.getOrderName(),
-                        rowCGOw.getContrasName(),
-                        rowCGOw.getGoodName(),
-                        formatValue(rowCGOw.getDeliveryTime()),
-                        formatValue(rowCGOw.getDeliveryTimeFinalWeight()),
-                        formatValue(rowCGOw.getMinVolume()),
-                        formatValue(rowCGOw.getMinVolumeFinalWeight()),
-                        formatValue(rowCGOw.getGoodQuality()),
-                        formatValue(rowCGOw.getGoodQualityFinalWeight()),
-                        formatValue(rowCGOw.getContrasReputation()),
-                        formatValue(rowCGOw.getContrasReputationFinalWeight()),
-                        formatValue(rowCGOw.getRatingComplete())
+            for (rowContrasGoodsOrdersWithWeights row : rowsCGOws) {
+                double rating = row.getRatingComplete();
+                String category = getRatingCategoryByNN(row);
+
+                model.addRow(new Object[]{
+                        row.getOrderName(),
+                        row.getContrasName(),
+                        row.getGoodName(),
+                        formatValue(row.getDeliveryTime()),
+                        formatValue(row.getDeliveryTimeFinalWeight()),
+                        formatValue(row.getMinVolume()),
+                        formatValue(row.getMinVolumeFinalWeight()),
+                        formatValue(row.getGoodQuality()),
+                        formatValue(row.getGoodQualityFinalWeight()),
+                        formatValue(row.getContrasReputation()),
+                        formatValue(row.getContrasReputationFinalWeight()),
+                        formatValue(rating),
+                        category
                 });
             }
 
-            // Включаем сортировку после обновления данных
+            tableRating.setModel(model);
+
             try {
-                enableSortingForTable(tableRating, 3, 4, 5, 6, 7, 8, 9, 10, 11); // Указываем числовые столбцы для корректной сортировки
+                enableSortingForTable(tableRating, 3, 4, 5, 6, 7, 8, 9, 10, 11); // сортировка по числовым колонкам
             } catch (Exception e) {
                 System.err.println("Ошибка при применении сортировки: " + e.getMessage());
             }
@@ -2462,7 +2494,28 @@ public class mainForm extends JFrame {
         }
     }
 
+    private NeuralNetwork nn;
+    private String getRatingCategoryByNN(rowContrasGoodsOrdersWithWeights row) {
+        if (nn == null) {
+            nn = new NeuralNetwork(4, 5);
 
+        }
+
+        double[] input = new double[] {
+                row.getDeliveryTimeFinalWeight(),
+                row.getMinVolumeFinalWeight(),
+                row.getGoodQualityFinalWeight(),
+                row.getContrasReputationFinalWeight()
+        };
+
+        double value = nn.predict(input); // исправлено с feedforward на predict
+
+        if (value >= 0.7) return "Надёжный поставщик";
+        else if (value >= 0.4) return "Допустимый поставщик";
+        else return "Ненадёжный поставщик";
+    }
+
+    // В конструкторе или при объявлении поля:
 
 
     private String formatValue(double value) {
