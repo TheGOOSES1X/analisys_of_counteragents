@@ -579,17 +579,31 @@ public class mainForm extends JFrame {
         comboBoxProfileCriterion.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String selectedProfile = (String) comboBoxProfileCriterion.getSelectedItem();
+                try {
+                    String selectedProfile = (String) comboBoxProfileCriterion.getSelectedItem();
 
-                if (selectedProfile != null && !selectedProfile.isEmpty()) {
+                    if (selectedProfile == null || selectedProfile.isEmpty()) {
+                        return;
+                    }
+
                     boolean success = dbExtractor.applyProfileByName(selectedProfile);
 
                     if (success) {
                         JOptionPane.showMessageDialog(null, "Профиль \"" + selectedProfile + "\" успешно применён!");
-                        updateCritValues(); // если реализовано
+
+                        // Проверяем, установлены ли CritString/CritShort перед обновлением
+                        if (CritString != null && !CritString.isEmpty() &&
+                                CritShort != null && !CritShort.isEmpty()) {
+                            updateCritValues();
+                        }
                     } else {
                         JOptionPane.showMessageDialog(null, "Ошибка при применении профиля.");
                     }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(null,
+                            "Ошибка при обработке профиля: " + ex.getMessage(),
+                            "Ошибка", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
                 }
             }
         });
@@ -1065,7 +1079,7 @@ public class mainForm extends JFrame {
 
         DefaultTableModel modelCGOws = new DefaultTableModel(
                 new Object[][]{},
-                new String[]{"Наименование заказа", "Наименование поставщика", "Наименование ТМЦ", "Срок поставки, день", "Минимальная партия поставки, ед.", "Уровень качества ТМЦ по жалобам", "Деловая репутация", "Рейтинг"}
+                new String[]{"Наименование заказа", "Наименование поставщика", "Наименование ТМЦ", "Срок поставки, день", "Минимальная партия поставки, ед.", "Уровень качества ТМЦ по жалобам", "Деловая репутация", "Рейтинг", "Категория"}
         ) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -2449,6 +2463,7 @@ public class mainForm extends JFrame {
             DefaultTableModel modelContrasGoodsOrdersWeights = (DefaultTableModel) tableRating.getModel();
 
             for (rowContrasGoodsOrdersWithWeights rowCGOw : rowsCGOws) {
+                String category = getRatingCategoryByNN(rowCGOw);
                 modelContrasGoodsOrdersWeights.addRow(new Object[]{
                         rowCGOw.getOrderName(),
                         rowCGOw.getContrasName(),
@@ -2457,7 +2472,8 @@ public class mainForm extends JFrame {
                         formatValue(rowCGOw.getMinVolume()),
                         formatValue(rowCGOw.getGoodQuality()),
                         formatValue(rowCGOw.getContrasReputation()),
-                        formatValue(rowCGOw.getRatingComplete())
+                        formatValue(rowCGOw.getRatingComplete()),
+                        category
                 });
             }
 
@@ -2470,6 +2486,27 @@ public class mainForm extends JFrame {
         } else {
             System.out.println("Ошибка: tableRating не инициализирована.");
         }
+    }
+
+    private NeuralNetwork nn;
+    private String getRatingCategoryByNN(rowContrasGoodsOrdersWithWeights row) {
+        if (nn == null) {
+            nn = new NeuralNetwork(4, 5);
+
+        }
+
+        double[] input = new double[] {
+                row.getDeliveryTimeFinalWeight(),
+                row.getMinVolumeFinalWeight(),
+                row.getGoodQualityFinalWeight(),
+                row.getContrasReputationFinalWeight()
+        };
+
+        double value = nn.predict(input); // исправлено с feedforward на predict
+
+        if (value >= 0.7) return "Надёжный поставщик";
+        else if (value >= 0.4) return "Допустимый поставщик";
+        else return "Ненадёжный поставщик";
     }
 
 
