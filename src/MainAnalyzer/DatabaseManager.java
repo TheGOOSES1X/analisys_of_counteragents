@@ -3748,7 +3748,19 @@ public class DatabaseManager {
                 "inn, name, max_complaints, reason, status, " +
                 "total_judicial_proceedings, proceedings_descriptions, okpd2_codes) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
-                "ON CONFLICT (contract_id) DO NOTHING";
+                "ON CONFLICT (contract_id) DO UPDATE SET " +
+                "contract_id = EXCLUDED.contract_id " +
+                "WHERE supplier_summary.inn = EXCLUDED.inn " +
+                "AND supplier_summary.name = EXCLUDED.name " +
+                "AND supplier_summary.start_date = EXCLUDED.start_date " +
+                "AND supplier_summary.end_date = EXCLUDED.end_date " +
+                "AND supplier_summary.contract_duration_days = EXCLUDED.contract_duration_days " +
+                "AND supplier_summary.max_complaints = EXCLUDED.max_complaints " +
+                "AND (supplier_summary.reason IS NOT DISTINCT FROM EXCLUDED.reason) " +
+                "AND (supplier_summary.status IS NOT DISTINCT FROM EXCLUDED.status) " +
+                "AND supplier_summary.total_judicial_proceedings = EXCLUDED.total_judicial_proceedings " +
+                "AND (supplier_summary.proceedings_descriptions IS NOT DISTINCT FROM EXCLUDED.proceedings_descriptions) " +
+                "AND (supplier_summary.okpd2_codes IS NOT DISTINCT FROM EXCLUDED.okpd2_codes)";
 
         try (Connection connection = getConnection(false);
              Statement selectStmt = connection.createStatement();
