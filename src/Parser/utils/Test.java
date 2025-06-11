@@ -21,12 +21,11 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 import javax.swing.*;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Test {
 
@@ -34,15 +33,15 @@ public class Test {
 //        String url1 = "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18049823";
 //        String url2 = "https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18015273";
 //
-        String userAgent = RandomUserAgent.getRandomUserAgent();
-        DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
-        WebDriver  driver = chromeSetup.setupDriver();
-        DocumentDraftUrlFinder finder = new DocumentDraftUrlFinder();
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
+//        String userAgent = RandomUserAgent.getRandomUserAgent();
+//        DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
+//        WebDriver  driver = chromeSetup.setupDriver();
+//        DocumentDraftUrlFinder finder = new DocumentDraftUrlFinder();
+//        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(30));
 //        ContractDataExtractor extractor = new ContractDataExtractor();
 //        extractor.parseAndPrintGeneralContractData("https://zakupki.gov.ru/epz/contract/contractCard/common-info.html?reestrNumber=4780551456224000016",
 //                driver,wait);
-        MainInfoParser223 purchaseParser223 = new MainInfoParser223();
+//        MainInfoParser223 purchaseParser223 = new MainInfoParser223();
 //        purchaseParser223.parsePurchasePage("https://zakupki.gov.ru/epz/order/notice/notice223/common-info.html?noticeInfoId=18345067",driver,wait);
 
 
@@ -67,14 +66,74 @@ public class Test {
 //        ExtractInfoFromDocument extractor = new ExtractInfoFromDocument();
 //        Map<String, Map<String, Object>> participantsData = extractor.extractParticipantsFromAllDocuments();
 //        printParticipantsData(participantsData);
+        String filePath = "All_links.txt";
+        try {
+            // Читаем все строки из файлаs
+            List<String> lines = Files.readAllLines(Paths.get(filePath));
 
+            // Создаем Set для хранения уникальных ссылок
+            Set<String> uniqueLinks = new HashSet<>();
 
+            // Добавляем все ссылки в Set (дубликаты будут автоматически игнорироваться)
+            uniqueLinks.addAll(lines);
+
+            // Выводим результаты
+            System.out.println("Всего ссылок в файле: " + lines.size());
+            System.out.println("Уникальных ссылок: " + uniqueLinks.size());
+
+            if (lines.size() > uniqueLinks.size()) {
+                System.out.println("Найдены дубликаты! Количество дубликатов: " +
+                        (lines.size() - uniqueLinks.size()));
+
+                // Если нужно вывести дубликаты
+                findAndPrintDuplicates(lines);
+            } else {
+                System.out.println("Дубликатов не найдено.");
+            }
+
+        } catch (IOException e) {
+            System.err.println("Ошибка при чтении файла: " + e.getMessage());
+        }
+        String outputFilePath = "unique_links.txt";
+        try {
+            // Читаем все строки из файла
+            List<String> allLinks = Files.readAllLines(Paths.get(filePath));
+
+            // Используем Set для автоматического удаления дубликатов
+            Set<String> uniqueLinks = new HashSet<>(allLinks);
+
+            // Сохраняем уникальные ссылки в новый файл
+            Files.write(Path.of(outputFilePath), uniqueLinks);
+
+            // Выводим отчет
+            System.out.println("✅ Готово!");
+            System.out.println("Всего ссылок в исходном файле: " + allLinks.size());
+            System.out.println("Уникальных ссылок (без дубликатов): " + uniqueLinks.size());
+            System.out.println("Сохранено в файл: " + outputFilePath);
+
+        } catch (IOException e) {
+            System.err.println("❌ Ошибка: " + e.getMessage());
+        }
 
 
 // Вывод результатов
 
     }
+    private static void findAndPrintDuplicates(List<String> lines) {
+        Set<String> seen = new HashSet<>();
+        Set<String> duplicates = new HashSet<>();
 
+        for (String link : lines) {
+            if (!seen.add(link)) {
+                duplicates.add(link);
+            }
+        }
+
+        if (!duplicates.isEmpty()) {
+            System.out.println("\nСписок дублирующихся ссылок:");
+            duplicates.forEach(System.out::println);
+        }
+    }
     private static void printParticipantsData(Map<String, Map<String, Object>> participantsData) {
         if (participantsData.isEmpty()) {
             System.out.println("Не найдено данных об участниках.");

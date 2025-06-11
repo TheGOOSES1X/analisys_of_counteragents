@@ -2,6 +2,8 @@ package Parser.implementations;
 
 import Parser.interfaces.PurchaseItem;
 
+import java.util.Objects;
+
 public class PurchaseItemImpl implements PurchaseItem {
     private final String number;
     private final String url;
@@ -40,5 +42,17 @@ public class PurchaseItemImpl implements PurchaseItem {
                 "Номер: %s\nСсылка: %s\nОбъект закупки: %s\nЗаказчик: %s\n",
                 number, url, purchaseObject, customer
         );
+    }
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        PurchaseItemImpl that = (PurchaseItemImpl) o;
+        return Objects.equals(url, that.url); // Сравниваем по URL
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(url); // Хэш на основе URL
     }
 }

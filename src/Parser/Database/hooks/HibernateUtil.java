@@ -36,7 +36,6 @@ public class HibernateUtil {
     public static SessionFactory getSessionFactory() {
         if (sessionFactory == null) {
             try {
-                // Проверка существования файла
                 File configFile = new File(configPath);
                 if (!configFile.exists()) {
                     throw new FileNotFoundException("Config file not found: " + configPath);
@@ -45,41 +44,32 @@ public class HibernateUtil {
                 String content = new String(Files.readAllBytes(configFile.toPath()));
                 JSONObject config = new JSONObject(content);
 
-                StandardServiceRegistryBuilder registryBuilder =
-                        new StandardServiceRegistryBuilder();
+                // Первая попытка подключения к основной БД
+                try {
+                    sessionFactory = createSessionFactory(config, false);
+                } catch (Exception e) {
+                    System.err.println("Не удалось подключиться к основной БД (" + e.getMessage() + "), пробуем локальную...");
+                    try {
+                        JSONObject localConfig = new JSONObject();
+                        localConfig.put("HOST", "localhost");
+                        localConfig.put("PORT", "5432");
+                        localConfig.put("DB_Global_Module", config.getString("DB_Global_Module"));
+                        localConfig.put("USER", "postgres");
+                        localConfig.put("PASSWORD", ""); // или ваш пароль для локальной БД
 
-                Map<String, Object> settings = new HashMap<>();
-                settings.put(Environment.DRIVER, "org.postgresql.Driver");
-                settings.put(Environment.URL, "jdbc:postgresql://" +
-                        config.optString("HOST", "192.168.234.237") + ":" +
-                        config.optString("PORT", "5432") + "/" +
-                        config.getString("DB_Global_Module")); // global_module_238
-                settings.put(Environment.USER, config.getString("USER")); // postgres
-                settings.put(Environment.PASS, config.getString("PASSWORD")); // globalA17P14
-                settings.put(Environment.DIALECT, "org.hibernate.dialect.PostgreSQLDialect");
-                settings.put(Environment.SHOW_SQL, "true");
-                // Только при первом запуске - создаем схему
-                if (!isDatabaseInitialized) {
-                    settings.put(Environment.HBM2DDL_AUTO, "update");
-                    isDatabaseInitialized = true;
-                } else {
-                    settings.put(Environment.HBM2DDL_AUTO, "validate");  // или "none"
+                        // Для локальной БД принудительно устанавливаем hbm2ddl.auto=update
+                        localConfig.put("HBM2DDL_AUTO", "update");
+
+                        sessionFactory = createSessionFactory(localConfig, true);
+                        System.out.println("Успешно подключились к локальной БД");
+                    } catch (Exception e2) {
+                        System.err.println("Не удалось подключиться и к локальной БД:");
+                        e2.printStackTrace();
+                        throw new ExceptionInInitializerError("Failed to initialize Hibernate with both connections: " +
+                                "Main DB error: " + e.getMessage() +
+                                ", Local DB error: " + e2.getMessage());
+                    }
                 }
-
-                registryBuilder.applySettings(settings);
-
-                StandardServiceRegistry registry = registryBuilder.build();
-                MetadataSources sources = new MetadataSources(registry)
-                        .addAnnotatedClass(Parser.Database.models.Customer.class)
-                        .addAnnotatedClass(Parser.Database.models.Purchase.class)
-                        .addAnnotatedClass(Parser.Database.models.ProcurementObject.class)
-                        .addAnnotatedClass(Parser.Database.models.Supplier.class)
-                        .addAnnotatedClass(Parser.Database.models.Contract.class)
-                        .addAnnotatedClass(Parser.Database.models.JudicialProceeding.class)
-                        .addAnnotatedClass(Parser.Database.models.SupplierReliability.class);
-
-                Metadata metadata = sources.getMetadataBuilder().build();
-                sessionFactory = metadata.getSessionFactoryBuilder().build();
             } catch (Exception e) {
                 System.err.println("Ошибка инициализации Hibernate:");
                 e.printStackTrace();
@@ -89,12 +79,78 @@ public class HibernateUtil {
         return sessionFactory;
     }
 
+    private static SessionFactory createSessionFactory(JSONObject config, boolean isLocal) throws Exception {
+        StandardServiceRegistryBuilder registryBuilder = new StandardServiceRegistryBuilder();
+
+        Map<String, Object> settings = new HashMap<>();
+        settings.put(Environment.DRIVER, "org.postgresql.Driver");
+
+        String url = "jdbc:postgresql://" +
+                config.optString("HOST", "localhost") + ":" +
+                config.optString("PORT", "5432") + "/" +
+                config.getString("DB_Global_Module");
+
+        settings.put(Environment.URL, url);
+        settings.put(Environment.USER, config.getString("USER"));
+        settings.put(Environment.PASS, config.getString("PASSWORD"));
+        settings.put(Environment.DIALECT, "org.hibernate.dialect.PostgreSQLDialect");
+        settings.put(Environment.SHOW_SQL, "true");
+        settings.put(Environment.FORMAT_SQL, "true");  // Форматирование SQL для удобства чтения
+
+        // Настройки для пакетной обработки (batch)
+        settings.put(Environment.STATEMENT_BATCH_SIZE, "50");  // Аналог hibernate.jdbc.batch_size
+        settings.put(Environment.ORDER_INSERTS, "true");       // Оптимизация порядка INSERT
+        settings.put(Environment.ORDER_UPDATES, "true");       // Оптимизация порядка UPDATE
+        settings.put(Environment.BATCH_VERSIONED_DATA, "true"); // Для версионированных сущностей
+
+        // Для PostgreSQL важно добавить:
+        settings.put("hibernate.jdbc.batch_size", "50");
+        settings.put("hibernate.connection.rewriteBatchedStatements", "true"); // Ключевая настройка для PostgreSQL
+
+        // Управление схемой БД
+        if (config.has("HBM2DDL_AUTO")) {
+            settings.put(Environment.HBM2DDL_AUTO, config.getString("HBM2DDL_AUTO"));
+        } else if (!isDatabaseInitialized) {
+            settings.put(Environment.HBM2DDL_AUTO, "update");
+            isDatabaseInitialized = true;
+        } else {
+            settings.put(Environment.HBM2DDL_AUTO, "validate");
+        }
+
+        // Дополнительные настройки для диагностики
+        settings.put(Environment.FAIL_ON_PAGINATION_OVER_COLLECTION_FETCH, "true");
+        settings.put(Environment.USE_SQL_COMMENTS, "true");
+
+        registryBuilder.applySettings(settings);
+
+        try {
+            StandardServiceRegistry registry = registryBuilder.build();
+            MetadataSources sources = new MetadataSources(registry)
+                    .addAnnotatedClass(Parser.Database.models.Customer.class)
+                    .addAnnotatedClass(Parser.Database.models.Purchase.class)
+                    .addAnnotatedClass(Parser.Database.models.ProcurementObject.class)
+                    .addAnnotatedClass(Parser.Database.models.Supplier.class)
+                    .addAnnotatedClass(Parser.Database.models.Contract.class)
+                    .addAnnotatedClass(Parser.Database.models.JudicialProceeding.class)
+                    .addAnnotatedClass(Parser.Database.models.SupplierReliability.class);
+
+            Metadata metadata = sources.getMetadataBuilder().build();
+            return metadata.getSessionFactoryBuilder().build();
+        } catch (Exception e) {
+            System.err.println("Ошибка при создании SessionFactory для URL: " + url);
+            if (e.getMessage().contains("missing table")) {
+                System.err.println("РЕКОМЕНДАЦИЯ: Установите hibernate.hbm2ddl.auto=update " +
+                        "для автоматического создания отсутствующих таблиц");
+            }
+            throw e;
+        }
+    }
+
     public static void shutdown() {
         if (sessionFactory != null) {
             sessionFactory.close();
         }
     }
-
     public static boolean testConnection() {
         try {
             SessionFactory sessionFactory = getSessionFactory();

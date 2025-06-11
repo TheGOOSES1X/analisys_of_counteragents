@@ -4,6 +4,7 @@ import Parser.implementations.Parser44.PurchaseParser44;
 import Parser.interfaces.*;
 import Parser.utils.Okpd2Converter;
 import org.openqa.selenium.By;
+import org.openqa.selenium.TimeoutException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -11,13 +12,10 @@ import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.Map;
-import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
 public class PurchasesParserHead implements PurchaseListParser {
     public volatile boolean isPaused = false;
@@ -129,7 +127,7 @@ public class PurchasesParserHead implements PurchaseListParser {
         WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(DEFAULT_PAGE_LOAD_TIMEOUT_SECONDS));
 
         try {
-            List<PurchaseItem> allPurchases = parseAllPages(driver, wait);
+            Set<PurchaseItem> allPurchases = parseAllPages(driver, wait);
             saveResults(allPurchases);
             notifyCompletion(allPurchases.size());
         } catch (Exception e) {
@@ -140,8 +138,8 @@ public class PurchasesParserHead implements PurchaseListParser {
     }
 
 
-    private List<PurchaseItem> parseAllPages(WebDriver driver, WebDriverWait wait) {
-        List<PurchaseItem> allPurchases = new ArrayList<>();
+    private Set<PurchaseItem> parseAllPages(WebDriver driver, WebDriverWait wait) {
+        Set<PurchaseItem> uniquePurchases = new LinkedHashSet<>();
         int currentPage = 1;
         int totalItems = 0;
         boolean hasNextPage = true;
@@ -160,8 +158,13 @@ public class PurchasesParserHead implements PurchaseListParser {
                 hasNextPage = false;
                 continue;
             }
-
-            processPageItems(itemContainers, allPurchases,totalItems);
+            for (WebElement itemContainer : itemContainers) {
+                PurchaseItem item = extractPurchaseData(itemContainer);
+                if (!uniquePurchases.add(item)) { // <- Автоматическая проверка дубликатов!
+                    System.out.println("Дубликат: " + item.getUrl());
+                }
+            }
+            processPageItems(itemContainers, uniquePurchases,totalItems);
             hasNextPage = shouldContinueToNextPage(currentPage, totalItems);
             currentPage++;
         }
@@ -169,13 +172,19 @@ public class PurchasesParserHead implements PurchaseListParser {
             driver.manage().deleteAllCookies();
         }
 
-        return allPurchases;
+        return uniquePurchases;
     }
 
-    private void navigateToPage(WebDriver driver, WebDriverWait wait, int pageNumber) {
-        driver.get(buildPaginatedUrl(pageNumber));
-        wait.until(ExpectedConditions.presenceOfElementLocated(
-                By.cssSelector(".registry-entry__header-mid__number")));
+    private boolean navigateToPage(WebDriver driver, WebDriverWait wait, int pageNumber) {
+        try {
+            driver.get(buildPaginatedUrl(pageNumber));
+            wait.until(ExpectedConditions.presenceOfElementLocated(
+                    By.cssSelector(".registry-entry__header-mid__number")));
+            return true; // Успешно загрузилось
+        } catch (TimeoutException e) {
+            System.err.println("Элемент не найден на странице " + pageNumber + ". Пропускаем...");
+            return false; // Не удалось загрузить
+        }
     }
 
     private int getTotalItemsCount(WebDriver driver) {
@@ -191,7 +200,7 @@ public class PurchasesParserHead implements PurchaseListParser {
         return driver.findElements(By.cssSelector(".search-registry-entry-block"));
     }
 
-    private void processPageItems(List<WebElement> itemContainers, List<PurchaseItem> allPurchases, int totalItems) {
+    private void processPageItems(List<WebElement> itemContainers, Set<PurchaseItem> allPurchases, int totalItems) {
         for (WebElement itemContainer : itemContainers) {
             if (isStopped) break; // Проверка на остановку
 
@@ -217,7 +226,7 @@ public class PurchasesParserHead implements PurchaseListParser {
         }
     }
 
-    private void saveResults(List<PurchaseItem> items) {
+    private void saveResults(Set<PurchaseItem> items) {
         if (resultsSaver != null) {
             resultsSaver.save(items);
         }
@@ -278,12 +287,25 @@ public class PurchasesParserHead implements PurchaseListParser {
     }
 
     private String extractCustomer(WebElement itemContainer) {
-        return extractTextFromXPath(itemContainer,
+        // Пробуем найти заказчика через ссылку (44-ФЗ)
+        String customer = extractTextFromXPath(itemContainer,
                 ".//div[contains(@class, 'registry-entry__body-block')]" +
                         "[.//div[contains(@class, 'registry-entry__body-title')]" +
                         "[contains(., 'Заказчик')]]" +
-                        "//span[contains(@class, 'highlightColor')]",
-                "Не указан");
+                        "//a[contains(@href, '/epz/organization/view/') or contains(@href, 'organizationId=')]",
+                null);
+
+        // Если не нашли через ссылку, пробуем через текст (223-ФЗ)
+        if (customer == null) {
+            customer = extractTextFromXPath(itemContainer,
+                    ".//div[contains(@class, 'registry-entry__body-block')]" +
+                            "[.//div[contains(@class, 'registry-entry__body-title')]" +
+                            "[contains(., 'Заказчик')]]" +
+                            "//div[contains(@class, 'registry-entry__body-value') or contains(@class, 'registry-entry__body-href')]",
+                    "Не указан");
+        }
+
+        return customer != null ? customer.trim() : "Не указан";
     }
 
     private String extractTextFromElement(WebElement parent, String cssSelector, String defaultValue) {
@@ -307,9 +329,13 @@ public class PurchasesParserHead implements PurchaseListParser {
 
     private String extractTextFromXPath(WebElement parent, String xpath, String defaultValue) {
         try {
-            return parent.findElement(By.xpath(xpath)).getText().trim();
+            List<WebElement> elements = parent.findElements(By.xpath(xpath));
+            if (elements.isEmpty()) {
+                return defaultValue;
+            }
+            return elements.get(0).getText().trim();
         } catch (Exception e) {
-            System.err.println("Не удалось извлечь текст по XPath: " + e.getMessage());
+            System.err.println("Ошибка при извлечении текста по XPath: " + xpath);
             return defaultValue;
         }
     }

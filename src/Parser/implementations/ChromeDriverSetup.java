@@ -36,4 +36,6 @@ public class ChromeDriverSetup implements DriverSetup {
         options.setExperimentalOption("excludeSwitches", new String[]{"enable-automation"});
         return new ChromeDriver(options);
     }
+
+
 }

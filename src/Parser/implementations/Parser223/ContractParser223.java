@@ -26,11 +26,15 @@ public class ContractParser223 {
             if (contractUrl != null) {
                 driver.get(contractUrl);
                 Map<String, String> contractDetails = parseContractDetails(driver, wait);
-                Map<String, String>  mainInfo = parseGeneralInfo(driver, wait);
-                fillContractModel(contract, contractDetails,mainInfo);
-                parseGeneralInfo(driver, wait);
+                Map<String, String> mainInfo = parseGeneralInfo(driver, wait);
+
+                // Проверяем, что мы получили какие-то данные
+                if (!contractDetails.isEmpty() || !mainInfo.isEmpty()) {
+                    fillContractModel(contract, contractDetails, mainInfo);
+                    return contract;
+                }
             }
-            return contract;
+            return null; // Возвращаем null, если не получили данных
         } catch (Exception e) {
             System.err.println("Error parsing contract info: " + e.getMessage());
             return null;

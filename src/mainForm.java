@@ -2962,8 +2962,8 @@ public class mainForm extends JFrame {
                     ParserProgressBar.setValue(statusForm.selectedUrls.size() + 1);
                 });
 
-                detailsParser.parseSupplierLitigations();
-                detailsParser.parseSupplierStatuses();
+//                detailsParser.parseSupplierLitigations();
+//                detailsParser.parseSupplierStatuses();
 //                detailsParser.cleanupDownloadDirectory();
 
             } finally {
@@ -3246,8 +3246,8 @@ public class mainForm extends JFrame {
         TotalRecords.setText("Всего записей: 0");
         CurrentRecords.setText("Обработано: 0");
         StatusLabel.setText("Статус: запуск парсера...");
-
-        listParser = new PurchasesParserHead(driverSetup, null, params, statusForm);
+        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
+        listParser = new PurchasesParserHead(driverSetup, saver, params, statusForm);
 
         new Thread(() -> {
             listParser.parse();
@@ -3291,61 +3291,6 @@ public class mainForm extends JFrame {
         }
     }
 
-    private void initChooseRangeElementsButton() {
-        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
-        int rowCount = model.getRowCount();
-
-        try {
-            // Получаем значения из текстовых полей
-            int from = From.getText().isEmpty() ? 1 : Integer.parseInt(From.getText());
-            int to = To.getText().isEmpty() ? rowCount : Integer.parseInt(To.getText());
-
-            // Корректируем значения, если они выходят за границы
-            from = Math.max(1, Math.min(from, rowCount));
-            to = Math.max(1, Math.min(to, rowCount));
-
-            // Меняем местами, если from > to
-            if (from > to) {
-                int temp = from;
-                from = to;
-                to = temp;
-            }
-
-            // Проверяем, есть ли хотя бы один выбранный элемент в диапазоне
-            boolean hasSelectedItemsInRange = false;
-            for (int i = from - 1; i < to; i++) {
-                if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
-                    hasSelectedItemsInRange = true;
-                    break;
-                }
-            }
-
-            // Если есть выбранные элементы в диапазоне - снимаем все галочки в этом диапазоне
-            if (hasSelectedItemsInRange) {
-                for (int i = from - 1; i < to; i++) {
-                    model.setValueAt(false, i, 3); // Снимаем галочку
-                    PurchaseItem item = statusForm.allItems.get(i);
-                    statusForm.selectedUrls.remove(item.getUrl()); // Удаляем URL
-                }
-                System.out.println("Элементы с " + from + " по " + to + " сняты.");
-            }
-            // Если нет выбранных элементов в диапазоне - выбираем все в диапазоне
-            else {
-                for (int i = from - 1; i < to; i++) {
-                    model.setValueAt(true, i, 3); // Ставим галочку
-                    PurchaseItem item = statusForm.allItems.get(i);
-                    if (!statusForm.selectedUrls.contains(item.getUrl())) {
-                        statusForm.selectedUrls.add(item.getUrl()); // Добавляем URL
-                    }
-                }
-                System.out.println("Выбраны элементы с " + from + " по " + to +
-                        ". Текущий список: " + statusForm.selectedUrls);
-            }
-        } catch (NumberFormatException e) {
-            System.out.println("Ошибка: введите корректные числовые значения");
-        }
-    }
-
     private void initChooseAllElementsButton() {
         DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
         int rowCount = model.getRowCount();
@@ -3376,10 +3321,86 @@ public class mainForm extends JFrame {
                     statusForm.selectedUrls.add(item.getUrl()); // Добавляем URL
                 }
             }
-            System.out.println("Выбраны все элементы. Текущий список: " + statusForm.selectedUrls);
+            System.out.println("Выбраны все элементы. Уникальных элементов: " + statusForm.selectedUrls.size());
+            System.out.println("Список: " + statusForm.selectedUrls);
         }
     }
 
+    private void initChooseRangeElementsButton() {
+        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
+        int rowCount = model.getRowCount();
+
+        try {
+            // Получаем значения из текстовых полей
+            int from = From.getText().isEmpty() ? 1 : Integer.parseInt(From.getText());
+            int to = To.getText().isEmpty() ? rowCount : Integer.parseInt(To.getText());
+
+            // Корректируем значения
+            from = Math.max(1, Math.min(from, rowCount));
+            to = Math.max(1, Math.min(to, rowCount));
+
+            if (from > to) {
+                int temp = from;
+                from = to;
+                to = temp;
+            }
+
+            // Проверяем, есть ли выбранные элементы в диапазоне
+            boolean hasSelectedItemsInRange = false;
+            for (int i = from - 1; i < to; i++) {
+                if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
+                    hasSelectedItemsInRange = true;
+                    break;
+                }
+            }
+
+            if (hasSelectedItemsInRange) {
+                // Сначала собираем все URL из текущего диапазона
+                Set<String> urlsInRange = new HashSet<>();
+                for (int i = from - 1; i < to; i++) {
+                    PurchaseItem item = statusForm.allItems.get(i);
+                    urlsInRange.add(item.getUrl());
+                }
+
+                // Затем проверяем, есть ли эти URL в других выбранных элементах
+                for (int i = 0; i < rowCount; i++) {
+                    if (i >= from - 1 && i < to) continue; // Пропускаем текущий диапазон
+                    if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
+                        PurchaseItem item = statusForm.allItems.get(i);
+                        urlsInRange.remove(item.getUrl()); // Удаляем URL, если он есть в других выбранных элементах
+                    }
+                }
+
+                // Теперь удаляем только те URL, которые больше нигде не выбраны
+                for (int i = from - 1; i < to; i++) {
+                    model.setValueAt(false, i, 3);
+                    PurchaseItem item = statusForm.allItems.get(i);
+                    if (urlsInRange.contains(item.getUrl())) {
+                        statusForm.selectedUrls.remove(item.getUrl());
+                    }
+                }
+
+                System.out.println("Элементы с " + from + " по " + to + " сняты.");
+                System.out.println("Уникальных элементов осталось: " + statusForm.selectedUrls.size());
+            } else {
+                int addedCount = 0;
+                for (int i = from - 1; i < to; i++) {
+                    model.setValueAt(true, i, 3);
+                    PurchaseItem item = statusForm.allItems.get(i);
+                    if (!statusForm.selectedUrls.contains(item.getUrl())) {
+                        statusForm.selectedUrls.add(item.getUrl());
+                        addedCount++;
+                    }
+                }
+                System.out.println("Выбраны элементы с " + from + " по " + to +
+                        ". Добавлено уникальных элементов: " + addedCount);
+                System.out.println("Всего уникальных элементов: " + statusForm.selectedUrls.size());
+                System.out.println("Список: " + statusForm.selectedUrls);
+            }
+        } catch (NumberFormatException e) {
+            System.out.println("Ошибка: введите корректные числовые значения");
+        }
+    }
     private void togglePauseParser() {
         if (listParser != null) {
             PurchasesParserHead parser = (PurchasesParserHead) listParser;

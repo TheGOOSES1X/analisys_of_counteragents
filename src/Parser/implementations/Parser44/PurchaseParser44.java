@@ -174,8 +174,8 @@ public class PurchaseParser44 implements PurchaseDetailsParser {
                 // Обработка для 223-ФЗ
                 purchase = mainInfoParser223.parsePurchaseMainInfo(url, driver);
                 customer = mainInfoParser223.parsePurchaseCustomer(url, driver);
-                contract = mainInfoParser223.parsePurchaseContract(url, driver, wait);
-                procurementObjects = mainInfoParser223.parsePurchaseSubjects(url, driver, wait);
+                contract = mainInfoParser223.parsePurchaseContract(url, driver);
+                procurementObjects = mainInfoParser223.parsePurchaseSubjects(url, driver);
                 if (procurementObjects != null) {
                     procurementObjects.forEach(purchase::addProcurementObject);
                 }

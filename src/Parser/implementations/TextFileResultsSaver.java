@@ -11,6 +11,9 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TextFileResultsSaver implements ResultsSaver<PurchaseItem> {
     private static final String DEFAULT_OUTPUT_PREFIX = "zakupki_results_";
@@ -21,7 +24,7 @@ public class TextFileResultsSaver implements ResultsSaver<PurchaseItem> {
     }
 
     @Override
-    public void save(List<PurchaseItem> purchases) {
+    public void save(Set<PurchaseItem> purchases) {
         String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
         String filename = DEFAULT_OUTPUT_PREFIX + timestamp + ".txt";
         Path filePath = Paths.get(outputPath, filename);
@@ -31,9 +34,9 @@ public class TextFileResultsSaver implements ResultsSaver<PurchaseItem> {
             writer.write(String.format("Всего найдено: %d записей\n\n", purchases.size()));
 
             for (PurchaseItem item : purchases) {
-                writer.write(item.toString());
-                writer.write("\n".repeat(2));
-                writer.write("-".repeat(80));
+                writer.write(item.getUrl().toString());
+//                writer.write("\n".repeat(2));
+//                writer.write("-".repeat(80));
                 writer.write("\n\n");
             }
 
@@ -42,6 +45,7 @@ public class TextFileResultsSaver implements ResultsSaver<PurchaseItem> {
             System.err.println("Ошибка при сохранении в файл: " + e.getMessage());
         }
     }
+
 
     @Override
     public void setOutputPath(String path) {

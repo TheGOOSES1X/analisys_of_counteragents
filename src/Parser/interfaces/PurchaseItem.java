@@ -8,4 +8,7 @@ public interface PurchaseItem {
 
     @Override
     String toString(); // Можно оставить default-реализацию
+
+
+
 }

@@ -98,7 +98,10 @@ public class ParserUtils {
     public static BigDecimal parsePrice(String priceStr) {
         if (priceStr == null || priceStr.trim().isEmpty()) return null;
         try {
-            return new BigDecimal(priceStr.replaceAll("[^\\d.]", ""));
+            // Заменяем все пробелы (неразрывные тоже), затем заменяем запятую на точку
+            String normalized = priceStr.replaceAll("\\s", "")
+                    .replace(",", ".");
+            return new BigDecimal(normalized);
         } catch (Exception e) {
             System.out.println("Ошибка парсинга цены: " + priceStr);
             return null;

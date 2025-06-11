@@ -3,6 +3,7 @@
 package Parser.implementations.Parser223;
 
 import Parser.Database.models.*;
+import Parser.implementations.Parser223.Contracts.Parser223;
 import Parser.implementations.Parser44.CustomerPageParser;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
@@ -15,15 +16,13 @@ import static Parser.utils.ParserUtils.parseDate;
 import static Parser.utils.ParserUtils.parsePrice;
 
 public class MainInfoParser223 {
-    private final ContractParser223 contractParser223;
+    private final Parser223 contractParser;
     private final CustomerPageParser customerPageParser;
 
-    private String currentUrl;
-    private String contractUrl;
 
     public MainInfoParser223() {
         this.customerPageParser = new CustomerPageParser();
-        this.contractParser223 = new ContractParser223();
+        this.contractParser = new Parser223();
     }
     public Purchase parsePurchaseMainInfo(String url, WebDriver driver) {
         driver.get(url);
@@ -36,23 +35,23 @@ public class MainInfoParser223 {
         return parsePurchasePageFromDataFiller(purchaseData, commonData);
 
     }
-    public Contract parsePurchaseContract(String url, WebDriver driver, WebDriverWait wait) {
+    public Contract parsePurchaseContract(String url, WebDriver driver) {
         driver.get(url);
         WebElement purchaseCard = driver.findElement(By.cssSelector(".search-results.item"));
         Map<String, String> purchaseData = parsePurchaseCard(purchaseCard);
 
         if (purchaseData.containsKey("contractLink")) {
-            return contractParser223.parseContractInfo(purchaseData.get("contractLink"), driver, wait);
+            return contractParser.parseContract(purchaseData.get("contractLink"),driver);
         }
         return null;
     }
-    public List<ProcurementObject> parsePurchaseSubjects(String url, WebDriver driver, WebDriverWait wait) {
+    public List<ProcurementObject> parsePurchaseSubjects(String url, WebDriver driver) {
         driver.get(url);
         WebElement purchaseCard = driver.findElement(By.cssSelector(".search-results.item"));
         Map<String, String> purchaseData = parsePurchaseCard(purchaseCard);
 
         if (purchaseData.containsKey("contractLink")) {
-            return contractParser223.parseContractSubjects(purchaseData.get("contractLink"), driver, wait);
+            return contractParser.parseContractSubjects(purchaseData.get("contractLink"), driver);
         }
         return Collections.emptyList();
     }
@@ -101,6 +100,9 @@ public class MainInfoParser223 {
             if (commonData.containsKey("updateDate")) {
                 purchase.setUpdateDate(parseDate(commonData.get("updateDate")));
             }
+            if (commonData.containsKey("currency")) {
+                purchase.setCurrency(commonData.get("currency"));
+            }
             if (commonData.containsKey("initialPrice")) {
                 purchase.setInitialMaxPrice(parsePrice(commonData.get("initialPrice")));
             }
@@ -123,8 +125,8 @@ public class MainInfoParser223 {
             if (commonData.containsKey("purchaseNumber")) {
                 purchase.setPurchaseNumber(commonData.get("purchaseNumber"));
             }
-            if (purchaseData.containsKey("Сведения о закупке -> Способ осуществления закупки")) {
-                purchase.setProcurementMethod(purchaseData.get("Сведения о закупке -> Способ осуществления закупки"));
+            if (purchaseData.containsKey("Сведения о закупке > Способ осуществления закупки")) {
+                purchase.setProcurementMethod(purchaseData.get("Сведения о закупке > Способ осуществления закупки"));
             }
 
 
@@ -157,8 +159,18 @@ public class MainInfoParser223 {
             result.put("customer", cardElement.findElement(By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Заказчик')]/following-sibling::div/a"))
                     .getText().trim());
 
-            result.put("initialPrice", cardElement.findElement(By.cssSelector(".price-block__value"))
-                    .getText().replaceAll("[^\\d,]", "").replace(",", ".").trim());
+            WebElement priceElement = cardElement.findElement(By.cssSelector(".price-block__value"));
+            String priceText = priceElement.getText().trim();
+
+            // Извлекаем числовое значение цены
+            String initialPrice = priceText.replaceAll("[^\\d,]", "").replace(",", ".").trim();
+            result.put("initialPrice", initialPrice);
+
+            String[] priceParts = priceText.split("\\s+");
+            String currency = priceParts[priceParts.length - 1];
+            result.put("currency", currency);
+
+
 
             result.put("publicationDate", cardElement.findElement(By.xpath(".//div[contains(@class, 'data-block__title') and contains(text(), 'Размещено')]/following-sibling::div"))
                     .getText().trim());

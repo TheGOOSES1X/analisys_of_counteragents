@@ -24,6 +24,7 @@ public class CustomerPageParser {
             driver.get(customerUrl);
             Customer customer = parseCustomerPage(customerUrl, driver);
 
+
             // Возвращаемся обратно
             driver.get(currentUrl);
             cookies.forEach(cookie -> driver.manage().addCookie(cookie));
@@ -148,6 +149,7 @@ public class CustomerPageParser {
         return sectionData;
     }
 
+
     public Customer parseCustomerPage(String customerUrl, WebDriver driver) {
         if (customerUrl == null) {
             System.out.println("URL заказчика не предоставлен");
@@ -174,7 +176,7 @@ public class CustomerPageParser {
             customer.setLastUpdated(LocalDateTime.now());
 
             // Заполняем поля из словаря
-            customer.setFullName(allData.getOrDefault("Полное наименование", null));
+//            customer.setFullName(allData.getOrDefault("Полное наименование", null));
             customer.setShortName(allData.getOrDefault("Сокращенное наименование", null));
             customer.setConsolidatedRegisterCode(allData.getOrDefault("Код по Сводному реестру", null));
 
@@ -188,13 +190,50 @@ public class CustomerPageParser {
             } catch (Exception e) {
                 System.out.println("Ошибка парсинга даты регистрации: " + e.getMessage());
             }
+            WebElement searchResultElement = driver.findElement(By.cssSelector(".search-registry-entry-block"));
+            try {
+                // Парсинг полного наименования
+                WebElement nameElement = searchResultElement.findElement(By.cssSelector(".registry-entry__header-mid__number a"));
+                customer.setFullName(nameElement.getText().trim());
 
-            // Остальные поля...
-            customer.setInn(allData.getOrDefault("ИНН", null));
-            customer.setKpp(allData.getOrDefault("КПП", null));
-            customer.setOgrn(allData.getOrDefault("ОГРН", null));
+                // Парсинг местонахождения
+                WebElement locationElement = searchResultElement.findElement(
+                        By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Местонахождение')]/following-sibling::div"));
+                customer.setLocation(locationElement.getText().trim());
+
+                // Парсинг ОГРН, ИНН, КПП
+                List<WebElement> infoBlocks = searchResultElement.findElements(By.cssSelector(".registry-entry__body-block .row .col-md-auto"));
+                for (WebElement block : infoBlocks) {
+                    String title = block.findElement(By.cssSelector(".registry-entry__body-title")).getText().trim();
+                    String value = block.findElement(By.cssSelector(".registry-entry__body-value")).getText().trim();
+
+                    switch (title) {
+                        case "ОГРН":
+                            customer.setOgrn(value);
+                            break;
+                        case "ИНН":
+                            customer.setInn(value);
+                            break;
+                        case "КПП":
+                            customer.setKpp(value);
+                            break;
+                    }
+                }
+
+                customer.setLastUpdated(LocalDateTime.now());
+
+
+            } catch (Exception e) {
+                System.out.println("Ошибка при парсинге элемента поиска: " + e.getMessage());
+                return null;
+            }
+
+//            // Остальные поля...
+//            customer.setInn(allData.getOrDefault("ИНН", null));
+//            customer.setKpp(allData.getOrDefault("КПП", null));
+//            customer.setOgrn(allData.getOrDefault("ОГРН", null));
             customer.setOktmo(allData.getOrDefault("ОКТМО", null));
-            customer.setLocation(allData.getOrDefault("Место нахождения", null));
+//            customer.setLocation(allData.getOrDefault("Место нахождения", null));
 
 
             // ИКУ и дата назначения ИКУ
