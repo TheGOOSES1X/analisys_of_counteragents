@@ -10,8 +10,10 @@ import java.util.Comparator;
 import java.awt.*;
 import java.sql.PreparedStatement;
 
+import Critical_Criteries.InAgent;
 import MainAnalyzer.*;
 import Parser.interfaces.*;
+import Parser_EGRUL.Parser;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -22,7 +24,6 @@ import Parser.utils.RandomUserAgent;
 import Parser.utils.StatusForm;
 import com.toedter.calendar.JDateChooser;
 
-import java.awt.*;
 // для json
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,9 +33,6 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONException;
-import org.json.JSONObject;
-
-
 
 
 public class mainForm extends JFrame {
@@ -209,6 +207,9 @@ public class mainForm extends JFrame {
     private JLabel EGRUL_Parser_left;
     private JLabel EGRUL_PDF_left;
 
+    private JLabel crit_criteries_label;
+    private JButton crit_inagent_button;
+
     private StatusForm statusForm;
     private JTextField textFieldFilterOkpd2;
     private JTextField textFieldFilterGroup;
@@ -258,6 +259,7 @@ public class mainForm extends JFrame {
     private Role currentRole;
     private Thread EGRUL_Thread;
     private Thread PDF_to_Data_Thread;
+    private Thread InAgent_Thread;
 
     private void applyRolePermissions() {
         boolean isExpert = currentRole == Role.EXPERT;
@@ -1949,6 +1951,7 @@ public class mainForm extends JFrame {
             }
         });
         EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
+        crit_inagent_button.addActionListener(e -> Parser_InAgent());
 
         Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "resources/currency.json");
 
@@ -3045,6 +3048,25 @@ public class mainForm extends JFrame {
 
         });
         PDF_to_Data_Thread.start();
+    }
+
+    private void Parser_InAgent(){
+        if (InAgent_Thread != null && InAgent_Thread.isAlive()) {
+            return;
+        }
+
+        crit_inagent_button.setEnabled(false);
+        crit_inagent_button.setText("Сбор данных");
+
+        InAgent_Thread = new Thread(() -> {
+            InAgent.ParserInAgent();
+
+            SwingUtilities.invokeLater(() -> {
+                crit_inagent_button.setEnabled(true);
+                crit_inagent_button.setText("Иностранные агенты");
+            });
+        });
+        InAgent_Thread.start();
     }
 
     private void initStartParsingButton() {
