@@ -2962,8 +2962,8 @@ public class mainForm extends JFrame {
                     ParserProgressBar.setValue(statusForm.selectedUrls.size() + 1);
                 });
 
-//                detailsParser.parseSupplierLitigations();
-//                detailsParser.parseSupplierStatuses();
+                detailsParser.parseSupplierLitigations();
+                detailsParser.parseSupplierStatuses();
 //                detailsParser.cleanupDownloadDirectory();
 
             } finally {

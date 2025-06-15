@@ -92,26 +92,42 @@ public class PurchasePageParser {
     }
 
 
-    private void parseCardMainInfo( WebDriverWait wait, Purchase purchase) {
+    private void parseCardMainInfo(WebDriverWait wait, Purchase purchase) {
         try {
             // 1. Ожидаем загрузки всей секции
             WebElement sectionMainInfo = wait.until(ExpectedConditions.presenceOfElementLocated(
                     By.cssSelector("div.sectionMainInfo")));
 
             // 2. Парсим закон и тип процедуры
-            WebElement titleElement = sectionMainInfo.findElement(
-                    By.cssSelector("div.cardMainInfo__title.d-flex.text-truncate"));
-            purchase.setLaw(titleElement.getText().trim().split("\\s+")[0]); // Берем только "44-ФЗ"
+            try {
+                WebElement titleElement = sectionMainInfo.findElement(
+                        By.cssSelector("div.cardMainInfo__title.d-flex.text-truncate"));
+                String law = titleElement.getText().trim().split("\\s+")[0];
+                purchase.setLaw(law);
+            } catch (Exception e) {
+                System.out.println("Не удалось распарсить закон: " + e.getMessage());
+                purchase.setLaw(null);
+            }
 
             // 3. Парсим номер закупки
-            WebElement numberElement = sectionMainInfo.findElement(
-                    By.cssSelector("span.cardMainInfo__purchaseLink a"));
-            purchase.setPurchaseNumber(numberElement.getText().trim());
+            try {
+                WebElement numberElement = sectionMainInfo.findElement(
+                        By.cssSelector("span.cardMainInfo__purchaseLink a"));
+                purchase.setPurchaseNumber(numberElement.getText().trim());
+            } catch (Exception e) {
+                System.out.println("Не удалось распарсить номер закупки: " + e.getMessage());
+                purchase.setPurchaseNumber(null);
+            }
 
             // 4. Парсим статус/этап закупки
-            WebElement stageElement = sectionMainInfo.findElement(
-                    By.cssSelector("span.cardMainInfo__state.distancedText"));
-            purchase.setProcurementStage(stageElement.getText().trim());
+            try {
+                WebElement stageElement = sectionMainInfo.findElement(
+                        By.cssSelector("span.cardMainInfo__state.distancedText"));
+                purchase.setProcurementStage(stageElement.getText().trim());
+            } catch (Exception e) {
+                System.out.println("Не удалось распарсить статус закупки: " + e.getMessage());
+                purchase.setProcurementStage(null);
+            }
 
             // 5. Парсим объект закупки (может отсутствовать)
             try {
@@ -119,20 +135,15 @@ public class PurchasePageParser {
                         By.xpath(".//div[contains(@class,'cardMainInfo__section')]" +
                                 "[.//span[contains(@class,'cardMainInfo__title') and " +
                                 "contains(text(),'Объект закупки')]]//span[@class='cardMainInfo__content']"));
-
-                if (purchaseObjectElement != null) {
-                    purchase.setPurchaseObject(purchaseObjectElement.getText().trim());
-                } else {
-                    purchase.setPurchaseObject(null);
-                }
+                purchase.setPurchaseObject(purchaseObjectElement.getText().trim());
             } catch (Exception e) {
                 System.out.println("Объект закупки не указан или не найден: " + e.getMessage());
                 purchase.setPurchaseObject(null);
             }
 
         } catch (Exception e) {
-            System.out.println("Критическая ошибка при парсинге основной информации: " + e.getMessage());
-            throw new RuntimeException("Не удалось распарсить основную информацию", e);
+            System.out.println("Ошибка при загрузке секции основной информации: " + e.getMessage());
+            // Не бросаем исключение, просто логируем ошибку
         }
     }
 

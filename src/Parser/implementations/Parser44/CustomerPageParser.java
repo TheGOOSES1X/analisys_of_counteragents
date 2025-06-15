@@ -2,6 +2,7 @@ package Parser.implementations.Parser44;
 
 import Parser.Database.models.Customer;
 import org.openqa.selenium.*;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -193,39 +194,59 @@ public class CustomerPageParser {
             WebElement searchResultElement = driver.findElement(By.cssSelector(".search-registry-entry-block"));
             try {
                 // Парсинг полного наименования
-                WebElement nameElement = searchResultElement.findElement(By.cssSelector(".registry-entry__header-mid__number a"));
-                customer.setFullName(nameElement.getText().trim());
+                WebElement nameElement = null;
+                try {
+                    nameElement = searchResultElement.findElement(By.cssSelector(".registry-entry__header-mid__number a"));
+                    customer.setFullName(nameElement.getText().trim());
+                } catch (NoSuchElementException e) {
+                    customer.setFullName(null);
+                    System.out.println("Элемент полного наименования не найден");
+                }
 
                 // Парсинг местонахождения
-                WebElement locationElement = searchResultElement.findElement(
-                        By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Местонахождение')]/following-sibling::div"));
-                customer.setLocation(locationElement.getText().trim());
+                try {
+                    WebElement locationElement = searchResultElement.findElement(
+                            By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Местонахождение')]/following-sibling::div"));
+                    customer.setLocation(locationElement.getText().trim());
+                } catch (NoSuchElementException e) {
+                    customer.setLocation(null);
+                    System.out.println("Элемент местонахождения не найден");
+                }
 
                 // Парсинг ОГРН, ИНН, КПП
-                List<WebElement> infoBlocks = searchResultElement.findElements(By.cssSelector(".registry-entry__body-block .row .col-md-auto"));
-                for (WebElement block : infoBlocks) {
-                    String title = block.findElement(By.cssSelector(".registry-entry__body-title")).getText().trim();
-                    String value = block.findElement(By.cssSelector(".registry-entry__body-value")).getText().trim();
+                List<WebElement> infoBlocks = Collections.emptyList();
+                try {
+                    infoBlocks = searchResultElement.findElements(By.cssSelector(".registry-entry__body-block .row .col-md-auto"));
+                } catch (NoSuchElementException e) {
+                    System.out.println("Информационные блоки не найдены");
+                }
 
-                    switch (title) {
-                        case "ОГРН":
-                            customer.setOgrn(value);
-                            break;
-                        case "ИНН":
-                            customer.setInn(value);
-                            break;
-                        case "КПП":
-                            customer.setKpp(value);
-                            break;
+                for (WebElement block : infoBlocks) {
+                    try {
+                        String title = block.findElement(By.cssSelector(".registry-entry__body-title")).getText().trim();
+                        String value = block.findElement(By.cssSelector(".registry-entry__body-value")).getText().trim();
+
+                        switch (title) {
+                            case "ОГРН":
+                                customer.setOgrn(value);
+                                break;
+                            case "ИНН":
+                                customer.setInn(value);
+                                break;
+                            case "КПП":
+                                customer.setKpp(value);
+                                break;
+                        }
+                    } catch (NoSuchElementException e) {
+                        System.out.println("Не удалось извлечь данные из информационного блока");
                     }
                 }
 
                 customer.setLastUpdated(LocalDateTime.now());
 
-
             } catch (Exception e) {
                 System.out.println("Ошибка при парсинге элемента поиска: " + e.getMessage());
-                return null;
+                // Продолжаем выполнение, не возвращаем null
             }
 
 //            // Остальные поля...

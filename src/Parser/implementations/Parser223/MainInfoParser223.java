@@ -144,68 +144,48 @@ public class MainInfoParser223 {
 
         try {
             // Основные данные из карточки
-            result.put("purchaseType", cardElement.findElement(By.cssSelector(".registry-entry__header-top__title"))
-                    .getText().trim());
+            result.put("purchaseType", safeFindElementText(cardElement, By.cssSelector(".registry-entry__header-top__title")));
+            result.put("purchaseNumber", safeFindElementText(cardElement, By.cssSelector(".registry-entry__header-mid__number a"))
+                    .replace("№", "").trim());
+            result.put("purchaseStatus", safeFindElementText(cardElement, By.cssSelector(".registry-entry__header-mid__title")));
+            result.put("purchaseObject", safeFindElementText(cardElement,
+                    By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Объект закупки')]/following-sibling::div")));
+            result.put("customer", safeFindElementText(cardElement,
+                    By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Заказчик')]/following-sibling::div/a")));
 
-            result.put("purchaseNumber", cardElement.findElement(By.cssSelector(".registry-entry__header-mid__number a"))
-                    .getText().replace("№", "").trim());
-
-            result.put("purchaseStatus", cardElement.findElement(By.cssSelector(".registry-entry__header-mid__title"))
-                    .getText().trim());
-
-            result.put("purchaseObject", cardElement.findElement(By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Объект закупки')]/following-sibling::div"))
-                    .getText().trim());
-
-            result.put("customer", cardElement.findElement(By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Заказчик')]/following-sibling::div/a"))
-                    .getText().trim());
-
-            WebElement priceElement = cardElement.findElement(By.cssSelector(".price-block__value"));
-            String priceText = priceElement.getText().trim();
-
-            // Извлекаем числовое значение цены
-            String initialPrice = priceText.replaceAll("[^\\d,]", "").replace(",", ".").trim();
-            result.put("initialPrice", initialPrice);
-
-            String[] priceParts = priceText.split("\\s+");
-            String currency = priceParts[priceParts.length - 1];
-            result.put("currency", currency);
-
-
-
-            result.put("publicationDate", cardElement.findElement(By.xpath(".//div[contains(@class, 'data-block__title') and contains(text(), 'Размещено')]/following-sibling::div"))
-                    .getText().trim());
-
-            result.put("updateDate", cardElement.findElement(By.xpath(".//div[contains(@class, 'data-block__title') and contains(text(), 'Обновлено')]/following-sibling::div"))
-                    .getText().trim());
-
-            // Парсим дату окончания подачи заявок (если элемент существует)
+            // Обработка цены
             try {
-                String applicationEndDate = cardElement.findElement(By.xpath(
-                                ".//div[contains(@class, 'data-block__title') and contains(text(), 'Окончание подачи заявок')]/following-sibling::div"))
-                        .getText().trim();
-                result.put("applicationEndDate", applicationEndDate);
+                WebElement priceElement = cardElement.findElement(By.cssSelector(".price-block__value"));
+                String priceText = priceElement.getText().trim();
+                String initialPrice = priceText.replaceAll("[^\\d,]", "").replace(",", ".").trim();
+                result.put("initialPrice", initialPrice);
+
+                String[] priceParts = priceText.split("\\s+");
+                String currency = priceParts.length > 0 ? priceParts[priceParts.length - 1] : "";
+                result.put("currency", currency);
             } catch (NoSuchElementException e) {
-                System.out.println("Элемент 'Окончание подачи заявок' не найден");
-                result.put("applicationEndDate", null);
+                System.out.println("Элемент цены не найден");
+                result.put("initialPrice", null);
+                result.put("currency", null);
             }
+
+            result.put("publicationDate", safeFindElementText(cardElement,
+                    By.xpath(".//div[contains(@class, 'data-block__title') and contains(text(), 'Размещено')]/following-sibling::div")));
+            result.put("updateDate", safeFindElementText(cardElement,
+                    By.xpath(".//div[contains(@class, 'data-block__title') and contains(text(), 'Обновлено')]/following-sibling::div")));
+
+            // Парсим дату окончания подачи заявок
+            result.put("applicationEndDate", safeFindElementText(cardElement,
+                    By.xpath(".//div[contains(@class, 'data-block__title') and contains(text(), 'Окончание подачи заявок')]/following-sibling::div")));
+
             // Парсим ссылки (контракт, план закупки, жалоба)
             try {
                 WebElement hrefBlock = cardElement.findElement(By.cssSelector(".href-block"));
                 List<WebElement> links = hrefBlock.findElements(By.tagName("a"));
 
-                if (!links.isEmpty()) {
-                    // Ссылка на контракт (первая ссылка в блоке)
-                    String contractLink = links.get(0).getAttribute("href");
-                    result.put("contractLink", contractLink);
-
-                    // Ссылка на план закупки (вторая ссылка)
-                    String purchasePlanLink = links.get(1).getAttribute("href");
-                    result.put("purchasePlanLink", purchasePlanLink);
-
-                    // Ссылка на жалобы (третья ссылка)
-                    String complaintLink = links.get(2).getAttribute("href");
-                    result.put("complaintLink", complaintLink);
-                }
+                result.put("contractLink", links.size() > 0 ? links.get(0).getAttribute("href") : null);
+                result.put("purchasePlanLink", links.size() > 1 ? links.get(1).getAttribute("href") : null);
+                result.put("complaintLink", links.size() > 2 ? links.get(2).getAttribute("href") : null);
             } catch (NoSuchElementException e) {
                 System.out.println("Блок с ссылками не найден");
                 result.put("contractLink", null);
@@ -213,17 +193,23 @@ public class MainInfoParser223 {
                 result.put("complaintLink", null);
             }
 
-//            // Для отладки можно вывести результаты
-//            System.out.println("=== Парсинг карточки закупки ===");
-//            result.forEach((key, value) -> System.out.println(key + ": " + value));
-//            System.out.println("===============================");
-
         } catch (Exception e) {
             System.out.println("Ошибка при парсинге карточки закупки: " + e.getMessage());
-            throw e;
+            // Можно либо вернуть пустой Map, либо заполнить его null значениями
+            // В данном случае просто продолжаем с уже собранными данными
         }
 
         return result;
+    }
+
+    // Вспомогательный метод для безопасного поиска текста элемента
+    private String safeFindElementText(WebElement parent, By locator) {
+        try {
+            return parent.findElement(locator).getText().trim();
+        } catch (NoSuchElementException e) {
+            System.out.println("Элемент не найден: " + locator);
+            return null;
+        }
     }
 
 
