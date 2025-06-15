@@ -611,6 +611,28 @@ public class DatabaseManager {
             var4.printStackTrace();
         }
 
+        query = "CREATE TABLE IF NOT EXISTS public.supplier_summary (\n" +
+                "    contract_id bigint PRIMARY KEY,\n" +
+                "    start_date date,\n" +
+                "    end_date date,\n" +
+                "    contract_duration_days integer,\n" +
+                "    inn varchar,\n" +
+                "    name varchar,\n" +
+                "    max_complaints integer,\n" +
+                "    reason varchar,\n" +
+                "    status varchar,\n" +
+                "    total_judicial_proceedings bigint,\n" +
+                "    proceedings_descriptions text,\n" +
+                "    okpd2_codes text\n" +
+                ");";
+
+        try {
+            this.executeQueryNoResult(db_module, query);
+        } catch (SQLException var4) {
+            var4.printStackTrace();
+        }
+
+
     }
 
     public void updateTables(boolean db_main, boolean db_module) {
@@ -646,18 +668,18 @@ public class DatabaseManager {
         }
 
         // 2. Загрузка данных из suppliers
-        String supplierQuery = "SELECT id, country_name, country_code, inn FROM public.suppliers";
+        String supplierQuery = "SELECT id, name, inn FROM public.suppliers";
         try {
             ResultSet supplierSet = this.executeQuery(db_module, supplierQuery);
             try {
                 while (supplierSet.next()) {
                     long id = supplierSet.getLong("id") + 10_000_000;
-                    String name = supplierSet.getString("country_name"); // scaption
-                    String code = supplierSet.getString("country_code"); // scode
+                    String name = supplierSet.getString("name"); // scaption
+                    String code = supplierSet.getString("inn"); // scode
                     String inn = supplierSet.getString("inn"); // sinn
                     double c_rep = 1.0;
                     int globalStatus = 0;
-                    rowCs.add(new rowContras(id, name, c_rep, code, inn, globalStatus));
+                    rowCs.add(new rowContras(id, name, c_rep, "ИИН: " + code, inn, globalStatus));
                 }
             } finally {
                 if (supplierSet != null) {
@@ -685,6 +707,8 @@ public class DatabaseManager {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+        transferSupplierSummaryData();
+
 
         List<rowGoods> rowGs = new ArrayList();
         query = "SELECT DISTINCT bs.id as id_g, bs.sname as name_g, bs.sarticle as code_g, bs.jtypesizeattrs ->> 'width' as w_g, bs.jtypesizeattrs ->> 'length' as l_g, bs.jtypesizeattrs ->> 'height' as h_g, bs.jtypesizeattrs ->> 'diameter' as d_g, bs.jtypesizeattrs ->> 'thickness' as t_g, bg_mi.sheadline as measure_g FROM public.bs_goods bs ";
@@ -1006,7 +1030,7 @@ public class DatabaseManager {
                 + "    0.0 AS nprc, "
                 + "    0.0 AS nqtysale, "
                 + "    0.0 AS nprcsale, "
-                + "    1.0 AS ngoodquality, "
+                + "    ss.max_complaints AS ngoodquality, "
                 + "    0.0 AS ncontrasdelay "
                 + "FROM public.supplier_summary ss "
                 + "JOIN public.purchases p ON ss.contract_id = p.contract_id "
@@ -1028,8 +1052,8 @@ public class DatabaseManager {
                      n_qty = resultSet2.getDouble("nqty");
                      nprc = resultSet2.getDouble("nprc");
                      n_qty_b = resultSet2.getDouble("nqtysale");
-                    double nprc_b = resultSet2.getDouble("nprcsale");
-                    double g_qual = 1.0;  // Хорошее качество товара (по умолчанию 1.0)
+                    double nprc_b = 0.0;
+                    double g_qual = resultSet2.getDouble("ngoodquality");  // Хорошее качество товара (по умолчанию 1.0)
                     double c_del = 0.0;   // Задержка контрагента (по умолчанию 0.0)
 
                     // Добавляем новый объект rowLot в список
@@ -1138,21 +1162,16 @@ public class DatabaseManager {
         }
 
         query =
-                "UPDATE public.module_lotcriterion mlc " +
-                        "SET ndeliverytime = ( " +
-                        "    SELECT pl.ndeliverytime " +
-                        "    FROM prs_lot pl " +
-                        "    WHERE pl.id_contras = mlc.id_contras " +
-                        "      AND pl.id_goods = mlc.id_goods " +
-                        "    LIMIT 1 " +
-                        ") " +
-                        "WHERE mlc.id_contras > 10000000 " +
-                        "  AND mlc.id_goods > 10000000 " +
-                        "  AND EXISTS ( " +
-                        "    SELECT 1 FROM prs_lot pl2 " +
-                        "    WHERE pl2.id_contras = mlc.id_contras " +
-                        "      AND pl2.id_goods = mlc.id_goods " +
-                        ");";
+                "UPDATE public.module_lotcriterion mlc\n" +
+                        "SET \n" +
+                        "    ndeliverytime = pl.ndeliverytime,\n" +
+                        "    ngoodquality = pl.ngoodquality\n" +
+                        "FROM prs_lot pl\n" +
+                        "WHERE \n" +
+                        "    mlc.id_contras = pl.id_contras\n" +
+                        "    AND mlc.id_goods = pl.id_goods\n" +
+                        "    AND mlc.id_contras >= 10000000\n" +
+                        "    AND mlc.id_goods >= 10000000;";
 
         try {
             this.executeQueryNoResult(db_module, query);
@@ -1881,7 +1900,6 @@ public class DatabaseManager {
                 "JOIN bs_goods bg ON mw.id_goods = bg.id " +
                 "JOIN prs_lot pl ON bg.id = pl.id_goods " +
                 "JOIN bs_contras bc ON pl.id_contras = bc.id " +
-                "WHERE bc.id >= 10000000 " +
                 "ON CONFLICT (id_contras, id_goods) DO NOTHING";
 
         try {
@@ -2182,10 +2200,21 @@ public class DatabaseManager {
         return filteredCGOwes;
     }
 
-    public List<rowContrasGoodsOrdersWithWeights> getCGOwesAsUserCrit(boolean db_module, String filterContrasName, String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
+    public List<rowContrasGoodsOrdersWithWeights> getCGOwesAsUserCrit(boolean db_module, String filterContrasName,
+                                                                      String filterGoodName, String filterOrderName, String filterCGDateSupply, String filterCGMinVolume, String okpd2) {
+
+        // Сначала получаем список всех пользовательских критериев
         List<rowContrasGoodsOrdersWithWeights> filteredCGOwes = new ArrayList<>();
 
-        // Базовый запрос
+        // Сначала получаем список всех пользовательских критериев
+        List<Long> userCriteriaIds = getAllUserCriteriaIds(db_module);
+
+        // Формируем часть запроса для пользовательских критериев
+        StringBuilder userCritsSelect = new StringBuilder();
+        for (Long critId : userCriteriaIds) {
+            userCritsSelect.append(", module_lotcriterion.user_crit_").append(critId).append(" AS user_crit_").append(critId);
+        }
+
         String query = "SELECT DISTINCT bs_order.id AS o_id, bs_order.scaption AS o_name, " +
                 "bs_contras.id AS c_id, bs_contras.scaption AS c_name, " +
                 "bs_goods.id AS g_id, bs_goods.sname AS g_name, " +
@@ -2193,7 +2222,8 @@ public class DatabaseManager {
                 "module_lotcriterion.nqty AS min_vol, " +
                 "module_lotcriterion.ngoodquality AS g_qual, " +
                 "bs_contras.ncontrasreliability AS c_rep, " +
-                "bs_goods.okpd2 AS g_okpd2 " +
+                "bs_goods.okpd2 AS g_okpd2 " + // Добавляем выборку поля okpd2
+                userCritsSelect.toString() + " " +
                 "FROM bs_order " +
                 "JOIN mes_workorder ON bs_order.id = mes_workorder.id_order " +
                 "JOIN bs_goods ON mes_workorder.id_goods = bs_goods.id " +
@@ -2201,81 +2231,126 @@ public class DatabaseManager {
                 "JOIN bs_contras ON module_lotcriterion.id_contras = bs_contras.id " +
                 "WHERE 1=1";
 
-        List<String> conditions = new ArrayList<>();
-        List<Object> params = new ArrayList<>();
-
+        // Добавляем фильтры
         if (!filterContrasName.isEmpty()) {
-            conditions.add("bs_contras.scaption ILIKE ?");
-            params.add("%" + filterContrasName.trim() + "%");
+            query += " AND bs_contras.scaption ILIKE '%" + filterContrasName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterGoodName.isEmpty()) {
-            conditions.add("bs_goods.sname ILIKE ?");
-            params.add("%" + filterGoodName.trim() + "%");
+            query += " AND bs_goods.sname ILIKE '%" + filterGoodName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterOrderName.isEmpty()) {
-            conditions.add("bs_order.scaption ILIKE ?");
-            params.add("%" + filterOrderName.trim() + "%");
+            query += " AND bs_order.scaption ILIKE '%" + filterOrderName.trim().replace("'", "''") + "%'";
         }
-
         if (!filterCGDateSupply.isEmpty()) {
-            conditions.add("module_lotcriterion.ndeliverytime = ?");
-            params.add(Integer.parseInt(filterCGDateSupply));
+            query += " AND module_lotcriterion.ndeliverytime = " + filterCGDateSupply;
         }
-
         if (!filterCGMinVolume.isEmpty()) {
-            conditions.add("module_lotcriterion.nqty = ?");
-            params.add(Double.parseDouble(filterCGMinVolume));
+            query += " AND module_lotcriterion.nqty = " + filterCGMinVolume;
+        }
+        // Добавляем фильтр по okpd2 с точным совпадением
+        if (okpd2 != null && !okpd2.isEmpty()) {
+            query += " AND bs_goods.okpd2 = '" + okpd2.trim().replace("'", "''") + "'";
         }
 
-        if (!okpd2.isEmpty()) {
-            conditions.add("bs_goods.okpd2 = ?");
-            params.add(okpd2);
-        }
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+            while (resultSet.next()) {
+                long o_id = resultSet.getLong("o_id");
+                long c_id = resultSet.getLong("c_id");
+                long g_id = resultSet.getLong("g_id");
+                String o_name = resultSet.getString("o_name");
+                String c_name = resultSet.getString("c_name");
+                String g_name = resultSet.getString("g_name");
+                int deliveryTime = resultSet.getInt("date_supply");
+                double minQuantity = resultSet.getDouble("min_vol");
+                double g_quality = resultSet.getDouble("g_qual");
+                double c_rep = resultSet.getDouble("c_rep");
 
-        if (!conditions.isEmpty()) {
-            query += " AND " + String.join(" AND ", conditions);
-        }
+                rowContrasGoodsOrdersWithWeights row = new rowContrasGoodsOrdersWithWeights(
+                        c_id, c_name, g_id, g_name, o_id, o_name,
+                        deliveryTime, 1.0, minQuantity, 1.0,
+                        g_quality, 1.0, c_rep, 1.0, null, 1.0
+                );
 
-        try (Connection conn = getConnection(db_module);
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-
-            for (int i = 0; i < params.size(); i++) {
-                if (params.get(i) instanceof Integer) {
-                    stmt.setInt(i + 1, (Integer) params.get(i));
-                } else if (params.get(i) instanceof Double) {
-                    stmt.setDouble(i + 1, (Double) params.get(i));
-                } else {
-                    stmt.setString(i + 1, (String) params.get(i));
+                // Загружаем пользовательские критерии
+                for (Long critId : userCriteriaIds) {
+                    String columnName = "user_crit_" + critId;
+                    if (resultSet.getObject(columnName) != null) {
+                        double critValue = resultSet.getDouble(columnName);
+                        row.setUserCritValue(critId, critValue);
+                    }
                 }
+
+                filteredCGOwes.add(row);
             }
-
-            try (ResultSet resultSet = stmt.executeQuery()) {
-                while (resultSet.next()) {
-                    long o_id = resultSet.getLong("o_id");
-                    long c_id = resultSet.getLong("c_id");
-                    long g_id = resultSet.getLong("g_id");
-                    String o_name = resultSet.getString("o_name");
-                    String c_name = resultSet.getString("c_name");
-                    String g_name = resultSet.getString("g_name");
-                    int deliveryTime = resultSet.getInt("date_supply");
-                    double minQuantity = resultSet.getDouble("min_vol");
-                    double g_quality = resultSet.getDouble("g_qual");
-                    double c_rep = resultSet.getDouble("c_rep");
-
-                    filteredCGOwes.add(new rowContrasGoodsOrdersWithWeights(
-                            c_id, c_name, g_id, g_name, o_id, o_name,
-                            deliveryTime, 1.0, minQuantity, 1.0,
-                            g_quality, 1.0, c_rep, 1.0, null, 1.0
-                    ));
-                }
+            if (resultSet != null) {
+                resultSet.close();
             }
         } catch (SQLException e) {
             e.printStackTrace();
         }
 
         return filteredCGOwes;
+    }
+
+    private List<Long> getAllUserCriteriaIds(boolean db_module) {
+        List<Long> criteriaIds = new ArrayList<>();
+        String query = "SELECT id FROM module_criterion WHERE id > 3"; // ID > 3 считаем пользовательскими
+
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+            try {
+                while (resultSet.next()) {
+                    criteriaIds.add(resultSet.getLong("id"));
+                }
+            } catch (Throwable t) {
+                if (resultSet != null) {
+                    try {
+                        resultSet.close();
+                    } catch (Throwable t1) {
+                        t.addSuppressed(t1);
+                    }
+                }
+                throw t;
+            }
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return criteriaIds;
+    }
+
+    public List<Long> getAllCriteriaIds(boolean db_module) {
+        List<Long> criteriaIds = new ArrayList<>();
+        String query = "SELECT id FROM module_criterion";
+
+        try {
+            ResultSet resultSet = this.executeQuery(db_module, query);
+            try {
+                while (resultSet.next()) {
+                    criteriaIds.add(resultSet.getLong("id"));
+                }
+            } catch (Throwable t) {
+                if (resultSet != null) {
+                    try {
+                        resultSet.close();
+                    } catch (Throwable t1) {
+                        t.addSuppressed(t1);
+                    }
+                }
+                throw t;
+            }
+            if (resultSet != null) {
+                resultSet.close();
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return criteriaIds;
     }
 
 
@@ -2339,6 +2414,7 @@ public class DatabaseManager {
                     String g_name = resultSet.getString("g_name").trim();
                     double r_rat = resultSet.getDouble("r_rat");
 
+                    //СМОТРИ USERCRITS (Дополнительный критерии для рейтинга)
                     ratedCGOwes.add(new rowContrasGoodsOrdersWithWeights(
                             c_id, c_name, g_id, g_name, o_id, o_name,
                             0, 1.0D, 0.0D, 1.0D, 0.0D, 1.0D, 0.0D, 1.0D, null, r_rat));
@@ -3641,6 +3717,82 @@ public class DatabaseManager {
         }
 
         return list;
+    }
+
+    public void transferSupplierSummaryData() {
+        // 1. Сначала получаем данные из исходных таблиц
+        String selectQuery = "SELECT " +
+                "c.id AS contract_id, " +
+                "c.start_date, " +
+                "c.end_date, " +
+                "(c.end_date - c.start_date) AS contract_duration_days, " +
+                "s.inn, " +
+                "s.name AS name, " +
+                "MAX(p.complaints) AS max_complaints, " +
+                "sr.reason, " +
+                "sr.status, " +
+                "COUNT(DISTINCT jp.id) AS total_judicial_proceedings, " +
+                "STRING_AGG(DISTINCT jp.description, '; ') AS proceedings_descriptions, " +
+                "STRING_AGG(DISTINCT po.ktru_okpd2_codes, '; ') AS okpd2_codes " +
+                "FROM public.contracts c " +
+                "LEFT JOIN public.suppliers s ON c.supplier_id = s.id " +
+                "LEFT JOIN public.purchases p ON c.id = p.contract_id " +
+                "LEFT JOIN public.supplier_reliability sr ON c.supplier_id = sr.supplier_id " +
+                "LEFT JOIN public.judicial_proceedings jp ON c.supplier_id = jp.supplier_id " +
+                "LEFT JOIN public.procurement_objects po ON p.id = po.purchase_id " +
+                "GROUP BY c.id, c.start_date, c.end_date, s.inn, s.name, sr.reason, sr.status";
+
+        // 2. Затем вставляем полученные данные в целевую таблицу
+        String insertQuery = "INSERT INTO public.supplier_summary " +
+                "(contract_id, start_date, end_date, contract_duration_days, " +
+                "inn, name, max_complaints, reason, status, " +
+                "total_judicial_proceedings, proceedings_descriptions, okpd2_codes) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) " +
+                "ON CONFLICT (contract_id) DO UPDATE SET " +
+                "contract_id = EXCLUDED.contract_id " +
+                "WHERE supplier_summary.inn = EXCLUDED.inn " +
+                "AND supplier_summary.name = EXCLUDED.name " +
+                "AND supplier_summary.start_date = EXCLUDED.start_date " +
+                "AND supplier_summary.end_date = EXCLUDED.end_date " +
+                "AND supplier_summary.contract_duration_days = EXCLUDED.contract_duration_days " +
+                "AND supplier_summary.max_complaints = EXCLUDED.max_complaints " +
+                "AND (supplier_summary.reason IS NOT DISTINCT FROM EXCLUDED.reason) " +
+                "AND (supplier_summary.status IS NOT DISTINCT FROM EXCLUDED.status) " +
+                "AND supplier_summary.total_judicial_proceedings = EXCLUDED.total_judicial_proceedings " +
+                "AND (supplier_summary.proceedings_descriptions IS NOT DISTINCT FROM EXCLUDED.proceedings_descriptions) " +
+                "AND (supplier_summary.okpd2_codes IS NOT DISTINCT FROM EXCLUDED.okpd2_codes)";
+
+        try (Connection connection = getConnection(false);
+             Statement selectStmt = connection.createStatement();
+             ResultSet resultSet = selectStmt.executeQuery(selectQuery);
+             PreparedStatement insertStmt = connection.prepareStatement(insertQuery)) {
+
+            connection.setAutoCommit(false);
+
+            // Обрабатываем ResultSet и добавляем в batch
+            while (resultSet.next()) {
+                insertStmt.setLong(1, resultSet.getLong("contract_id"));
+                insertStmt.setDate(2, resultSet.getDate("start_date"));
+                insertStmt.setDate(3, resultSet.getDate("end_date"));
+                insertStmt.setInt(4, resultSet.getInt("contract_duration_days"));
+                insertStmt.setString(5, resultSet.getString("inn"));
+                insertStmt.setString(6, resultSet.getString("name"));
+                insertStmt.setInt(7, resultSet.getInt("max_complaints"));
+                insertStmt.setString(8, resultSet.getString("reason"));
+                insertStmt.setString(9, resultSet.getString("status"));
+                insertStmt.setLong(10, resultSet.getLong("total_judicial_proceedings"));
+                insertStmt.setString(11, resultSet.getString("proceedings_descriptions"));
+                insertStmt.setString(12, resultSet.getString("okpd2_codes"));
+                insertStmt.addBatch();
+            }
+
+            insertStmt.executeBatch();
+            connection.commit();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // Обработка ошибки
+        }
     }
 
     public class CriterionData {

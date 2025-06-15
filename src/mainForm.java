@@ -27,6 +27,7 @@ import java.awt.*;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
@@ -197,11 +198,17 @@ public class mainForm extends JFrame {
     private JButton StopParser;
     private JButton PauseParsingButton;
     private JButton StopParseringButton;
+
     private JButton EGRUL_PDF_Parser_Start;
     private JButton EGRUL_PDF_Parser_Stop;
+    private AtomicBoolean EGRUL_Parser_isStopped = new AtomicBoolean(false);
+
     private JButton EGRUL_PDF_To_Data;
-    private JProgressBar EGRUL_Parser_Progress_Bar;
+    private JProgressBar EGRUL_Progress_Bar;
     private JLabel EGRUL_PDF_Bar_status;
+    private JLabel EGRUL_Parser_left;
+    private JLabel EGRUL_PDF_left;
+
     private StatusForm statusForm;
     private JTextField textFieldFilterOkpd2;
     private JTextField textFieldFilterGroup;
@@ -235,6 +242,7 @@ public class mainForm extends JFrame {
 
     private DatabaseManager dbManager;
     private JComboBox<String> comboBoxProfileCriterion;
+    private JPanel ParserPanel;
 
 
     public enum Role {
@@ -248,6 +256,8 @@ public class mainForm extends JFrame {
     }
 
     private Role currentRole;
+    private Thread EGRUL_Thread;
+    private Thread PDF_to_Data_Thread;
 
     private void applyRolePermissions() {
         boolean isExpert = currentRole == Role.EXPERT;
@@ -260,6 +270,7 @@ public class mainForm extends JFrame {
         buttonCritEditAddPoint.setEnabled(isExpert);
         buttonSync.setEnabled(isExpert);
         buttonCreateProfile.setEnabled(isExpert);
+        ParserPanel.setVisible(isExpert);
 
         // И так далее для всех элементов
         textFieldCritEditWeight.setEditable(isExpert);
@@ -568,17 +579,31 @@ public class mainForm extends JFrame {
         comboBoxProfileCriterion.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                String selectedProfile = (String) comboBoxProfileCriterion.getSelectedItem();
+                try {
+                    String selectedProfile = (String) comboBoxProfileCriterion.getSelectedItem();
 
-                if (selectedProfile != null && !selectedProfile.isEmpty()) {
+                    if (selectedProfile == null || selectedProfile.isEmpty()) {
+                        return;
+                    }
+
                     boolean success = dbExtractor.applyProfileByName(selectedProfile);
 
                     if (success) {
                         JOptionPane.showMessageDialog(null, "Профиль \"" + selectedProfile + "\" успешно применён!");
-                        updateCritValues(); // если реализовано
+
+                        // Проверяем, установлены ли CritString/CritShort перед обновлением
+                        if (CritString != null && !CritString.isEmpty() &&
+                                CritShort != null && !CritShort.isEmpty()) {
+                            updateCritValues();
+                        }
                     } else {
                         JOptionPane.showMessageDialog(null, "Ошибка при применении профиля.");
                     }
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(null,
+                            "Ошибка при обработке профиля: " + ex.getMessage(),
+                            "Ошибка", JOptionPane.ERROR_MESSAGE);
+                    ex.printStackTrace();
                 }
             }
         });
@@ -914,7 +939,8 @@ public class mainForm extends JFrame {
                     String c_code = tableCrit.getValueAt(i, 1).toString();
                     String c_name = tableCrit.getValueAt(i, 2).toString();
                     Long g_id = Long.parseLong(tableCrit.getValueAt(i, 3).toString());
-                    String g_code = tableCrit.getValueAt(i, 4).toString();
+                    String g_code_raw = tableCrit.getValueAt(i, 4) == null ? "" : tableCrit.getValueAt(i, 4).toString();
+                    String g_code = g_code_raw.trim(); // можно еще trim(), чтобы убрать случайные пробелы
                     String g_name = tableCrit.getValueAt(i, 5).toString();
 
                     // Обрабатываем ввод пользователя (заменяем запятую на точку)
@@ -1053,7 +1079,7 @@ public class mainForm extends JFrame {
 
         DefaultTableModel modelCGOws = new DefaultTableModel(
                 new Object[][]{},
-                new String[]{"Наименование заказа", "Наименование поставщика", "Наименование ТМЦ", "Срок поставки, день", "Вес срока поставки", "Минимальная партия поставки, ед.", "Вес минимальной партии", "Уровень качества ТМЦ, %", "Вес уровня качества ТМЦ", "Деловая репутация, флаг", "Вес деловой репутации", "Рейтинг"}
+                new String[]{"Наименование заказа", "Наименование поставщика", "Наименование ТМЦ", "Срок поставки, день", "Минимальная партия поставки, ед.", "Уровень качества ТМЦ по жалобам", "Деловая репутация", "Рейтинг", "Категория"}
         ) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -1089,8 +1115,7 @@ public class mainForm extends JFrame {
                         textFieldFilterOrder.getText(),
                         textFieldFilterDate.getText(),
                         textFieldFilterMinVolume.getText(),
-                        textFieldFilterOkpd2.getText(),
-                        textFieldFilterGroup.getText()
+                        textFieldFilterOkpd2.getText()
                 );
 
                 // Обновляем таблицу
@@ -1916,6 +1941,13 @@ public class mainForm extends JFrame {
             stopParsing();
         });
         EGRUL_PDF_Parser_Start.addActionListener(e -> EGRUL_Parser_Start());
+        EGRUL_PDF_Parser_Stop.addActionListener(e -> {
+            try {
+                EGRUL_Parser_Stop();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+        });
         EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
 
         Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "resources/currency.json");
@@ -2431,31 +2463,50 @@ public class mainForm extends JFrame {
             DefaultTableModel modelContrasGoodsOrdersWeights = (DefaultTableModel) tableRating.getModel();
 
             for (rowContrasGoodsOrdersWithWeights rowCGOw : rowsCGOws) {
+                String category = getRatingCategoryByNN(rowCGOw);
                 modelContrasGoodsOrdersWeights.addRow(new Object[]{
                         rowCGOw.getOrderName(),
                         rowCGOw.getContrasName(),
                         rowCGOw.getGoodName(),
                         formatValue(rowCGOw.getDeliveryTime()),
-                        formatValue(rowCGOw.getDeliveryTimeFinalWeight()),
                         formatValue(rowCGOw.getMinVolume()),
-                        formatValue(rowCGOw.getMinVolumeFinalWeight()),
                         formatValue(rowCGOw.getGoodQuality()),
-                        formatValue(rowCGOw.getGoodQualityFinalWeight()),
                         formatValue(rowCGOw.getContrasReputation()),
-                        formatValue(rowCGOw.getContrasReputationFinalWeight()),
-                        formatValue(rowCGOw.getRatingComplete())
+                        formatValue(rowCGOw.getRatingComplete()),
+                        category
                 });
             }
 
             // Включаем сортировку после обновления данных
             try {
-                enableSortingForTable(tableRating, 3, 4, 5, 6, 7, 8, 9, 10, 11); // Указываем числовые столбцы для корректной сортировки
+                enableSortingForTable(tableRating, 3, 4, 5, 6, 7); // Указываем числовые столбцы для корректной сортировки
             } catch (Exception e) {
                 System.err.println("Ошибка при применении сортировки: " + e.getMessage());
             }
         } else {
             System.out.println("Ошибка: tableRating не инициализирована.");
         }
+    }
+
+    private NeuralNetwork nn;
+    private String getRatingCategoryByNN(rowContrasGoodsOrdersWithWeights row) {
+        if (nn == null) {
+            nn = new NeuralNetwork(4, 5);
+
+        }
+
+        double[] input = new double[] {
+                row.getDeliveryTimeFinalWeight(),
+                row.getMinVolumeFinalWeight(),
+                row.getGoodQualityFinalWeight(),
+                row.getContrasReputationFinalWeight()
+        };
+
+        double value = nn.predict(input); // исправлено с feedforward на predict
+
+        if (value >= 0.7) return "Надёжный поставщик";
+        else if (value >= 0.4) return "Допустимый поставщик";
+        else return "Ненадёжный поставщик";
     }
 
 
@@ -2876,27 +2927,124 @@ public class mainForm extends JFrame {
     }
 
     private void EGRUL_Parser_Start(){
-//        try {
-//            EGRUL_PDF_Parser_Start.setText("Парсинг...");
-//            EGRUL_PDF_Parser_Start.setEnabled(false);
-//
-//            EGRUL_Parser_Progress_Bar.setMinimum(0);
-//            EGRUL_Parser_Progress_Bar.setMaximum(Parser_EGRUL.Parser.countRemainingUrls());
-//
-//
-//
-//            Parser_EGRUL.Parser.StartParsingEGRUL();
-//        } catch (IOException e) {
-//            EGRUL_PDF_Bar_status.setText("Ошибка при сборе данных " + e.toString());
-//        }
+        if (EGRUL_Thread != null && EGRUL_Thread.isAlive()) {
+            return;
+        }
+
+        EGRUL_Parser_isStopped.set(false);
+
+        EGRUL_Thread = new Thread(() -> {
+
+            EGRUL_PDF_Parser_Start.setText("Парсинг...");
+            EGRUL_PDF_Parser_Start.setEnabled(false);
+            EGRUL_PDF_To_Data.setEnabled(false);
+            EGRUL_PDF_Parser_Stop.setEnabled(true);
+            EGRUL_PDF_Bar_status.setText("Парсинг PDF");
+            EGRUL_Progress_Bar.setMinimum(0);
+
+            try {
+                Parser_EGRUL.Parser.StartParsingEGRUL(EGRUL_Parser_isStopped, new Parser_EGRUL.Parser.ProgressUpdater() {
+                    @Override
+                    public void incrementProgress() {
+                        SwingUtilities.invokeLater(() -> {
+                            EGRUL_Progress_Bar.setValue(EGRUL_Progress_Bar.getValue() + 1);
+                        });
+                    }
+
+                    @Override
+                    public void updateStatus(String text) {
+                        SwingUtilities.invokeLater(() -> {
+                            EGRUL_Parser_left.setText(text);
+                        });
+                    }
+
+                    @Override
+                    public void defineBarMaximum(int number) {
+                        SwingUtilities.invokeLater(() -> {
+                            EGRUL_Progress_Bar.setMaximum(number);
+                        });
+                    }
+                });
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            // Восстанавливаем UI
+            SwingUtilities.invokeLater(() -> {
+                EGRUL_PDF_Bar_status.setText("Парсинг остановлен");
+                EGRUL_PDF_Parser_Start.setText("Сбор PDF");
+                EGRUL_PDF_Parser_Start.setEnabled(true);
+                EGRUL_PDF_To_Data.setEnabled(true);
+                EGRUL_PDF_Parser_Stop.setEnabled(false);
+            });
+
+        });
+        EGRUL_Thread.start();
+    }
+
+    private void EGRUL_Parser_Stop() throws InterruptedException {
+        EGRUL_Parser_isStopped.set(true);  // Устанавливаем флаг остановки
+
+        if (EGRUL_Thread != null && EGRUL_Thread.isAlive()) {
+            EGRUL_Thread.interrupt();
+        }
+
+        try {
+            Runtime.getRuntime().exec("taskkill /F /IM chromedriver.exe /T");
+            Runtime.getRuntime().exec("taskkill /F /IM chrome.exe /T");
+        } catch (IOException e) {
+            System.err.println("Ошибка при закрытии Chrome: " + e.getMessage());
+        }
+
+        System.out.println("Обработка остановлена");
     }
 
     private void EGRUL_PDF_Processing(){
-//        try {
-//            Parser_EGRUL.Parser.StartParsingEGRUL(this);
-//        } catch (IOException e) {
-//            throw new RuntimeException(e);
-//        }
+        if (PDF_to_Data_Thread != null && PDF_to_Data_Thread.isAlive()) {
+            return;
+        }
+
+        PDF_to_Data_Thread = new Thread(() -> {
+
+            EGRUL_PDF_To_Data.setText("Обрабатываем...");
+            EGRUL_PDF_Parser_Start.setEnabled(false);
+            EGRUL_PDF_To_Data.setEnabled(false);
+            EGRUL_PDF_Bar_status.setText("Обработка PDF");
+            EGRUL_Progress_Bar.setMinimum(0);
+            EGRUL_Progress_Bar.setValue(0);
+
+            Parser_EGRUL.Data_Extractor.readAllInfoFromFiles(new Parser_EGRUL.Data_Extractor.ProgressUpdater() {
+                @Override
+                public void incrementProgress() {
+                    SwingUtilities.invokeLater(() -> {
+                        EGRUL_Progress_Bar.setValue(EGRUL_Progress_Bar.getValue() + 1);
+                    });
+                }
+
+                @Override
+                public void updateStatus(String text) {
+                    SwingUtilities.invokeLater(() -> {
+                        EGRUL_PDF_left.setText(text);
+                    });
+                }
+
+                @Override
+                public void defineBarMaximum(int number) {
+                    SwingUtilities.invokeLater(() -> {
+                        EGRUL_Progress_Bar.setMaximum(number);
+                    });
+                }
+            });
+
+            SwingUtilities.invokeLater(() -> {
+                EGRUL_PDF_Bar_status.setText("Обработка завершена");
+                EGRUL_PDF_Parser_Start.setEnabled(true);
+                EGRUL_PDF_To_Data.setEnabled(true);
+                EGRUL_PDF_To_Data.setText("Обработка PDF");
+            });
+
+        });
+        PDF_to_Data_Thread.start();
     }
 
     private void initStartParsingButton() {
