@@ -10,10 +10,11 @@ import java.util.Comparator;
 import java.awt.*;
 import java.sql.PreparedStatement;
 
+import Critical_Criteries.Extrem;
 import Critical_Criteries.InAgent;
+import Critical_Criteries.TerrorWeapon;
 import MainAnalyzer.*;
 import Parser.interfaces.*;
-import Parser_EGRUL.Parser;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -208,7 +209,7 @@ public class mainForm extends JFrame {
     private JLabel EGRUL_PDF_left;
 
     private JLabel crit_criteries_label;
-    private JButton crit_inagent_button;
+    private JButton crit_criteries_button;
 
     private StatusForm statusForm;
     private JTextField textFieldFilterOkpd2;
@@ -259,7 +260,7 @@ public class mainForm extends JFrame {
     private Role currentRole;
     private Thread EGRUL_Thread;
     private Thread PDF_to_Data_Thread;
-    private Thread InAgent_Thread;
+    private Thread Critical_Criteries_Thread;
 
     private void applyRolePermissions() {
         boolean isExpert = currentRole == Role.EXPERT;
@@ -1951,7 +1952,7 @@ public class mainForm extends JFrame {
             }
         });
         EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
-        crit_inagent_button.addActionListener(e -> Parser_InAgent());
+        crit_criteries_button.addActionListener(e -> Parser_InAgent());
 
         Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "resources/currency.json");
 
@@ -3051,22 +3052,24 @@ public class mainForm extends JFrame {
     }
 
     private void Parser_InAgent(){
-        if (InAgent_Thread != null && InAgent_Thread.isAlive()) {
+        if (Critical_Criteries_Thread != null && Critical_Criteries_Thread.isAlive()) {
             return;
         }
 
-        crit_inagent_button.setEnabled(false);
-        crit_inagent_button.setText("Сбор данных");
+        crit_criteries_button.setEnabled(false);
+        crit_criteries_button.setText("Сбор данных");
 
-        InAgent_Thread = new Thread(() -> {
+        Critical_Criteries_Thread = new Thread(() -> {
             InAgent.ParserInAgent();
+            Extrem.ParseData();
+            TerrorWeapon.ParseData();
 
             SwingUtilities.invokeLater(() -> {
-                crit_inagent_button.setEnabled(true);
-                crit_inagent_button.setText("Иностранные агенты");
+                crit_criteries_button.setEnabled(true);
+                crit_criteries_button.setText("Начать сбор");
             });
         });
-        InAgent_Thread.start();
+        Critical_Criteries_Thread.start();
     }
 
     private void initStartParsingButton() {

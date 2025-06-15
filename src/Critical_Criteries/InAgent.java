@@ -41,9 +41,7 @@ public class InAgent {
         File inagent_file = new File(filePath);
         if (inagent_file.exists()) {
             if (inagent_file.delete()) {
-                System.out.println("Файл успешно удален: " + filePath);
             } else {
-                System.out.println("Не удалось удалить файл: " + filePath);
             }
         }
 
@@ -52,7 +50,7 @@ public class InAgent {
             driver.findElement(By.id(targetId)).click();
 
             Thread.sleep(5000);
-            System.out.println("Файл загружен в: " + DOWNLOAD_DIR);
+            System.out.println("Файл данных успешно загружен в: " + DOWNLOAD_DIR);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -66,8 +64,6 @@ public class InAgent {
         String user = "postgres";
         String password = "177013";
 
-        System.out.println(1);
-
         List<List<String>> data = readXlsx(filePath);
         Connection conn = null;
         Statement stmt = null;
@@ -79,7 +75,7 @@ public class InAgent {
 
             if (tableExists(conn, "criterion_inagent")) {
                 stmt.executeUpdate("DROP TABLE criterion_inagent");
-                System.out.println("criterion_inagent удалена.");
+                System.out.println("criterion_inagent успешно удалена.");
             }
 
             stmt.executeUpdate(
@@ -105,7 +101,6 @@ public class InAgent {
                             "authorized_bank_correspondent_account_number VARCHAR, " +
                             "special_account_opening_date DATE, " +
                             "bank_account_agreement_date DATE)");
-            System.out.println("Таблица успешно создана!");
 
             String insertSQL = "INSERT INTO criterion_inagent VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement pstmt = conn.prepareStatement(insertSQL)) {
@@ -131,7 +126,7 @@ public class InAgent {
                     }
                     pstmt.executeUpdate();
                 }
-                System.out.println("Данные успешно добавлены!");
+                System.out.println("criterion_inagent успешно загружена!");
             }
 
         } catch (SQLException e) {
