@@ -17,7 +17,7 @@ public class Supplier {
     private String type;
 
     @NaturalId
-    @Column(name = "name", columnDefinition = "TEXT", unique = true)
+    @Column(name = "name", columnDefinition = "TEXT")
     private String name;
 
     @Column(name = "country_name", columnDefinition = "TEXT")
@@ -35,7 +35,7 @@ public class Supplier {
     @Column(name = "ogrn", length = 13)
     private String ogrn;
 
-    @Column(name = "inn", length = 12)
+    @Column(name = "inn", columnDefinition = "TEXT",unique = true)
     private String inn;
 
     @Column(name = "kpp", length = 9)

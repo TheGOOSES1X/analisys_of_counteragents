@@ -3113,7 +3113,8 @@ public class mainForm extends JFrame {
                 detailsParser.parseSupplierStatuses();
 //                detailsParser.cleanupDownloadDirectory();
 
-            } finally {
+            }
+            finally {
                 SwingUtilities.invokeLater(() -> {
                     if (parserState != ParserState.STOPPED) {
                         StartParsing.setText("Начать парсинг");
@@ -3413,7 +3414,7 @@ public class mainForm extends JFrame {
                 // После завершения парсинга сбрасываем кнопки
                 PauseParser.setEnabled(true);  // "Пауза" активна
                 StopParser.setEnabled(true);
-                StatusLabel.setText("Статус: запуск парсера...");
+//                StatusLabel.setText("Статус: запуск парсера...");
             });
         }).start();
     }
@@ -3426,7 +3427,7 @@ public class mainForm extends JFrame {
             StopParser.setEnabled(true); // Аналогично
 
             // Сбрасываем статус
-            StatusLabel.setText("Статус: готов к работе");
+//            StatusLabel.setText("Статус: готов к работе");
 
             // Если у вас есть другие элементы (например, ProgressBar), их тоже можно сбросить
             // ParserProgressBar.setValue(0);

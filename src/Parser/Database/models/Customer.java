@@ -15,7 +15,7 @@ public class Customer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "full_name", columnDefinition = "TEXT",unique = true)
+    @Column(name = "full_name", columnDefinition = "TEXT")
     private String fullName;
 
     @Column(name = "short_name", columnDefinition = "TEXT")
@@ -30,7 +30,7 @@ public class Customer {
     @Column(name = "last_updated")
     private LocalDateTime lastUpdated;
 
-    @Column(name = "inn", columnDefinition = "TEXT")
+    @Column(name = "inn", columnDefinition = "TEXT", unique = true)
     private String inn;
 
     @Column(name = "kpp", columnDefinition = "TEXT")

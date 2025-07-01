@@ -146,11 +146,24 @@ public class PurchasesParserHead implements PurchaseListParser {
 
         while (hasNextPage && !isStopped) {
             checkPaused();
-            navigateToPage(driver, wait, currentPage);
+            boolean pageLoaded = navigateToPage(driver, wait, currentPage);
+            if (!pageLoaded) break;
+
+            if (isNoResultsMessagePresent(driver)) {
+                if (statusListener != null) {
+                    statusListener.updateStatus("Поиск не дал результатов.");
+                }
+                break;
+            }
 
             if (currentPage == 1) {
                 totalItems = getTotalItemsCount(driver);
-                if (totalItems == 0) break;
+                if (totalItems == 0) {
+                    if (statusListener != null) {
+                        statusListener.updateStatus("Поиск не дал результатов. 0 записей.");
+                    }
+                    break;
+                }
             }
 
             List<WebElement> itemContainers = getItemContainers(driver);
@@ -174,18 +187,42 @@ public class PurchasesParserHead implements PurchaseListParser {
 
         return uniquePurchases;
     }
+    private boolean isNoResultsMessagePresent(WebDriver driver) {
+        try {
+            List<WebElement> noResults = driver.findElements(By.cssSelector("p.noRecords"));
+            return !noResults.isEmpty();
+        } catch (Exception e) {
+            System.err.println("Ошибка при проверке наличия сообщения о пустом результате: " + e.getMessage());
+            return false;
+        }
+    }
+
 
     private boolean navigateToPage(WebDriver driver, WebDriverWait wait, int pageNumber) {
         try {
             driver.get(buildPaginatedUrl(pageNumber));
-            wait.until(ExpectedConditions.presenceOfElementLocated(
-                    By.cssSelector(".registry-entry__header-mid__number")));
-            return true; // Успешно загрузилось
+
+            // Явное ожидание: или запись, или сообщение "нет результатов"
+            wait.until(driver1 ->
+                    !driver1.findElements(By.cssSelector(".registry-entry__header-mid__number")).isEmpty()
+                            || !driver1.findElements(By.cssSelector("p.noRecords")).isEmpty());
+
+            // Если на странице написано "Поиск не дал результатов", обрабатываем это отдельно
+            if (!driver.findElements(By.cssSelector("p.noRecords")).isEmpty()) {
+                if (statusListener != null) {
+                    statusListener.updateStatus("Поиск не дал результатов (0 записей).");
+                }
+                return false; // выходим из парсинга
+            }
+
+            return true;
         } catch (TimeoutException e) {
-            System.err.println("Элемент не найден на странице " + pageNumber + ". Пропускаем...");
-            return false; // Не удалось загрузить
+            handleError("Сайт не отвечает или структура страницы изменилась.", e);
+            return false;
         }
     }
+
+
 
     private int getTotalItemsCount(WebDriver driver) {
         int totalItems = extractTotalItems(driver);
@@ -233,7 +270,7 @@ public class PurchasesParserHead implements PurchaseListParser {
     }
 
     private void notifyCompletion(int totalProcessed) {
-        if (statusListener != null) {
+        if (statusListener != null && totalProcessed > 0) {
             statusListener.updateStatus("Парсинг завершен! Обработано: " + totalProcessed);
         }
     }

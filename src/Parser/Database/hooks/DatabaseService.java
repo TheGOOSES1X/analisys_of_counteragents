@@ -49,8 +49,8 @@ public class DatabaseService {
 
         Customer customer = purchase.getCustomer();
         Customer existingCustomer = session.createQuery(
-                        "FROM Customer WHERE fullName = :fullName", Customer.class)
-                .setParameter("fullName", customer.getFullName())
+                        "FROM Customer WHERE inn = :inn", Customer.class)
+                .setParameter("inn", customer.getInn())
                 .uniqueResult();
 
         if (existingCustomer != null) {
@@ -69,8 +69,8 @@ public class DatabaseService {
         Supplier supplier = purchase.getContract().getSupplier();
         if (supplier != null) {
             Supplier existingSupplier = session.createQuery(
-                            "FROM Supplier WHERE name = :name", Supplier.class)
-                    .setParameter("name", supplier.getName())
+                            "FROM Supplier WHERE inn = :inn", Supplier.class)
+                    .setParameter("inn", supplier.getInn())
                     .uniqueResult();
 
             if (existingSupplier != null) {

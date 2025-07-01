@@ -1,6 +1,6 @@
 package Parser.interfaces;
 import org.openqa.selenium.WebDriver;
 
-public interface  DriverSetup {
+public interface DriverSetup {
     WebDriver setupDriver();
 }

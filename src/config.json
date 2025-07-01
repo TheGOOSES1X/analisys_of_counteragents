@@ -3,5 +3,5 @@
   "USER" : "postgres",
   "PASSWORD" : "sa",
   "DB_Global_Marine" : "globaldb",
-  "DB_Global_Module" : "global_module_238"
+  "DB_Global_Module" : "NewOSSZ"
 }
