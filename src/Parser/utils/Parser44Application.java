@@ -340,18 +340,29 @@ public class Parser44Application {
 //            System.exit(1);
 //        }
 //        ResultsSaver<PurchaseItem> saver = new TextFileResultsSaver();
+
+
+
         String userAgent = RandomUserAgent.getRandomUserAgent();
         DriverSetup chromeSetup = new ChromeDriverSetup(userAgent);
         PurchaseParser44 parser = new PurchaseParser44(chromeSetup);
+//
+//        parser.parseUrlsParallel(
+//                new ArrayList<>(selectedUrls),
+//                result -> handleParseResult(result),
+//                8, null
+//        );
+//
+//
 
-        parser.parseUrlsParallel(
-                new ArrayList<>(selectedUrls),
-                result -> handleParseResult(result),
-                8, null
-        );
+
+
 //        parser.parseSupplierStatuses();
 //        parser.parseSupplierLitigations();
 //        parser.cleanupDownloadDirectory();
+        parser.parseSupplierLitigationsParallel(2);
+        parser.parseSupplierStatusesParallel(2);
+
 
     }
 

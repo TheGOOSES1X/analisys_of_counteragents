@@ -17,4 +17,8 @@ public interface PurchaseDetailsParser {
     void parseSupplierLitigations();
     void parseSupplierStatuses();
     void cleanupDownloadDirectory();
+
+    void parseSupplierStatusesParallel(int selectedThreadCount);
+
+    void parseSupplierLitigationsParallel(int selectedThreadCount);
 }

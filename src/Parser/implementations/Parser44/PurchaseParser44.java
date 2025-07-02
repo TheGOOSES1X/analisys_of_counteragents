@@ -173,8 +173,8 @@ public class PurchaseParser44 implements PurchaseDetailsParser {
                 // Обработка для 223-ФЗ
                 purchase = mainInfoParser223.parsePurchaseMainInfo(url, driver);
                 customer = mainInfoParser223.parsePurchaseCustomer(url, driver);
-                contract = mainInfoParser223.parsePurchaseContract(url, driver, wait);
-                procurementObjects = mainInfoParser223.parsePurchaseSubjects(url, driver,wait);
+                contract = mainInfoParser223.parsePurchaseContract(url, driver);
+                procurementObjects = mainInfoParser223.parsePurchaseSubjects(url, driver);
                 if (procurementObjects != null) {
                     procurementObjects.forEach(purchase::addProcurementObject);
                 }
@@ -264,6 +264,72 @@ public class PurchaseParser44 implements PurchaseDetailsParser {
             }
         }
     }
+    @Override
+    public void parseSupplierLitigationsParallel(int threadCount) {
+        List<String> supplierInns = getSupplierInnsFromDatabase();
+        if (supplierInns.isEmpty()) return;
+
+        isStopped = false;
+        isPaused = false;
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        List<Future<?>> futures = new ArrayList<>();
+
+        int chunkSize = (int) Math.ceil(supplierInns.size() / (double) threadCount);
+
+        for (int i = 0; i < supplierInns.size(); i += chunkSize) {
+            int end = Math.min(i + chunkSize, supplierInns.size());
+            List<String> subList = supplierInns.subList(i, end);
+
+            futures.add(executor.submit(() -> processLitigationChunk(subList)));
+        }
+
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(2, TimeUnit.MINUTES)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void processLitigationChunk(List<String> inns) {
+        DatabaseService dbService = new DatabaseService();
+        LitigationParser localParser = new LitigationParser(driverSetup.setupDriver());  // Локальный parser для потока
+
+        for (String inn : inns) {
+            if (isStopped) break;
+
+            while (isPaused && !isStopped) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+
+            try {
+                localParser.searchByInn(inn);
+                List<JudicialProceeding> proceedings = localParser.parseCases();
+                dbService.saveJudicialProceedings(proceedings, inn);
+
+            } catch (Exception e) {
+                System.err.println("Ошибка при парсинге дел для ИНН " + inn + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        try {
+            localParser.close(); // если в parser есть метод закрытия драйвера
+        } catch (Exception e) {
+            System.err.println("Ошибка при закрытии локального LitigationParser: " + e.getMessage());
+        }
+    }
+
+
 
     @Override
     public void parseSupplierStatuses() {
@@ -313,6 +379,90 @@ public class PurchaseParser44 implements PurchaseDetailsParser {
             }
         }
     }
+
+    @Override
+    public void parseSupplierStatusesParallel(int threadCount) {
+        List<String> supplierInns = getSupplierInnsFromDatabase();
+        if (supplierInns.isEmpty()) return;
+
+        isStopped = false;
+        isPaused = false;
+
+        ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+        List<Future<List<SupplierReliability>>> futures = new ArrayList<>();
+
+        int chunkSize = (int) Math.ceil(supplierInns.size() / (double) threadCount);
+
+        for (int i = 0; i < supplierInns.size(); i += chunkSize) {
+            int end = Math.min(i + chunkSize, supplierInns.size());
+            List<String> subList = supplierInns.subList(i, end);
+
+            futures.add(executor.submit(() -> processInnChunk(subList)));
+        }
+
+        DatabaseService dbService = new DatabaseService();
+        for (Future<List<SupplierReliability>> future : futures) {
+            try {
+                List<SupplierReliability> result = future.get();
+                if (!result.isEmpty()) {
+                    dbService.saveSupplierReliability(result);
+                }
+            } catch (Exception e) {
+                System.err.println("Ошибка при получении результата потока: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        executor.shutdown();
+        try {
+            if (!executor.awaitTermination(1, TimeUnit.MINUTES)) {
+                executor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private List<SupplierReliability> processInnChunk(List<String> inns) {
+        List<SupplierReliability> reliabilities = new ArrayList<>();
+
+        for (String inn : inns) {
+            if (isStopped) break;
+
+            while (isPaused && !isStopped) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+
+            try {
+                List<String> dishonestyLinks = supplierStatusParser.parseSupplierStatuses(Collections.singletonList(inn));
+                for (String link : dishonestyLinks) {
+                    try {
+                        SupplierReliability reliability = supplierStatusParser.parseAndPrintDetails(link);
+                        if (reliability != null) {
+                            reliability.setInn(inn);
+                            reliabilities.add(reliability);
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Ошибка при обработке ссылки " + link + " для ИНН " + inn + ": " + e.getMessage());
+                    }
+                }
+
+            } catch (Exception e) {
+                System.err.println("Ошибка при парсинге статусов для ИНН " + inn + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        return reliabilities;
+    }
+
+
     @Override
     public void cleanupDownloadDirectory() {
         Path downloadDir = Paths.get("downloads");

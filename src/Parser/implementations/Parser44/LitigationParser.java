@@ -181,4 +181,14 @@ public class LitigationParser {
             System.err.println("Ошибка при парсинге деталей дела: " + e.getMessage());
         }
     }
+
+    public void close() {
+        if (driver != null) {
+            try {
+                driver.quit();
+            } catch (Exception e) {
+                System.err.println("Ошибка при закрытии WebDriver в LitigationParser: " + e.getMessage());
+            }
+        }
+    }
 }
