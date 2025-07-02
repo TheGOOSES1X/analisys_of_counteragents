@@ -3108,7 +3108,7 @@ public class mainForm extends JFrame {
                     StatusLabel.setText("Парсинг судебных дел поставщиков...");
                     ParserProgressBar.setValue(statusForm.selectedUrls.size() + 1);
                 });
-
+                deselectAllCheckboxes();
 //                detailsParser.parseSupplierLitigations();
                 detailsParser.parseSupplierLitigationsParallel(selectedThreadCount);
 //                detailsParser.parseSupplierStatuses();
@@ -3125,6 +3125,7 @@ public class mainForm extends JFrame {
                         StopParseringButton.setEnabled(false);
                         parserState = ParserState.IDLE;
                         StatusLabel.setText("Парсинг завершен");
+
                         statusForm.selectedUrls.clear();
                     }
                 });
@@ -3486,7 +3487,22 @@ public class mainForm extends JFrame {
             System.out.println("Список: " + statusForm.selectedUrls);
         }
     }
+    private void deselectAllCheckboxes() {
+        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
+        int rowCount = model.getRowCount();
 
+        for (int i = 0; i < rowCount; i++) {
+            model.setValueAt(false, i, 3); // Снимаем галочку
+        }
+
+        // Полностью очищаем список выбранных URL (уверенно, после обновления модели)
+        statusForm.selectedUrls.clear();
+
+        // Обновляем интерфейс (если требуется)
+        HeadersTable.repaint();
+
+        System.out.println("Все чекбоксы сняты. statusForm.selectedUrls очищен.");
+    }
     private void initChooseRangeElementsButton() {
         DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
         int rowCount = model.getRowCount();
@@ -3633,8 +3649,9 @@ public class mainForm extends JFrame {
                 StopParseringButton.setEnabled(false);
                 StatusLabel.setText("Парсинг остановлен");
                 ParserProgressBar.setValue(0);
-
+                deselectAllCheckboxes();
             });
+
         }
     }
 
