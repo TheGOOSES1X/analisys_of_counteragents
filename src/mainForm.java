@@ -3070,7 +3070,7 @@ public class mainForm extends JFrame {
 
         // Настройка UI
         ParserProgressBar.setMinimum(0);
-        ParserProgressBar.setMaximum(statusForm.selectedUrls.size() + 1); // +1 для этапа парсинга судебных дел
+        ParserProgressBar.setMaximum(statusForm.selectedUrls.size()); // +1 для этапа парсинга судебных дел
         ParserProgressBar.setValue(0);
         ParserProgressBar.setStringPainted(true);
 
@@ -3143,10 +3143,10 @@ public class mainForm extends JFrame {
                 System.err.println("Ошибка при парсинге URL: " + result.url);
                 result.error.printStackTrace();
 
-                // Можно показать уведомление в UI
+
                 JOptionPane.showMessageDialog(this,
-                        "Ошибка при парсинге: " + result.error.getMessage(),
-                        "Ошибка",
+                        "Парсинг завершен досрочно.",
+                        "Внимание!",
                         JOptionPane.ERROR_MESSAGE);
             } else if (result.purchaseData != null) {
                 // Обработка успешного результата
@@ -3433,7 +3433,7 @@ public class mainForm extends JFrame {
 //            StatusLabel.setText("Статус: готов к работе");
 
             // Если у вас есть другие элементы (например, ProgressBar), их тоже можно сбросить
-            // ParserProgressBar.setValue(0);
+             ParserProgressBar.setValue(0);
         });
     }
 

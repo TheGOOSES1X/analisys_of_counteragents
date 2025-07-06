@@ -146,7 +146,7 @@ public class PurchaseParser44 implements PurchaseDetailsParser {
 
             return parsePurchaseUrl(url, driver, wait);
         } catch (Exception e) {
-            saveErrorUrl(url); // Сохраняем URL при ошибке
+//            saveErrorUrl(url); // Сохраняем URL при ошибке
             return new ParseResult(url, null, e);
         } finally {
             if (driver != null) driverPool.returnDriver(driver);;
