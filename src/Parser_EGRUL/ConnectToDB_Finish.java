@@ -4,9 +4,11 @@ import java.util.List;
 
 public class ConnectToDB_Finish {
     public static void writeToPostgres(List<List<Object>> data) {
-        String url = "jdbc:postgresql://192.168.234.237:5432/global_module_238";
+        //String url = "jdbc:postgresql://192.168.234.237:5432/global_module_238";
+        String url = "jdbc:postgresql://localhost:5432/globaldb";
         String user = "postgres";
-        String password = "globalA17P14";
+        //String password = "globalA17P14";
+        String password = "177013";
 
         Connection conn = null;
         Statement stmt = null;
@@ -110,16 +112,16 @@ public class ConnectToDB_Finish {
             }
 
             // Создаем финальную таблицу с вычислением нового поля
-            stmt.executeUpdate(
-                    "CREATE TABLE criterion_fns AS " +
-                            "SELECT field1 AS inn, field2 AS activity_code, " +
-                            "(sum_field3 / max_field4) AS result_value " +
-                            "FROM intermediate_table");
+            stmt.executeUpdate( "CREATE TABLE criterion_fns AS " +
+                    "SELECT bs.id AS id, field1 AS inn, field2 AS activity_code, " +
+                    "(sum_field3 / max_field4) AS result_value " +
+                    "FROM intermediate_table " +
+                    "JOIN bs_contras as bs " +
+                    "ON bs.sinn = intermediate_table.field1");
 
             // Добавляем первичный ключ
-            stmt.executeUpdate(
-                    "ALTER TABLE criterion_fns " +
-                            "ADD PRIMARY KEY (inn, activity_code)");
+            stmt.executeUpdate( "ALTER TABLE criterion_fns " +
+                    "ADD PRIMARY KEY (id, activity_code, result_value)");
 
             // 5. Удаление временных таблиц
             if (tableExists(conn, "temp_table")) {
