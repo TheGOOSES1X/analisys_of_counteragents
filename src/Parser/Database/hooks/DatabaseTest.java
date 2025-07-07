@@ -24,9 +24,9 @@ public class DatabaseTest {
 
             // Формирование URL
             String url = String.format("jdbc:postgresql://%s:%s/%s",
-                    config.optString("HOST", "localhost"),
+                    config.optString("HOST", "192.168.234.237"),
                     config.optString("PORT", "5432"),
-                    config.getString("DB_Global_Marine"));
+                    config.getString("DB_Global_Module"));
 
             // Подключение
             Connection conn = DriverManager.getConnection(

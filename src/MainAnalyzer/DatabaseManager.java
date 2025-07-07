@@ -1048,7 +1048,6 @@ public class DatabaseManager {
                     long id_goods = resultSet2.getLong("id_goods");
                     long id_contras = resultSet2.getLong("id_c");
                     int ndeliverytime = resultSet2.getInt("ndeliverytime");
-                    System.out.println(ndeliverytime);
                      n_qty = resultSet2.getDouble("nqty");
                      nprc = resultSet2.getDouble("nprc");
                      n_qty_b = resultSet2.getDouble("nqtysale");
@@ -2087,7 +2086,6 @@ public class DatabaseManager {
 
             // Если все прошло успешно, фиксируем изменения
             connection.commit();
-            System.out.println("Обновлено записей: " + rowsUpdated);
         } catch (SQLException ex) {
             try {
                 if (connection != null) {
