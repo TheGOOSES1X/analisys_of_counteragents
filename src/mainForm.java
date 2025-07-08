@@ -10,6 +10,9 @@ import java.util.Comparator;
 import java.awt.*;
 import java.sql.PreparedStatement;
 
+import Critical_Criteries.Extrem;
+import Critical_Criteries.InAgent;
+import Critical_Criteries.TerrorWeapon;
 import MainAnalyzer.*;
 import Parser.interfaces.*;
 import org.json.JSONArray;
@@ -22,7 +25,6 @@ import Parser.utils.RandomUserAgent;
 import Parser.utils.StatusForm;
 import com.toedter.calendar.JDateChooser;
 
-import java.awt.*;
 // для json
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,9 +34,6 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONException;
-import org.json.JSONObject;
-
-
 
 
 public class mainForm extends JFrame {
@@ -209,6 +208,9 @@ public class mainForm extends JFrame {
     private JLabel EGRUL_Parser_left;
     private JLabel EGRUL_PDF_left;
 
+    private JLabel crit_criteries_label;
+    private JButton crit_criteries_button;
+
     private StatusForm statusForm;
     private JTextField textFieldFilterOkpd2;
     private JTextField textFieldFilterGroup;
@@ -258,6 +260,7 @@ public class mainForm extends JFrame {
     private Role currentRole;
     private Thread EGRUL_Thread;
     private Thread PDF_to_Data_Thread;
+    private Thread Critical_Criteries_Thread;
 
     private void applyRolePermissions() {
         boolean isExpert = currentRole == Role.EXPERT;
@@ -1951,6 +1954,7 @@ public class mainForm extends JFrame {
             }
         });
         EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
+        crit_criteries_button.addActionListener(e -> Parser_InAgent());
 
         Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "resources/currency.json");
 
@@ -3078,6 +3082,27 @@ public class mainForm extends JFrame {
 
         });
         PDF_to_Data_Thread.start();
+    }
+
+    private void Parser_InAgent(){
+        if (Critical_Criteries_Thread != null && Critical_Criteries_Thread.isAlive()) {
+            return;
+        }
+
+        crit_criteries_button.setEnabled(false);
+        crit_criteries_button.setText("Сбор данных");
+
+        Critical_Criteries_Thread = new Thread(() -> {
+            InAgent.ParserInAgent();
+            Extrem.ParseData();
+            TerrorWeapon.ParseData();
+
+            SwingUtilities.invokeLater(() -> {
+                crit_criteries_button.setEnabled(true);
+                crit_criteries_button.setText("Начать сбор");
+            });
+        });
+        Critical_Criteries_Thread.start();
     }
 
     private void initStartParsingButton() {
