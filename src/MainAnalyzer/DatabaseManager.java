@@ -1785,39 +1785,67 @@ public class DatabaseManager {
     }
 
     public long addUserCritData(boolean db_module, String critName, String funcInd, String minVal, String maxVal, String critW, String jPoints) {
-        String query = "INSERT INTO public.module_criterion (sname, nfunctiontype, nminval, nmaxval, nweight, jdatapoints) " +
-                "VALUES ('" + critName + "', '" + funcInd + "', '" + minVal + "', '" + maxVal + "', '" + critW + "', '" + jPoints + "') RETURNING id";
+        // Проверяем, существует ли запись с таким же sname
+        String checkQuery = "SELECT id FROM public.module_criterion WHERE sname = ?";
+        // Запрос на вставку с проверкой уникальности
+        String insertQuery = "INSERT INTO public.module_criterion " +
+                "(sname, nfunctiontype, nminval, nmaxval, nweight, jdatapoints) " +
+                "SELECT ?::text, ?::integer, ?::integer, ?::integer, ?::integer, ?::jsonb " +
+                "WHERE NOT EXISTS (SELECT 1 FROM public.module_criterion WHERE sname = ?) " +
+                "RETURNING id";
 
         Connection conn = null;
         PreparedStatement stmt = null;
         ResultSet rs = null;
+        long newCritId = -1;
 
         try {
-            conn = this.getConnection(db_module);  // Открываем соединение
-            stmt = conn.prepareStatement(query);  // Подготавливаем запрос
-            rs = stmt.executeQuery();  // Выполняем запрос
+            conn = this.getConnection(db_module);
+
+            // Сначала проверяем существование записи
+            stmt = conn.prepareStatement(checkQuery);
+            stmt.setString(1, critName);
+            rs = stmt.executeQuery();
 
             if (rs.next()) {
-                return rs.getLong("id");  // Возвращаем сгенерированный id
+                // Запись уже существует, возвращаем её ID
+                return rs.getLong("id");
+            }
+
+            // Закрываем предыдущие ресурсы
+            rs.close();
+            stmt.close();
+
+            // Если записи нет, выполняем вставку
+            stmt = conn.prepareStatement(insertQuery);
+            stmt.setString(1, critName);
+            stmt.setString(2, funcInd);
+            stmt.setString(3, minVal);
+            stmt.setString(4, maxVal);
+            stmt.setString(5, critW);
+            stmt.setString(6, jPoints);
+            stmt.setString(7, critName);  // Повторяем для условия WHERE NOT EXISTS
+
+            rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                newCritId = rs.getLong("id");
+                // Создаем соответствующую колонку в таблице
+                String newColumn = "user_crit_" + newCritId;
+                alterUserCritData(db_module, newColumn);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
             try {
-                if (rs != null) {
-                    rs.close();  // Закрываем ResultSet
-                }
-                if (stmt != null) {
-                    stmt.close();  // Закрываем PreparedStatement
-                }
-                if (conn != null) {
-                    conn.close();  // Закрываем соединение
-                }
+                if (rs != null) rs.close();
+                if (stmt != null) stmt.close();
+                if (conn != null) conn.close();
             } catch (SQLException e) {
                 e.printStackTrace();
             }
         }
-        return -1;  // Если ошибка, возвращаем -1
+        return -1;  // Ошибка или запись не была добавлена
     }
     public List<rowCritData> getAllCritData(boolean db_module) {
         List<rowCritData> critData = new ArrayList<>();

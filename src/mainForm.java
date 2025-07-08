@@ -413,6 +413,10 @@ public class mainForm extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 dbExtractor.setTables(false);
                 dbExtractor.updateTables(true, false);
+                long critId = dbExtractor.addUserCritData(false, "Опыт поставщика", "0", "0", "100", "1", "{}");
+
+                // Добавляем в комбобокс, если критерий создан и его еще нет в списке
+                addCriterion("Опыт поставщика", true);
 
                 // установить соединение с БД модуля и создать таблицу в случае её отсутствия)
                 //    dbExtractor.setCells(false);
@@ -969,8 +973,7 @@ public class mainForm extends JFrame {
         buttonUserCritAdd.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // добавление в список введённого значения
-                comboBoxUserCrit.addItem(comboBoxUserCrit.getEditor().getItem());
+                addCriterion(comboBoxUserCrit.getEditor().getItem().toString(), false);
             }
         });
 
@@ -1028,17 +1031,16 @@ public class mainForm extends JFrame {
                         }
 
                         if (selected == null) {
-                            // Добавляем новый критерий
-                            dbExtractor.addUserCritData(false, inputName, "0", "0", "100", "1", "{}");
-                            long newCritId = dbExtractor.getMaxCritId(false);
-                            String newColumn = "user_crit_" + newCritId;
-                            dbExtractor.alterUserCritData(false, newColumn);
+                            // Добавляем новый критерий (включая создание колонки)
+                            long newCritId = dbExtractor.addUserCritData(false, inputName, "0", "0", "100", "1", "{}");
 
-                            // Обновляем модель и выбираем новый элемент
-                            updateComboBoxModel();
-                            selectCritInComboBox(newCritId);
-
-                            selected = new rowCritData(newCritId, inputName, 0, 0, 100, 1, "{}");
+                            if (newCritId != -1) {
+                                // Обновляем модель и выбираем новый элемент
+                                updateComboBoxModel();
+                                selectCritInComboBox(newCritId);
+                                selected = new rowCritData(newCritId, inputName, 0, 0, 100, 1, "{}");
+                            } else {
+                            }
                         }
                     }
                 }
@@ -2800,6 +2802,37 @@ public class mainForm extends JFrame {
         }
 
         enableSortingForTable(tableOptCellsView, 0,1,3); // Сортировка по количеству товара (Sun_q_ty)
+    }
+
+    private void addCriterion(String name, boolean silent) {
+        String newItem = name.trim();
+
+        if (newItem.isEmpty()) {
+            if (!silent) {
+                JOptionPane.showMessageDialog(null, "Введите название критерия!", "Ошибка", JOptionPane.WARNING_MESSAGE);
+            }
+            return;
+        }
+
+        boolean itemExists = false;
+        ComboBoxModel<String> model = comboBoxUserCrit.getModel();
+        for (int i = 0; i < model.getSize(); i++) {
+            if (model.getElementAt(i).equals(newItem)) {
+                itemExists = true;
+                break;
+            }
+        }
+
+        if (!itemExists) {
+            comboBoxUserCrit.addItem(newItem);
+        } else if (!silent) {
+            JOptionPane.showMessageDialog(
+                    null,
+                    "Критерий \"" + newItem + "\" уже существует!",
+                    "Дубликат",
+                    JOptionPane.WARNING_MESSAGE
+            );
+        }
     }
 
 
