@@ -6,9 +6,9 @@ import java.util.List;
 
 public class ConnectToDB_Start {
     public static List<String> CollectINNFromDB() {
-        String url = "jdbc:postgresql://192.168.234.237:5432/global_module_238";
+        String url = "jdbc:postgresql://10.210.12.212:5432/global_module";
         String user = "postgres";
-        String password = "globalA17P14";
+        String password = "postgres";
 
         List<String> INN_list = new ArrayList<>();
 
