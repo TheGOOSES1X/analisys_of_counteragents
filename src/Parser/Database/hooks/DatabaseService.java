@@ -48,12 +48,13 @@ public class DatabaseService {
         if (purchase.getCustomer() == null) return;
 
         Customer customer = purchase.getCustomer();
-        Customer existingCustomer = session.createQuery(
+        List<Customer> customers = session.createQuery(
                         "FROM Customer WHERE inn = :inn", Customer.class)
                 .setParameter("inn", customer.getInn())
-                .uniqueResult();
+                .getResultList();
 
-        if (existingCustomer != null) {
+        if (!customers.isEmpty()) {
+            Customer existingCustomer = customers.get(0); // Можно взять первый
             updateCustomer(existingCustomer, customer);
             purchase.setCustomer(existingCustomer);
         } else {
