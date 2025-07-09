@@ -416,7 +416,7 @@ public class mainForm extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 dbExtractor.setTables(false);
                 dbExtractor.updateTables(true, false);
-                long critId = dbExtractor.addUserCritData(false, "Опыт поставщика", "0", "0", "100", "1", "{}");
+                dbExtractor.addUserCritData(false, "Опыт поставщика", "0", "0", "100", "1", "{}");
 
                 // Добавляем в комбобокс, если критерий создан и его еще нет в списке
                 addCriterion("Опыт поставщика", true);
@@ -2495,24 +2495,31 @@ public class mainForm extends JFrame {
     }
 
     private NeuralNetwork nn;
+
     private String getRatingCategoryByNN(rowContrasGoodsOrdersWithWeights row) {
         if (nn == null) {
-            nn = new NeuralNetwork(4, 5);
-
+            nn = new NeuralNetwork();
         }
 
-        double[] input = new double[] {
-                row.getDeliveryTimeFinalWeight(),
-                row.getMinVolumeFinalWeight(),
-                row.getGoodQualityFinalWeight(),
-                row.getContrasReputationFinalWeight()
-        };
+        double input = row.getDeliveryTimeFinalWeight();
+        double[] output = nn.predict(input);
 
-        double value = nn.predict(input); // исправлено с feedforward на predict
+        int classIndex = 0;
+        double maxProb = output[0];
+        for (int i = 1; i < output.length; i++) {
+            if (output[i] > maxProb) {
+                maxProb = output[i];
+                classIndex = i;
+            }
+        }
 
-        if (value >= 0.7) return "Надёжный поставщик";
-        else if (value >= 0.4) return "Допустимый поставщик";
-        else return "Ненадёжный поставщик";
+        switch (classIndex) {
+            case 0: return "Ненадёжный поставщик";
+            case 1: return "Допустимый поставщик";
+            case 2: return "Хороший поставщик";
+            case 3: return "Надёжный поставщик";
+            default: return "Неизвестно";
+        }
     }
 
 
@@ -3164,7 +3171,7 @@ public class mainForm extends JFrame {
                 // Этап 2: Парсинг судебных дел
                 SwingUtilities.invokeLater(() -> {
                     StatusLabel.setText("Парсинг судебных дел поставщиков...");
-                    ParserProgressBar.setValue(statusForm.selectedUrls.size() + 1);
+                    ParserProgressBar.setValue(statusForm.selectedUrls.size());
                 });
                 deselectAllCheckboxes();
 //                detailsParser.parseSupplierLitigations();

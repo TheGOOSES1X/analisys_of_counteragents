@@ -1189,6 +1189,60 @@ public class DatabaseManager {
             var35.printStackTrace();
         }
 
+
+        query =
+                "DO $$\n" +
+                        "DECLARE\n" +
+                        "    crit_id INTEGER;\n" +
+                        "    user_crit_column TEXT;\n" +
+                        "BEGIN\n" +
+                        "    SELECT id INTO crit_id \n" +
+                        "    FROM module_criterion \n" +
+                        "    WHERE sname = 'Опыт поставщика';\n" +
+                        "    user_crit_column := 'user_crit_' || crit_id;\n" +
+                        "    IF EXISTS (\n" +
+                        "        SELECT 1 \n" +
+                        "        FROM information_schema.columns \n" +
+                        "        WHERE table_name = 'module_lotcriterion' \n" +
+                        "        AND column_name = user_crit_column\n" +
+                        "    ) THEN\n" +
+                        "        EXECUTE format('\n" +
+                        "            UPDATE module_lotcriterion mlc\n" +
+                        "            SET %I = cf.result_value\n" +
+                        "            FROM criterion_fns cf, bs_goods bg\n" +
+                        "            WHERE \n" +
+                        "                mlc.id_contras = cf.id\n" +
+                        "                AND mlc.id_goods = bg.id\n" +
+                        "                AND mlc.%I IS NULL\n" +
+                        "                AND (\n" +
+                        "                    -- Сравниваем начало строк до минимальной длины\n" +
+                        "                    LEFT(cf.activity_code, \n" +
+                        "                        LEAST(\n" +
+                        "                            POSITION(''.'' IN cf.activity_code || ''.''), \n" +
+                        "                            POSITION(''.'' IN bg.okpd2 || ''.'')\n" +
+                        "                        ) - 1\n" +
+                        "                    ) = \n" +
+                        "                    LEFT(bg.okpd2, \n" +
+                        "                        LEAST(\n" +
+                        "                            POSITION(''.'' IN cf.activity_code || ''.''), \n" +
+                        "                            POSITION(''.'' IN bg.okpd2 || ''.'')\n" +
+                        "                        ) - 1\n" +
+                        "                    )\n" +
+                        "                )', \n" +
+                        "            user_crit_column, user_crit_column);\n" +
+                        "            \n" +
+                        "        RAISE NOTICE 'Обновлено поле %', user_crit_column;\n" +
+                        "    ELSE\n" +
+                        "        RAISE NOTICE 'Столбец % не существует в таблице module_lotcriterion', user_crit_column;\n" +
+                        "    END IF;\n" +
+                        "END $$;";
+
+        try {
+            this.executeQueryNoResult(db_module, query);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         List<rowGoodsOrdersStock> rowGOSs = new ArrayList();
         query = "SELECT DISTINCT sr.idgds as id_g, sr.idstock as id_s, bo.id as id_o, sum(sr.nqtybasemsr) as qty, sr.stype as tpy FROM public.stk_regmovmat sr ";
         query = query + "left join bs_order bo on sr.gidmaster = bo.gid ";
