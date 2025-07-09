@@ -250,11 +250,9 @@ public class Data_Extractor {
     }
 
     public static void writeToPostgres(List<List<Object>> data) {
-        //String url = "jdbc:postgresql://192.168.234.237:5432/global_module_238";
-        String url = "jdbc:postgresql://localhost:5432/globaldb";
+        String url = "jdbc:postgresql://192.168.234.237:5432/global_module_238";
         String user = "postgres";
-        //String password = "globalA17P14";
-        String password = "177013";
+        String password = "globalA17P14";
 
         Connection conn = null;
         Statement stmt = null;

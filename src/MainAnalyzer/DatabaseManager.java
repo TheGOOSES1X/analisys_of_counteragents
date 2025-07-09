@@ -468,6 +468,44 @@ public class DatabaseManager {
         }
     }
 
+    private void executeQueryBatchRatingGlobal(boolean db_module, String query,
+                                               List<rowContrasGoodsOrdersWithWeights> params) throws SQLException {
+
+        Connection connection = null;
+        PreparedStatement statement = null;
+
+        try {
+            connection = this.getConnection(db_module);
+            connection.setAutoCommit(false);
+            statement = connection.prepareStatement(query);
+
+            for (rowContrasGoodsOrdersWithWeights rowRat : params) {
+                double rating = rowRat.getRatingComplete();
+                // Обеспечиваем диапазон 0-1 перед умножением на 100
+                rating = Math.max(0, Math.min(1, rating));
+
+                // Параметры для UPDATE (1-3)
+                statement.setDouble(1, rating);  // Уже в диапазоне 0-1
+                statement.setLong(2, rowRat.getIdContras());
+                statement.setLong(3, rowRat.getIdGood());
+
+                // Параметры для INSERT (4-8)
+                statement.setLong(4, rowRat.getIdContras());
+                statement.setLong(5, rowRat.getIdGood());
+                statement.setDouble(6, rating);  // Уже в диапазоне 0-1
+                statement.setLong(7, rowRat.getIdContras());
+                statement.setLong(8, rowRat.getIdGood());
+
+                statement.addBatch();
+            }
+
+            statement.executeBatch();
+            connection.commit();
+        } finally {
+            this.closeResources(connection, statement, null);
+        }
+    }
+
     private void executeQueryBatchCH(boolean db_module, String query, List<rowContrasWithHistory> params) throws SQLException {
         Connection connection = null;
         PreparedStatement statement = null;
@@ -2459,6 +2497,45 @@ public class DatabaseManager {
 
         try {
             this.executeQueryBatchRating(db_module, query, rowsCGOws);
+        } catch (SQLException var5) {
+            var5.printStackTrace();
+        }
+
+    }
+
+    public void updateRatingTableGlobal(boolean db_module, List<rowContrasGoodsOrdersWithWeights> rowsCGOws) {
+
+        String query =
+                "WITH max_gid AS (\n" +
+                        "    SELECT COALESCE(MAX(gidref::bigint), 0) + 1 AS next_gid FROM public.xsmtuias_contrasrating\n" +
+                        "),\n" +
+                        "to_update AS (\n" +
+                        "    UPDATE public.xsmtuias_contrasrating cr\n" +
+                        "    SET \n" +
+                        "        srating = ROUND(?::numeric * 100, 2)::varchar,\n" +
+                        "        dchangedate = NOW()\n" +
+                        "    WHERE \n" +
+                        "        cr.idcontras = ?::bigint\n" +
+                        "        AND cr.idgds = ?::bigint\n" +
+                        "    RETURNING 1\n" +
+                        ")\n" +
+                        "INSERT INTO public.xsmtuias_contrasrating (gidref, idcontras, idgds, srating, dchangedate)\n" +
+                        "SELECT \n" +
+                        "    (mg.next_gid + ROW_NUMBER() OVER () - 1)::text,\n" +
+                        "    ?::bigint,\n" +
+                        "    ?::bigint,\n" +
+                        "    ROUND(?::numeric * 100, 2)::varchar,\n" +
+                        "    NOW()\n" +
+                        "FROM max_gid mg\n" +
+                        "WHERE NOT EXISTS (\n" +
+                        "    SELECT 1 FROM public.xsmtuias_contrasrating \n" +
+                        "    WHERE idcontras = ?::bigint AND idgds = ?::bigint\n" +
+                        ") AND NOT EXISTS (\n" +
+                        "    SELECT 1 FROM to_update\n" +
+                        ");";
+
+        try {
+            this.executeQueryBatchRatingGlobal(db_module, query, rowsCGOws);
         } catch (SQLException var5) {
             var5.printStackTrace();
         }

@@ -1127,9 +1127,13 @@ public class mainForm extends JFrame {
                 tableRating.setModel(modelCGOws);
                 updateTableContrasGoodsOrdersWes(rowsCGOws);
 
+                // Создаем дедуплицированный список для глобального обновления
+                List<rowContrasGoodsOrdersWithWeights> uniqueRows = removeDuplicates(rowsCGOws);
+
                 // Сохраняем рейтинги поставщиков
                 dbExtractor.setRatingTable(false);
-                dbExtractor.updateRatingTable(false, rowsCGOws);
+                dbExtractor.updateRatingTable(false, rowsCGOws); // оригинальный список с заказами
+                dbExtractor.updateRatingTableGlobal(true, uniqueRows); // дедуплицированный список
 
                 button_getBest.setEnabled(true);
                 tabbedPaneMain.setSelectedIndex(3);
@@ -2787,6 +2791,18 @@ public class mainForm extends JFrame {
         }
 
         enableSortingForTable(tableOptGoodsConditionsEdit, 0,1,3); // Сортировка по PrepareDays
+    }
+
+    private List<rowContrasGoodsOrdersWithWeights> removeDuplicates(List<rowContrasGoodsOrdersWithWeights> originalList) {
+        Map<String, rowContrasGoodsOrdersWithWeights> uniqueMap = new LinkedHashMap<>();
+
+        for (rowContrasGoodsOrdersWithWeights item : originalList) {
+            String key = item.getIdContras() + "_" + item.getIdGood();
+            // Берем последнее встреченное значение (можно изменить логику при необходимости)
+            uniqueMap.put(key, item);
+        }
+
+        return new ArrayList<>(uniqueMap.values());
     }
 
     private void updateGoodCellSumView(List<rowGoodsSumcells> rowsCHs, List<rowGoodsSumcells> rowsCHsFromStock) {
