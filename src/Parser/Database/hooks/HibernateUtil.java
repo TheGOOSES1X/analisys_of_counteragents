@@ -86,7 +86,7 @@ public class HibernateUtil {
         settings.put(Environment.DRIVER, "org.postgresql.Driver");
 
         String url = "jdbc:postgresql://" +
-                config.optString("HOST", "192.168.234.237") + ":" +
+                config.optString("HOST", "10.210.12.212") + ":" +
                 config.optString("PORT", "5432") + "/" +
                 config.getString("DB_Global_Module");
 
