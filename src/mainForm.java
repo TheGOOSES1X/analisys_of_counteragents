@@ -10,6 +10,9 @@ import java.util.Comparator;
 import java.awt.*;
 import java.sql.PreparedStatement;
 
+import Critical_Criteries.Extrem;
+import Critical_Criteries.InAgent;
+import Critical_Criteries.TerrorWeapon;
 import MainAnalyzer.*;
 import Parser.interfaces.*;
 import org.json.JSONArray;
@@ -22,7 +25,6 @@ import Parser.utils.RandomUserAgent;
 import Parser.utils.StatusForm;
 import com.toedter.calendar.JDateChooser;
 
-import java.awt.*;
 // для json
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,9 +34,6 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.io.IOUtils;
 import org.json.JSONException;
-import org.json.JSONObject;
-
-
 
 
 public class mainForm extends JFrame {
@@ -209,6 +208,9 @@ public class mainForm extends JFrame {
     private JLabel EGRUL_Parser_left;
     private JLabel EGRUL_PDF_left;
 
+    private JLabel crit_criteries_label;
+    private JButton crit_criteries_button;
+
     private StatusForm statusForm;
     private JTextField textFieldFilterOkpd2;
     private JTextField textFieldFilterGroup;
@@ -258,6 +260,7 @@ public class mainForm extends JFrame {
     private Role currentRole;
     private Thread EGRUL_Thread;
     private Thread PDF_to_Data_Thread;
+    private Thread Critical_Criteries_Thread;
 
     private void applyRolePermissions() {
         boolean isExpert = currentRole == Role.EXPERT;
@@ -413,6 +416,10 @@ public class mainForm extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 dbExtractor.setTables(false);
                 dbExtractor.updateTables(true, false);
+                dbExtractor.addUserCritData(false, "Опыт поставщика", "0", "0", "100", "1", "{}");
+
+                // Добавляем в комбобокс, если критерий создан и его еще нет в списке
+                addCriterion("Опыт поставщика", true);
 
                 // установить соединение с БД модуля и создать таблицу в случае её отсутствия)
                 //    dbExtractor.setCells(false);
@@ -969,8 +976,7 @@ public class mainForm extends JFrame {
         buttonUserCritAdd.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                // добавление в список введённого значения
-                comboBoxUserCrit.addItem(comboBoxUserCrit.getEditor().getItem());
+                addCriterion(comboBoxUserCrit.getEditor().getItem().toString(), false);
             }
         });
 
@@ -1028,17 +1034,16 @@ public class mainForm extends JFrame {
                         }
 
                         if (selected == null) {
-                            // Добавляем новый критерий
-                            dbExtractor.addUserCritData(false, inputName, "0", "0", "100", "1", "{}");
-                            long newCritId = dbExtractor.getMaxCritId(false);
-                            String newColumn = "user_crit_" + newCritId;
-                            dbExtractor.alterUserCritData(false, newColumn);
+                            // Добавляем новый критерий (включая создание колонки)
+                            long newCritId = dbExtractor.addUserCritData(false, inputName, "0", "0", "100", "1", "{}");
 
-                            // Обновляем модель и выбираем новый элемент
-                            updateComboBoxModel();
-                            selectCritInComboBox(newCritId);
-
-                            selected = new rowCritData(newCritId, inputName, 0, 0, 100, 1, "{}");
+                            if (newCritId != -1) {
+                                // Обновляем модель и выбираем новый элемент
+                                updateComboBoxModel();
+                                selectCritInComboBox(newCritId);
+                                selected = new rowCritData(newCritId, inputName, 0, 0, 100, 1, "{}");
+                            } else {
+                            }
                         }
                     }
                 }
@@ -1122,9 +1127,13 @@ public class mainForm extends JFrame {
                 tableRating.setModel(modelCGOws);
                 updateTableContrasGoodsOrdersWes(rowsCGOws);
 
+                // Создаем дедуплицированный список для глобального обновления
+                List<rowContrasGoodsOrdersWithWeights> uniqueRows = removeDuplicates(rowsCGOws);
+
                 // Сохраняем рейтинги поставщиков
                 dbExtractor.setRatingTable(false);
-                dbExtractor.updateRatingTable(false, rowsCGOws);
+                dbExtractor.updateRatingTable(false, rowsCGOws); // оригинальный список с заказами
+                dbExtractor.updateRatingTableGlobal(true, uniqueRows); // дедуплицированный список
 
                 button_getBest.setEnabled(true);
                 tabbedPaneMain.setSelectedIndex(3);
@@ -1949,6 +1958,7 @@ public class mainForm extends JFrame {
             }
         });
         EGRUL_PDF_To_Data.addActionListener(e -> EGRUL_PDF_Processing());
+        crit_criteries_button.addActionListener(e -> Parser_InAgent());
 
         Okpd2Converter.fillComboBoxWithCurrencies(comboBoxCurrency, "resources/currency.json");
 
@@ -2489,24 +2499,31 @@ public class mainForm extends JFrame {
     }
 
     private NeuralNetwork nn;
+
     private String getRatingCategoryByNN(rowContrasGoodsOrdersWithWeights row) {
         if (nn == null) {
-            nn = new NeuralNetwork(4, 5);
-
+            nn = new NeuralNetwork();
         }
 
-        double[] input = new double[] {
-                row.getDeliveryTimeFinalWeight(),
-                row.getMinVolumeFinalWeight(),
-                row.getGoodQualityFinalWeight(),
-                row.getContrasReputationFinalWeight()
-        };
+        double input = row.getDeliveryTimeFinalWeight();
+        double[] output = nn.predict(input);
 
-        double value = nn.predict(input); // исправлено с feedforward на predict
+        int classIndex = 0;
+        double maxProb = output[0];
+        for (int i = 1; i < output.length; i++) {
+            if (output[i] > maxProb) {
+                maxProb = output[i];
+                classIndex = i;
+            }
+        }
 
-        if (value >= 0.7) return "Надёжный поставщик";
-        else if (value >= 0.4) return "Допустимый поставщик";
-        else return "Ненадёжный поставщик";
+        switch (classIndex) {
+            case 0: return "Ненадёжный поставщик";
+            case 1: return "Допустимый поставщик";
+            case 2: return "Хороший поставщик";
+            case 3: return "Надёжный поставщик";
+            default: return "Неизвестно";
+        }
     }
 
 
@@ -2776,6 +2793,18 @@ public class mainForm extends JFrame {
         enableSortingForTable(tableOptGoodsConditionsEdit, 0,1,3); // Сортировка по PrepareDays
     }
 
+    private List<rowContrasGoodsOrdersWithWeights> removeDuplicates(List<rowContrasGoodsOrdersWithWeights> originalList) {
+        Map<String, rowContrasGoodsOrdersWithWeights> uniqueMap = new LinkedHashMap<>();
+
+        for (rowContrasGoodsOrdersWithWeights item : originalList) {
+            String key = item.getIdContras() + "_" + item.getIdGood();
+            // Берем последнее встреченное значение (можно изменить логику при необходимости)
+            uniqueMap.put(key, item);
+        }
+
+        return new ArrayList<>(uniqueMap.values());
+    }
+
     private void updateGoodCellSumView(List<rowGoodsSumcells> rowsCHs, List<rowGoodsSumcells> rowsCHsFromStock) {
         DefaultTableModel modelGoodsOrders = (DefaultTableModel) tableOptCellsView.getModel();
         modelGoodsOrders.setRowCount(0); // Очищаем таблицу перед добавлением новых данных
@@ -2800,6 +2829,37 @@ public class mainForm extends JFrame {
         }
 
         enableSortingForTable(tableOptCellsView, 0,1,3); // Сортировка по количеству товара (Sun_q_ty)
+    }
+
+    private void addCriterion(String name, boolean silent) {
+        String newItem = name.trim();
+
+        if (newItem.isEmpty()) {
+            if (!silent) {
+                JOptionPane.showMessageDialog(null, "Введите название критерия!", "Ошибка", JOptionPane.WARNING_MESSAGE);
+            }
+            return;
+        }
+
+        boolean itemExists = false;
+        ComboBoxModel<String> model = comboBoxUserCrit.getModel();
+        for (int i = 0; i < model.getSize(); i++) {
+            if (model.getElementAt(i).equals(newItem)) {
+                itemExists = true;
+                break;
+            }
+        }
+
+        if (!itemExists) {
+            comboBoxUserCrit.addItem(newItem);
+        } else if (!silent) {
+            JOptionPane.showMessageDialog(
+                    null,
+                    "Критерий \"" + newItem + "\" уже существует!",
+                    "Дубликат",
+                    JOptionPane.WARNING_MESSAGE
+            );
+        }
     }
 
 
@@ -3047,6 +3107,27 @@ public class mainForm extends JFrame {
         PDF_to_Data_Thread.start();
     }
 
+    private void Parser_InAgent(){
+        if (Critical_Criteries_Thread != null && Critical_Criteries_Thread.isAlive()) {
+            return;
+        }
+
+        crit_criteries_button.setEnabled(false);
+        crit_criteries_button.setText("Сбор данных");
+
+        Critical_Criteries_Thread = new Thread(() -> {
+            InAgent.ParserInAgent();
+            Extrem.ParseData();
+            TerrorWeapon.ParseData();
+
+            SwingUtilities.invokeLater(() -> {
+                crit_criteries_button.setEnabled(true);
+                crit_criteries_button.setText("Начать сбор");
+            });
+        });
+        Critical_Criteries_Thread.start();
+    }
+
     private void initStartParsingButton() {
         if (statusForm.selectedUrls.isEmpty()) {
             JOptionPane.showMessageDialog(this,
@@ -3106,7 +3187,7 @@ public class mainForm extends JFrame {
                 // Этап 2: Парсинг судебных дел
                 SwingUtilities.invokeLater(() -> {
                     StatusLabel.setText("Парсинг судебных дел поставщиков...");
-                    ParserProgressBar.setValue(statusForm.selectedUrls.size() + 1);
+                    ParserProgressBar.setValue(statusForm.selectedUrls.size());
                 });
                 deselectAllCheckboxes();
 //                detailsParser.parseSupplierLitigations();

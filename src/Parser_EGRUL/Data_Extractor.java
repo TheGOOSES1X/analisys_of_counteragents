@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.*;
 import java.time.LocalDate;
 import java.time.Period;
 import java.time.format.DateTimeFormatter;
@@ -36,6 +37,7 @@ public class Data_Extractor {
         try {
             List<Path> pdfFiles = findAllPdfFiles();
             List<List<Object>> Activity_Data_list = new ArrayList<>();
+            List<List<Object>> LiquidBankruptcy_Data_list = new ArrayList<>();
             List<String> INN_list = ConnectToDB_Start.CollectINNFromDB();;
 
             int countdown = pdfFiles.size();
@@ -43,7 +45,11 @@ public class Data_Extractor {
 
             for (Path pdfFile : pdfFiles) {
                 try{
-                    Activity_Data_list.addAll(readMemberINFOFromPDF(pdfFile, INN_list, countdown));
+                    Activity_Data_list.addAll(readMemberINFOFromPDF(pdfFile, INN_list, new ArrayList<>(), 0));
+                    List<List<Object>> INFO_PDF = readMemberINFOFromPDF(pdfFile, INN_list, new ArrayList<>(), 1);
+                    if (INFO_PDF != null){
+                        LiquidBankruptcy_Data_list.addAll(INFO_PDF);
+                    }
                 }
                 catch (Exception e) {
                     continue;
@@ -59,6 +65,7 @@ public class Data_Extractor {
                 countdown -= 1;
             }
             ConnectToDB_Finish.writeToPostgres(Activity_Data_list);
+            writeToPostgres(LiquidBankruptcy_Data_list);
         } catch (IOException e) {
             System.err.println("Ошибка при обработке файлов: " + e.getMessage());
         }
@@ -73,38 +80,53 @@ public class Data_Extractor {
         }
     }
 
-    private static List<List<Object>> readMemberINFOFromPDF(Path filePath, List<String> INN_list, int countdown) throws Exception {
+    private static List<List<Object>> readMemberINFOFromPDF(Path filePath, List<String> INN_list, List<List<Object>> data_list, int index) throws Exception {
         try (PDDocument pdfDocument = Loader.loadPDF(filePath.toFile())) {
             PDFTextStripper stripper = new PDFTextStripper();
             String pdf_text = stripper.getText(pdfDocument);
-            List<List<Object>> activity_list = new ArrayList<>();
 
             String inn = checkINN(pdf_text, INN_list);
 
-            if (checkOGRNIP(pdf_text) == null){
-                return Arrays.asList(Arrays.asList(inn, null, null, null));
-            }
-            else if (checkMainActivity(pdf_text) == null){
-                return Arrays.asList(Arrays.asList(inn, null, null, null));
-            }
-            else {
-                float monthsBetweenNow = getMonthsFromNow(checkMainActivityDate(pdf_text));
-                if (checkEndDate(pdf_text) == null)
-                {
-                    activity_list.add(Arrays.asList(inn, checkMainActivity(pdf_text), monthsBetweenNow, monthsBetweenNow));
+            if (index == 0){
+                if (checkOGRNIP(pdf_text) == null){
+                    return Arrays.asList(Arrays.asList(inn, null, null, null));
                 }
-                else{
-                    float monthsBetween = getMonthsBetweenDates(checkMainActivityDate(pdf_text), checkEndDate(pdf_text));
-                    activity_list.add(Arrays.asList(inn, checkMainActivity(pdf_text), monthsBetween, monthsBetweenNow));
+                else if (checkMainActivity(pdf_text) == null){
+                    return Arrays.asList(Arrays.asList(inn, null, null, null));
                 }
+                else {
+                    float monthsBetweenNow = getMonthsFromNow(checkMainActivityDate(pdf_text));
+                    if (checkEndDate(pdf_text) == null)
+                    {
+                        data_list.add(Arrays.asList(inn, checkMainActivity(pdf_text), monthsBetweenNow, monthsBetweenNow));
+                    }
+                    else{
+                        float monthsBetween = getMonthsBetweenDates(checkMainActivityDate(pdf_text), checkEndDate(pdf_text));
+                        data_list.add(Arrays.asList(inn, checkMainActivity(pdf_text), monthsBetween, monthsBetweenNow));
+                    }
 
-                try {
-                    activity_list.addAll(checkAndAddDopActivity(pdf_text, inn, filePath));
-                } catch (Exception e) {
+                    try {
+                        data_list.addAll(checkAndAddDopActivity(pdf_text, inn, filePath));
+                    } catch (Exception e) {
 
+                    }
+                    return data_list;
                 }
-                return activity_list;
             }
+
+            if (index == 1){
+                if (checkMainActivity(pdf_text) == null){
+                    return null;
+                }
+                else {
+                    if (checkLiquidBankruptcy(pdf_text) != null){
+                        data_list.add(Arrays.asList(inn, checkLiquidBankruptcy(pdf_text), 0));
+                    }
+                    return data_list;
+                }
+            }
+
+            return null;
 
         } catch (IOException e) {
             System.err.println("Ошибка при конвертации файла: " + filePath);
@@ -113,10 +135,12 @@ public class Data_Extractor {
         } catch (Exception e){
             System.err.println("Ошибка при обработке файла: " + filePath);
             e.printStackTrace();
-            List<List<Object>> activity_list = new ArrayList<>();
-            return activity_list;
+            data_list = new ArrayList<>();
+            return data_list;
         }
     }
+
+
 
 
 
@@ -191,14 +215,152 @@ public class Data_Extractor {
         return activity_list;
     }
 
+    private static String checkLiquidBankruptcy(String text) {
+        // Ищем неизменяемый текст, затем число (от 1 до 1000)
+        Pattern initialPattern = Pattern.compile("Сведения о состоянии\\s*(?:\\S+\\s*)*?(\\d{1,5})\\b");
+        Matcher initialMatcher = initialPattern.matcher(text);
 
+        if (!initialMatcher.find()) {
+            return null;
+        }
 
+        int startIndex = initialMatcher.end(); // Начинаем поиск после найденного числа
+        int nextNumberIndex = text.length();   // По умолчанию ищем до конца текста
 
+        // Ищем следующее число после начального
+        Pattern nextNumberPattern = Pattern.compile("\\s(\\d{1,4})\\s");
+        Matcher nextNumberMatcher = nextNumberPattern.matcher(text.substring(startIndex));
 
+        if (nextNumberMatcher.find()) {
+            nextNumberIndex = startIndex + nextNumberMatcher.start();
+        }
 
+        // Вырезаем отрезок для анализа
+        String segment = text.substring(startIndex, nextNumberIndex);
 
+        if (segment.replace("\n", " ").contains("Утратил государственную регистрацию")) {
+            return "Потеря гос. регистрации";
+        } else if (segment.replace("\n", " ").contains("в стадии ликвидации")) {
+            return "В стадии ликвидации";
+        } else if (segment.replace("\n", " ").contains("(банкрот")) {
+            return "Банкротство";
+        }
 
+        return null;
+    }
 
+    public static void writeToPostgres(List<List<Object>> data) {
+        String url = "jdbc:postgresql://192.168.234.237:5432/global_module_238";
+        String user = "postgres";
+        String password = "globalA17P14";
+
+        Connection conn = null;
+        Statement stmt = null;
+
+        try {
+            conn = DriverManager.getConnection(url, user, password);
+            conn.setAutoCommit(false);
+            stmt = conn.createStatement();
+
+            if (tableExists(conn, "temp_table")) {
+                stmt.executeUpdate("DROP TABLE temp_table");
+                System.out.println("Прошлая таблица temp_table удалена.");
+            }
+
+            if (tableExists(conn, "criterion_liqbank")) {
+                stmt.executeUpdate("DROP TABLE criterion_liqbank");
+                System.out.println("Прошлая таблица criterion_liqbank удалена.");
+            }
+
+            stmt.executeUpdate(
+                    "CREATE TABLE temp_table (" +
+                            "inn VARCHAR(30), " +
+                            "critical_status VARCHAR(30), " +
+                            "coeff FLOAT)");
+
+            PreparedStatement pstmt = conn.prepareStatement(
+                    "INSERT INTO temp_table (inn, critical_status, coeff) VALUES (?, ?, ?)");
+
+            for (List<Object> row : data) {
+                try {
+                    String field1 = (row.get(0) != null) ? row.get(0).toString() : "";
+                    String field2 = (row.get(1) != null) ? row.get(1).toString() : "";
+
+                    Float field3 = null;
+                    if (row.get(2) != null) {
+                        String normalizedValue3 = row.get(2).toString().replace(',', '.');
+                        field3 = Float.parseFloat(normalizedValue3);
+                    }
+
+                    // Установка значений в PreparedStatement
+                    pstmt.setString(1, field1);
+                    pstmt.setString(2, field2);
+
+                    if (field3 != null) {
+                        pstmt.setFloat(3, field3);
+                    } else {
+                        pstmt.setFloat(3, 0);
+                    }
+
+                    pstmt.addBatch();
+
+                } catch (NumberFormatException e) {
+                    System.err.println("Ошибка преобразования числа в строке: " + row);
+                    // Пропускаем проблемную строку или устанавливаем значения по умолчанию
+                    pstmt.setFloat(3, 0);
+                    pstmt.addBatch();
+                }
+            }
+            pstmt.executeBatch();
+
+            // Создаем финальную таблицу с вычислением нового поля
+            stmt.executeUpdate( "CREATE TABLE criterion_liqbank AS " +
+                    "SELECT DISTINCT ON (bs.id) bs.id AS id, t.inn AS inn, t.critical_status AS critical_status, t.coeff AS coefficient " +
+                    "FROM temp_table as t " +
+                    "JOIN bs_contras as bs ON bs.sinn = t.inn");
+
+            // Добавляем первичный ключ
+            stmt.executeUpdate( "ALTER TABLE criterion_liqbank " +
+                    "ADD PRIMARY KEY (id)");
+
+            if (tableExists(conn, "temp_table")) {
+                stmt.executeUpdate("DROP TABLE temp_table");
+                System.out.println("Временная таблица удалена.");
+            }
+
+            conn.commit();
+            System.out.println("Финальная таблица создана успешно.");
+
+        } catch (SQLException e) {
+            try {
+                if (conn != null) conn.rollback();
+            } catch (SQLException ex) {
+                System.err.println("Ошибка при откате: " + ex.getMessage());
+            }
+            System.err.println("Ошибка SQL: " + e.getMessage());
+        } catch (NumberFormatException e) {
+            try {
+                if (conn != null) conn.rollback();
+            } catch (SQLException ex) {
+                System.err.println("Ошибка при откате: " + ex.getMessage());
+            }
+            System.err.println("Ошибка преобразования числа: " + e.getMessage());
+        } finally {
+            try {
+                if (stmt != null) stmt.close();
+                if (conn != null) conn.close();
+            } catch (SQLException e) {
+                System.err.println("Ошибка при закрытии: " + e.getMessage());
+            }
+        }
+    }
+
+    private static boolean tableExists(Connection conn, String tableName) throws SQLException {
+        try (ResultSet rs = conn.getMetaData().getTables(
+                null, null, tableName, null)) {
+            return rs.next();
+        }
+    }
 
     private static String checkOGRNIP(String text){
         Pattern pattern = Pattern.compile(
@@ -271,9 +433,6 @@ public class Data_Extractor {
         Period period = Period.between(firstDate, today);
         return period.getYears() * 12 + period.getMonths();
     }
-
-
-
 
 
 

@@ -1,55 +1,80 @@
 package MainAnalyzer;
 
-import java.util.Random;
-
 public class NeuralNetwork {
 
-    private double[][] weights1;
-    private double[] bias1;
-    private double[] weights2;
-    private double bias2;
+    private double[] weights1 = {
+            -5.2,
+            8.1,
+            3.4,
+            7.7
+    };
 
-    public  NeuralNetwork(int inputSize, int hiddenSize) {
-        Random random = new Random();
-        weights1 = new double[inputSize][hiddenSize];
-        bias1 = new double[hiddenSize];
-        weights2 = new double[hiddenSize];
+    private double[] bias1 = {
+            2.5,
+            -3.2,
+            1.8,
+            4.1
+    };
 
-        for (int i = 0; i < inputSize; i++)
-            for (int j = 0; j < hiddenSize; j++)
-                weights1[i][j] = random.nextGaussian() * 0.1;
+    private double[][] weights2 = {
+            {1.2, -4.5, 0.8, 2.1},
+            {-2.3, 3.6, 1.5, -1.0},
+            {0.5, 2.2, -3.0, 4.4},
+            {-1.5, 1.1, 2.7, -2.2}
+    };
 
-        for (int j = 0; j < hiddenSize; j++) {
-            bias1[j] = 0.0;
-            weights2[j] = random.nextGaussian() * 0.1;
+    private double[] bias2 = {
+            0.5,
+            -0.8,
+            1.0,
+            -0.3
+    };
+
+    public double[] predict(double input) {
+        // === Нормализация входа ===
+        double xp1 = (input - 0.5) * 8 + (-1);
+
+        // === Скрытый слой (tansig) ===
+        double[] hidden = new double[4];
+        for (int i = 0; i < 4; i++) {
+            double sum = bias1[i] + weights1[i] * xp1;
+            hidden[i] = tansig(sum);
         }
 
-        bias2 = 0.0;
-    }
-
-    public double predict(double[] input) {
-        double[] hidden = new double[bias1.length];
-        for (int j = 0; j < bias1.length; j++) {
-            double sum = bias1[j];
-            for (int i = 0; i < input.length; i++) {
-                sum += input[i] * weights1[i][j];
+        // === Выходной слой (softmax) ===
+        double[] outputRaw = new double[4];
+        for (int k = 0; k < 4; k++) {
+            double sum = bias2[k];
+            for (int j = 0; j < 4; j++) {
+                sum += weights2[k][j] * hidden[j];
             }
-            hidden[j] = relu(sum);
+            outputRaw[k] = sum;
         }
 
-        double output = bias2;
-        for (int j = 0; j < hidden.length; j++) {
-            output += hidden[j] * weights2[j];
+        return softmax(outputRaw);
+    }
+
+    private double tansig(double x) {
+        return 2.0 / (1.0 + Math.exp(-2.0 * x)) - 1.0;
+    }
+
+    private double[] softmax(double[] x) {
+        double max = Double.NEGATIVE_INFINITY;
+        for (double v : x) {
+            if (v > max) max = v;
         }
 
-        return sigmoid(output);
-    }
+        double sum = 0.0;
+        double[] exp = new double[x.length];
+        for (int i = 0; i < x.length; i++) {
+            exp[i] = Math.exp(x[i] - max);
+            sum += exp[i];
+        }
 
-    private double relu(double x) {
-        return Math.max(0, x);
-    }
+        for (int i = 0; i < x.length; i++) {
+            exp[i] /= sum;
+        }
 
-    private double sigmoid(double x) {
-        return 1.0 / (1.0 + Math.exp(-x));
+        return exp;
     }
 }

@@ -468,6 +468,44 @@ public class DatabaseManager {
         }
     }
 
+    private void executeQueryBatchRatingGlobal(boolean db_module, String query,
+                                               List<rowContrasGoodsOrdersWithWeights> params) throws SQLException {
+
+        Connection connection = null;
+        PreparedStatement statement = null;
+
+        try {
+            connection = this.getConnection(db_module);
+            connection.setAutoCommit(false);
+            statement = connection.prepareStatement(query);
+
+            for (rowContrasGoodsOrdersWithWeights rowRat : params) {
+                double rating = rowRat.getRatingComplete();
+                // Обеспечиваем диапазон 0-1 перед умножением на 100
+                rating = Math.max(0, Math.min(1, rating));
+
+                // Параметры для UPDATE (1-3)
+                statement.setDouble(1, rating);  // Уже в диапазоне 0-1
+                statement.setLong(2, rowRat.getIdContras());
+                statement.setLong(3, rowRat.getIdGood());
+
+                // Параметры для INSERT (4-8)
+                statement.setLong(4, rowRat.getIdContras());
+                statement.setLong(5, rowRat.getIdGood());
+                statement.setDouble(6, rating);  // Уже в диапазоне 0-1
+                statement.setLong(7, rowRat.getIdContras());
+                statement.setLong(8, rowRat.getIdGood());
+
+                statement.addBatch();
+            }
+
+            statement.executeBatch();
+            connection.commit();
+        } finally {
+            this.closeResources(connection, statement, null);
+        }
+    }
+
     private void executeQueryBatchCH(boolean db_module, String query, List<rowContrasWithHistory> params) throws SQLException {
         Connection connection = null;
         PreparedStatement statement = null;
@@ -1189,6 +1227,60 @@ public class DatabaseManager {
             var35.printStackTrace();
         }
 
+
+        query =
+                "DO $$\n" +
+                        "DECLARE\n" +
+                        "    crit_id INTEGER;\n" +
+                        "    user_crit_column TEXT;\n" +
+                        "BEGIN\n" +
+                        "    SELECT id INTO crit_id \n" +
+                        "    FROM module_criterion \n" +
+                        "    WHERE sname = 'Опыт поставщика';\n" +
+                        "    user_crit_column := 'user_crit_' || crit_id;\n" +
+                        "    IF EXISTS (\n" +
+                        "        SELECT 1 \n" +
+                        "        FROM information_schema.columns \n" +
+                        "        WHERE table_name = 'module_lotcriterion' \n" +
+                        "        AND column_name = user_crit_column\n" +
+                        "    ) THEN\n" +
+                        "        EXECUTE format('\n" +
+                        "            UPDATE module_lotcriterion mlc\n" +
+                        "            SET %I = cf.result_value\n" +
+                        "            FROM criterion_fns cf, bs_goods bg\n" +
+                        "            WHERE \n" +
+                        "                mlc.id_contras = cf.id\n" +
+                        "                AND mlc.id_goods = bg.id\n" +
+                        "                AND mlc.%I IS NULL\n" +
+                        "                AND (\n" +
+                        "                    -- Сравниваем начало строк до минимальной длины\n" +
+                        "                    LEFT(cf.activity_code, \n" +
+                        "                        LEAST(\n" +
+                        "                            POSITION(''.'' IN cf.activity_code || ''.''), \n" +
+                        "                            POSITION(''.'' IN bg.okpd2 || ''.'')\n" +
+                        "                        ) - 1\n" +
+                        "                    ) = \n" +
+                        "                    LEFT(bg.okpd2, \n" +
+                        "                        LEAST(\n" +
+                        "                            POSITION(''.'' IN cf.activity_code || ''.''), \n" +
+                        "                            POSITION(''.'' IN bg.okpd2 || ''.'')\n" +
+                        "                        ) - 1\n" +
+                        "                    )\n" +
+                        "                )', \n" +
+                        "            user_crit_column, user_crit_column);\n" +
+                        "            \n" +
+                        "        RAISE NOTICE 'Обновлено поле %', user_crit_column;\n" +
+                        "    ELSE\n" +
+                        "        RAISE NOTICE 'Столбец % не существует в таблице module_lotcriterion', user_crit_column;\n" +
+                        "    END IF;\n" +
+                        "END $$;";
+
+        try {
+            this.executeQueryNoResult(db_module, query);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
         List<rowGoodsOrdersStock> rowGOSs = new ArrayList();
         query = "SELECT DISTINCT sr.idgds as id_g, sr.idstock as id_s, bo.id as id_o, sum(sr.nqtybasemsr) as qty, sr.stype as tpy FROM public.stk_regmovmat sr ";
         query = query + "left join bs_order bo on sr.gidmaster = bo.gid ";
@@ -1785,39 +1877,67 @@ public class DatabaseManager {
     }
 
     public long addUserCritData(boolean db_module, String critName, String funcInd, String minVal, String maxVal, String critW, String jPoints) {
-        String query = "INSERT INTO public.module_criterion (sname, nfunctiontype, nminval, nmaxval, nweight, jdatapoints) " +
-                "VALUES ('" + critName + "', '" + funcInd + "', '" + minVal + "', '" + maxVal + "', '" + critW + "', '" + jPoints + "') RETURNING id";
+        // Проверяем, существует ли запись с таким же sname
+        String checkQuery = "SELECT id FROM public.module_criterion WHERE sname = ?";
+        // Запрос на вставку с проверкой уникальности
+        String insertQuery = "INSERT INTO public.module_criterion " +
+                "(sname, nfunctiontype, nminval, nmaxval, nweight, jdatapoints) " +
+                "SELECT ?::text, ?::integer, ?::integer, ?::integer, ?::integer, ?::jsonb " +
+                "WHERE NOT EXISTS (SELECT 1 FROM public.module_criterion WHERE sname = ?) " +
+                "RETURNING id";
 
         Connection conn = null;
         PreparedStatement stmt = null;
         ResultSet rs = null;
+        long newCritId = -1;
 
         try {
-            conn = this.getConnection(db_module);  // Открываем соединение
-            stmt = conn.prepareStatement(query);  // Подготавливаем запрос
-            rs = stmt.executeQuery();  // Выполняем запрос
+            conn = this.getConnection(db_module);
+
+            // Сначала проверяем существование записи
+            stmt = conn.prepareStatement(checkQuery);
+            stmt.setString(1, critName);
+            rs = stmt.executeQuery();
 
             if (rs.next()) {
-                return rs.getLong("id");  // Возвращаем сгенерированный id
+                // Запись уже существует, возвращаем её ID
+                return rs.getLong("id");
+            }
+
+            // Закрываем предыдущие ресурсы
+            rs.close();
+            stmt.close();
+
+            // Если записи нет, выполняем вставку
+            stmt = conn.prepareStatement(insertQuery);
+            stmt.setString(1, critName);
+            stmt.setString(2, funcInd);
+            stmt.setString(3, minVal);
+            stmt.setString(4, maxVal);
+            stmt.setString(5, critW);
+            stmt.setString(6, jPoints);
+            stmt.setString(7, critName);  // Повторяем для условия WHERE NOT EXISTS
+
+            rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                newCritId = rs.getLong("id");
+                // Создаем соответствующую колонку в таблице
+                String newColumn = "user_crit_" + newCritId;
+                alterUserCritData(db_module, newColumn);
             }
         } catch (SQLException e) {
             e.printStackTrace();
         } finally {
             try {
-                if (rs != null) {
-                    rs.close();  // Закрываем ResultSet
-                }
-                if (stmt != null) {
-                    stmt.close();  // Закрываем PreparedStatement
-                }
-                if (conn != null) {
-                    conn.close();  // Закрываем соединение
-                }
+                if (rs != null) rs.close();
+                if (stmt != null) stmt.close();
+                if (conn != null) conn.close();
             } catch (SQLException e) {
                 e.printStackTrace();
             }
         }
-        return -1;  // Если ошибка, возвращаем -1
+        return -1;  // Ошибка или запись не была добавлена
     }
     public List<rowCritData> getAllCritData(boolean db_module) {
         List<rowCritData> critData = new ArrayList<>();
@@ -2377,6 +2497,45 @@ public class DatabaseManager {
 
         try {
             this.executeQueryBatchRating(db_module, query, rowsCGOws);
+        } catch (SQLException var5) {
+            var5.printStackTrace();
+        }
+
+    }
+
+    public void updateRatingTableGlobal(boolean db_module, List<rowContrasGoodsOrdersWithWeights> rowsCGOws) {
+
+        String query =
+                "WITH max_gid AS (\n" +
+                        "    SELECT COALESCE(MAX(gidref::bigint), 0) + 1 AS next_gid FROM public.xsmtuias_contrasrating\n" +
+                        "),\n" +
+                        "to_update AS (\n" +
+                        "    UPDATE public.xsmtuias_contrasrating cr\n" +
+                        "    SET \n" +
+                        "        srating = ROUND(?::numeric * 100, 2)::varchar,\n" +
+                        "        dchangedate = NOW()\n" +
+                        "    WHERE \n" +
+                        "        cr.idcontras = ?::bigint\n" +
+                        "        AND cr.idgds = ?::bigint\n" +
+                        "    RETURNING 1\n" +
+                        ")\n" +
+                        "INSERT INTO public.xsmtuias_contrasrating (gidref, idcontras, idgds, srating, dchangedate)\n" +
+                        "SELECT \n" +
+                        "    (mg.next_gid + ROW_NUMBER() OVER () - 1)::text,\n" +
+                        "    ?::bigint,\n" +
+                        "    ?::bigint,\n" +
+                        "    ROUND(?::numeric * 100, 2)::varchar,\n" +
+                        "    NOW()\n" +
+                        "FROM max_gid mg\n" +
+                        "WHERE NOT EXISTS (\n" +
+                        "    SELECT 1 FROM public.xsmtuias_contrasrating \n" +
+                        "    WHERE idcontras = ?::bigint AND idgds = ?::bigint\n" +
+                        ") AND NOT EXISTS (\n" +
+                        "    SELECT 1 FROM to_update\n" +
+                        ");";
+
+        try {
+            this.executeQueryBatchRatingGlobal(db_module, query, rowsCGOws);
         } catch (SQLException var5) {
             var5.printStackTrace();
         }
