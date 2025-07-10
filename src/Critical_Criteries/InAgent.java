@@ -60,9 +60,9 @@ public class InAgent {
     }
 
     public static void WriteInAgentToPostgres() {
-        String url = "jdbc:postgresql://10.210.12.212:5432/global_module";
+        String url = "jdbc:postgresql://192.168.234.237:5432/global_module_238";
         String user = "postgres";
-        String password = "postgres";
+        String password = "globalA17P14";
 
         List<List<String>> data = readXlsx(filePath);
         Connection conn = null;
