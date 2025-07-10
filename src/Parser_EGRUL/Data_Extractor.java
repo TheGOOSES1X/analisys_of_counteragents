@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 
 public class Data_Extractor {
 
-    private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Parser_EGRUL", "PDF_files");
+    private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "Parser_EGRUL", "PDF_files");
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     public interface ProgressUpdater {

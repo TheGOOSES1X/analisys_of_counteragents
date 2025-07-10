@@ -20,7 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class TerrorWeapon {
-    private static final String DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Critical_Criteries", "CritExtrem").toString();
+    private static final String DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "Critical_Criteries", "CritExtrem").toString();
     private static final String ExtremUrl = "https://www.fedsfm.ru/documents/omu-or-terrorists-catalog-all";
 
 //    public static void main(String[] args) {

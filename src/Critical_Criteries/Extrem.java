@@ -20,7 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Extrem {
-    private static final String DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Critical_Criteries", "CritExtrem").toString();
+    private static final String DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "Critical_Criteries", "CritExtrem").toString();
     private static final String ExtremUrl = "https://www.fedsfm.ru/documents/terrorists-catalog-portal-act";
 
 //    public static void main(String[] args) {

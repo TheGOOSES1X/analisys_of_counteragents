@@ -26,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 
 public class Parser {
-    private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Parser_EGRUL", "PDF_files");
+    private static final Path DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "Parser_EGRUL", "PDF_files");
     private static final int TIMEOUT_SECONDS = 30;
     private static final int THREAD_POOL_SIZE = 6; // Количество потоков
     private static final String url = "https://egrul.nalog.ru/index.html";
@@ -34,7 +34,7 @@ public class Parser {
     private static final String searchButtonId = "btnSearch";
     private static final String endButtonId = "btnReference";
     private static final Logger log = LogManager.getLogger(Parser.class);
-    private static final String CSV_FILE = "./src/Parser_EGRUL/INN_list.csv";
+    private static final String CSV_FILE = "./Parser_EGRUL/INN_list.csv";
     private static final Object fileLock = new Object(); // Общий объект для синхронизации
 
     public interface ProgressUpdater {

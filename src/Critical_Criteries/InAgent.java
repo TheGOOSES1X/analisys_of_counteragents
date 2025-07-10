@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Set;
 
 public class InAgent {
-    private static final String DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "src", "Critical_Criteries", "CritInAgent").toString();
+    private static final String DOWNLOAD_DIR = Paths.get(System.getProperty("user.dir"), "Critical_Criteries", "CritInAgent").toString();
     private static final String InAgentUrl = "https://www.minjust.gov.ru/ru/pages/reestr-inostryannykh-agentov/";
     private static final String targetId = "registry_download_xls";
     private static final String filePath = DOWNLOAD_DIR + "/export.xlsx";
