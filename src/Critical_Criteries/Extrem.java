@@ -70,9 +70,9 @@ public class Extrem {
     }
 
     public static void WriteToPostgres(List<List<String>> data, String tablename, String CreateTableSQL, String InsertTableSQL, Integer dateIndex) {
-        String url = "jdbc:postgresql://192.168.234.237:5432/global_module_238";
+        String url = "jdbc:postgresql://10.210.12.212:5432/global_module";
         String user = "postgres";
-        String password = "globalA17P14";
+        String password = "postgres";
 
         Connection conn = null;
         Statement stmt = null;
