@@ -34,7 +34,7 @@ public class Parser {
     private static final String searchButtonId = "btnSearch";
     private static final String endButtonId = "btnReference";
     private static final Logger log = LogManager.getLogger(Parser.class);
-    private static final String CSV_FILE = "./Parser_EGRUL/INN_list.csv";
+    private static final String CSV_FILE = Paths.get(System.getProperty("user.dir"), "Parser_EGRUL", "PDF_files","INN_list.csv").toString();
     private static final Object fileLock = new Object(); // Общий объект для синхронизации
 
     public interface ProgressUpdater {

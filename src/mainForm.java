@@ -3116,14 +3116,20 @@ public class mainForm extends JFrame {
         crit_criteries_button.setText("Сбор данных");
 
         Critical_Criteries_Thread = new Thread(() -> {
-            InAgent.ParserInAgent();
-            Extrem.ParseData();
-            TerrorWeapon.ParseData();
+            try{
+                InAgent.ParserInAgent();
+                Extrem.ParseData();
+                TerrorWeapon.ParseData();
 
-            SwingUtilities.invokeLater(() -> {
+                SwingUtilities.invokeLater(() -> {
+                    crit_criteries_button.setEnabled(true);
+                    crit_criteries_button.setText("Начать сбор");
+                });
+            }
+            catch (Exception e) {
                 crit_criteries_button.setEnabled(true);
                 crit_criteries_button.setText("Начать сбор");
-            });
+            }
         });
         Critical_Criteries_Thread.start();
     }

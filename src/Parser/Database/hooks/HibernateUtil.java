@@ -81,6 +81,7 @@ public class HibernateUtil {
 
     private static SessionFactory createSessionFactory(JSONObject config, boolean isLocal) throws Exception {
         StandardServiceRegistryBuilder registryBuilder = new StandardServiceRegistryBuilder();
+        System.out.println(config);
 
         Map<String, Object> settings = new HashMap<>();
         settings.put(Environment.DRIVER, "org.postgresql.Driver");
