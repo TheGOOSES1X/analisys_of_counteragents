@@ -26,7 +26,7 @@ public class DatabaseService {
                 handleCustomer(session, purchase);
 
                 // 2. Обработка Supplier и Contract
-                handleSupplierAndContract(session, purchase);
+//                handleSupplierAndContract(session, purchase);
 
                 handlePurchase(session, purchase);
 //
@@ -94,22 +94,26 @@ public class DatabaseService {
             updateContract(existingContract, contract);
             purchase.setContract(existingContract);
         } else {
-            // Проверяем, не связан ли уже этот контракт с другой закупкой
             if (contract.getId() != null) {
                 Contract attachedContract = session.find(Contract.class, contract.getId());
-                if (attachedContract != null && attachedContract.getPurchase() != null) {
-                    // Создаем новый контракт, если текущий уже привязан к другой закупке
+                if (attachedContract != null && attachedContract.getPurchase() != null
+                        && !attachedContract.getPurchase().getId().equals(purchase.getId())) {
+                    // Контракт уже привязан к другой закупке
                     Contract newContract = new Contract();
-                    // Копируем все поля из contract в newContract
                     updateContract(newContract, contract);
                     contract = newContract;
                 }
             }
+            contract.setPurchase(purchase); // <-- обязательно установить связь
             session.persist(contract);
+            purchase.setContract(contract); // <-- убедиться, что связаны
         }
-        session.flush();
+
     }
     private void handlePurchase(Session session, Purchase purchase) {
+        // Сначала обрабатываем контракт и поставщика
+        handleSupplierAndContract(session, purchase); // <-- переместили вверх
+
         Purchase existingPurchase = session.createQuery(
                         "FROM Purchase WHERE purchaseNumber = :purchaseNumber", Purchase.class)
                 .setParameter("purchaseNumber", purchase.getPurchaseNumber())
@@ -123,9 +127,8 @@ public class DatabaseService {
             session.flush(); // Необходимо для получения ID перед обработкой ProcurementObjects
         }
 
-        // Обрабатываем связанные объекты
-        handleSupplierAndContract(session, purchase);
-        updateProcurementObjects(session, purchase); // Заменяем handleProcurementObjects на updateProcurementObjects
+        // Обновляем объекты закупки
+        updateProcurementObjects(session, purchase);
     }
 
 

@@ -171,7 +171,6 @@ public class mainForm extends JFrame {
     private JLabel StatusLabel;
     private JLabel CurrentRecords;
     private JLabel TotalRecords;
-    private JPanel tablePanel;
     private JCheckBox PurchaseCancelled;
     private JCheckBox PurchaseCompleted;
     private JCheckBox SubmissionOfApplications;
@@ -1930,11 +1929,20 @@ public class mainForm extends JFrame {
         statusForm.setStatusLabel(StatusLabel);
         statusForm.setCurrentRecords(CurrentRecords);
         statusForm.setTotalRecords(TotalRecords);
-        statusForm.setHeadersTable(HeadersTable);
+//        statusForm.setHeadersTable(HeadersTable);
         QueryButton.addActionListener(e -> onQueryButtonClicked());
         StartParsing.addActionListener(e -> initStartParsingButton());
         ChooseAllElements.addActionListener(e -> initChooseAllElementsButton());
-        ChooseRange.addActionListener(e -> initChooseRangeElementsButton());
+        ChooseRange.addActionListener(e -> {
+            try {
+                int from = From.getText().isEmpty() ? 1 : Integer.parseInt(From.getText());
+                int to = To.getText().isEmpty() ? statusForm.allItems.size() : Integer.parseInt(To.getText());
+
+                initChooseRangeElementsButton(from, to);
+            } catch (NumberFormatException ex) {
+                System.out.println("Ошибка: введите корректные числовые значения");
+            }
+        });
         StopParser.addActionListener(e -> stopParser());
         PauseParser.addActionListener(e -> togglePauseParser());
         StopParseringButton.addActionListener(e -> {
@@ -1966,18 +1974,18 @@ public class mainForm extends JFrame {
                     break;
             }
         });
-        initHeadersTable();
-        customizeTableRenderers();
-        try {
-            Okpd2Converter.loadFromJson("resources/okpd2_full.json");
-        } catch (IOException e) {
-            System.err.println("Ошибка загрузки файла ОКПД2: " + e.getMessage());
-            e.printStackTrace();
-            JOptionPane.showMessageDialog(null,
-                    "Не удалось загрузить справочник ОКПД2",
-                    "Ошибка",
-                    JOptionPane.ERROR_MESSAGE);
-        }
+//        initHeadersTable();
+//        customizeTableRenderers();
+//        try {
+//            Okpd2Converter.loadFromJson("resources/okpd2_full.json");
+//        } catch (IOException e) {
+//            System.err.println("Ошибка загрузки файла ОКПД2: " + e.getMessage());
+//            e.printStackTrace();
+//            JOptionPane.showMessageDialog(null,
+//                    "Не удалось загрузить справочник ОКПД2",
+//                    "Ошибка",
+//                    JOptionPane.ERROR_MESSAGE);
+//        }
 //        Эти методы для стилей таблицы, не трогать без необходимости
 //        configureTableColumns();
 //      initTableWithScroll();
@@ -2323,83 +2331,9 @@ public class mainForm extends JFrame {
     }
 
 
-    private void initHeadersTable() {
-        // Создаем модель с правильными названиями столбцов
-        String[] columnNames = {"№", "Номер закупки", "Информация по закупке", "Выбор"};
 
-        DefaultTableModel model = new DefaultTableModel(columnNames, 0) {
-            @Override
-            public Class<?> getColumnClass(int columnIndex) {
-                return columnIndex == 3 ? Boolean.class : String.class;
-            }
 
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return column == 3;
-            }
-        };
 
-        HeadersTable.setModel(model);
-        // Добавляем слушатель изменений
-        HeadersTable.getModel().addTableModelListener(e -> {
-            if (e.getColumn() == 3) {
-                boolean isSelected = (boolean) HeadersTable.getModel().getValueAt(e.getFirstRow(), 3);
-                PurchaseItem item = statusForm.allItems.get(e.getFirstRow());
-
-                if (isSelected) {
-                    statusForm.selectedUrls.add(item.getUrl());
-//                    System.out.println("Добавлена ссылка: " + item.getUrl());
-//                    System.out.println("Полная информация: " + item.toString());
-                } else {
-                    statusForm.selectedUrls.remove(item.getUrl());
-//                    System.out.println("Удалена ссылка: " + item.getUrl());
-                }
-
-//                System.out.println("Текущий список выбранных ссылок: " + statusForm.selectedUrls);
-            }
-        });
-        HeadersTable.setRowHeight(60); // Начальная высота строки
-    }
-    private void initTableWithScroll() {
-        tablePanel.setLayout(new BorderLayout());
-        JScrollPane scrollPane = new JScrollPane(HeadersTable);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_ALWAYS);
-        scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        scrollPane.setViewportBorder(BorderFactory.createEmptyBorder());
-        JViewport viewport = scrollPane.getViewport();
-        viewport.setOpaque(false);
-        viewport.setBorder(null);
-        HeadersTable.setFillsViewportHeight(true);
-        tablePanel.removeAll();
-        tablePanel.add(scrollPane, BorderLayout.CENTER);
-        tablePanel.revalidate();
-        tablePanel.repaint();
-    }
-    private void configureTableColumns() {
-        // Устанавливаем режим автоматического изменения размера
-        HeadersTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
-
-        TableColumnModel columnModel = HeadersTable.getColumnModel();
-
-        // Настройка каждого столбца
-        columnModel.getColumn(0).setPreferredWidth(50);  // №
-        columnModel.getColumn(0).setMaxWidth(80);
-
-        columnModel.getColumn(1).setPreferredWidth(150); // Номер закупки
-        columnModel.getColumn(1).setMaxWidth(200);
-
-        // Основной столбец с информацией
-        columnModel.getColumn(2).setPreferredWidth(400);
-        columnModel.getColumn(2).setCellRenderer(new MultiLineCellRenderer());
-
-        // Чекбоксы
-        columnModel.getColumn(3).setPreferredWidth(60);
-        columnModel.getColumn(3).setMaxWidth(80);
-
-        // Включаем заполнение всего доступного пространства
-        HeadersTable.setFillsViewportHeight(true);
-    }
     private void customizeTableRenderers() {
         // Рендерер для столбца с разделенным текстом
         HeadersTable.getColumnModel().getColumn(2).setCellRenderer(new DefaultTableCellRenderer() {
@@ -3390,10 +3324,10 @@ public class mainForm extends JFrame {
         statusForm.clearAllItems(); //
 
         Map<String, String> params = buildFinalParams();
-        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
+//        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
 
         // Очищаем все строки
-        model.setRowCount(0);
+//        model.setRowCount(0);
         // Логируем все параметры
         System.out.println("Формируемые параметры:");
         params.forEach((k, v) -> System.out.println(k + " = " + v));
@@ -3453,131 +3387,89 @@ public class mainForm extends JFrame {
         }
     }
 
-    private void initChooseAllElementsButton() {
-        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
-        int rowCount = model.getRowCount();
+    public void initChooseAllElementsButton() {
+        List<String> selectedUrls = statusForm.selectedUrls;
+        List<PurchaseItem> allItems = statusForm.allItems;
 
-        // Проверяем, есть ли хотя бы один выбранный элемент
-        boolean hasSelectedItems = false;
-        for (int i = 0; i < rowCount; i++) {
-            if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
-                hasSelectedItems = true;
+        boolean hasSelectedItems = !selectedUrls.isEmpty();
+
+        if (hasSelectedItems) {
+            selectedUrls.clear();
+            System.out.println("Все элементы сняты. Список пуст.");
+        } else {
+            for (PurchaseItem item : allItems) {
+                if (!selectedUrls.contains(item.getUrl())) {
+                    selectedUrls.add(item.getUrl());
+                }
+            }
+            System.out.println("Выбраны все элементы. Уникальных элементов: " + selectedUrls.size());
+            System.out.println("Список: " + selectedUrls);
+        }
+    }
+
+    public void deselectAllCheckboxes() {
+        statusForm.selectedUrls.clear();
+        System.out.println("Все элементы сняты. selectedUrls очищен.");
+    }
+
+    public void initChooseRangeElementsButton(int from, int to) {
+        List<String> selectedUrls = statusForm.selectedUrls;
+        List<PurchaseItem> allItems = statusForm.allItems;
+        int rowCount = allItems.size();
+
+        from = Math.max(1, Math.min(from, rowCount));
+        to = Math.max(1, Math.min(to, rowCount));
+        if (from > to) {
+            int temp = from;
+            from = to;
+            to = temp;
+        }
+
+        boolean hasSelectedInRange = false;
+        for (int i = from - 1; i < to; i++) {
+            if (selectedUrls.contains(allItems.get(i).getUrl())) {
+                hasSelectedInRange = true;
                 break;
             }
         }
 
-        // Если есть выбранные элементы — снимаем все галочки и очищаем список
-        if (hasSelectedItems) {
-            for (int i = 0; i < rowCount; i++) {
-                model.setValueAt(false, i, 3); // Снимаем галочку
-            }
-            statusForm.selectedUrls.clear(); // Очищаем список URL
-            System.out.println("Все элементы сняты. Список пуст.");
-        }
-        // Если нет выбранных элементов — выбираем все
-        else {
-            for (int i = 0; i < rowCount; i++) {
-                model.setValueAt(true, i, 3); // Ставим галочку
-                PurchaseItem item = statusForm.allItems.get(i);
-                if (!statusForm.selectedUrls.contains(item.getUrl())) {
-                    statusForm.selectedUrls.add(item.getUrl()); // Добавляем URL
-                }
-            }
-            System.out.println("Выбраны все элементы. Уникальных элементов: " + statusForm.selectedUrls.size());
-            System.out.println("Список: " + statusForm.selectedUrls);
-        }
-    }
-    private void deselectAllCheckboxes() {
-        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
-        int rowCount = model.getRowCount();
-
-        for (int i = 0; i < rowCount; i++) {
-            model.setValueAt(false, i, 3); // Снимаем галочку
-        }
-
-        // Полностью очищаем список выбранных URL (уверенно, после обновления модели)
-        statusForm.selectedUrls.clear();
-
-        // Обновляем интерфейс (если требуется)
-        HeadersTable.repaint();
-
-        System.out.println("Все чекбоксы сняты. statusForm.selectedUrls очищен.");
-    }
-    private void initChooseRangeElementsButton() {
-        DefaultTableModel model = (DefaultTableModel) HeadersTable.getModel();
-        int rowCount = model.getRowCount();
-
-        try {
-            // Получаем значения из текстовых полей
-            int from = From.getText().isEmpty() ? 1 : Integer.parseInt(From.getText());
-            int to = To.getText().isEmpty() ? rowCount : Integer.parseInt(To.getText());
-
-            // Корректируем значения
-            from = Math.max(1, Math.min(from, rowCount));
-            to = Math.max(1, Math.min(to, rowCount));
-
-            if (from > to) {
-                int temp = from;
-                from = to;
-                to = temp;
-            }
-
-            // Проверяем, есть ли выбранные элементы в диапазоне
-            boolean hasSelectedItemsInRange = false;
+        if (hasSelectedInRange) {
+            Set<String> urlsInRange = new HashSet<>();
             for (int i = from - 1; i < to; i++) {
-                if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
-                    hasSelectedItemsInRange = true;
-                    break;
+                urlsInRange.add(allItems.get(i).getUrl());
+            }
+
+            for (int i = 0; i < rowCount; i++) {
+                if (i >= from - 1 && i < to) continue;
+                urlsInRange.remove(allItems.get(i).getUrl());
+            }
+
+            for (int i = from - 1; i < to; i++) {
+                String url = allItems.get(i).getUrl();
+                if (urlsInRange.contains(url)) {
+                    selectedUrls.remove(url);
                 }
             }
 
-            if (hasSelectedItemsInRange) {
-                // Сначала собираем все URL из текущего диапазона
-                Set<String> urlsInRange = new HashSet<>();
-                for (int i = from - 1; i < to; i++) {
-                    PurchaseItem item = statusForm.allItems.get(i);
-                    urlsInRange.add(item.getUrl());
+            System.out.println("Элементы с " + from + " по " + to + " сняты.");
+            System.out.println("Уникальных элементов осталось: " + selectedUrls.size());
+        } else {
+            int added = 0;
+            for (int i = from - 1; i < to; i++) {
+                String url = allItems.get(i).getUrl();
+                if (!selectedUrls.contains(url)) {
+                    selectedUrls.add(url);
+                    added++;
                 }
-
-                // Затем проверяем, есть ли эти URL в других выбранных элементах
-                for (int i = 0; i < rowCount; i++) {
-                    if (i >= from - 1 && i < to) continue; // Пропускаем текущий диапазон
-                    if (Boolean.TRUE.equals(model.getValueAt(i, 3))) {
-                        PurchaseItem item = statusForm.allItems.get(i);
-                        urlsInRange.remove(item.getUrl()); // Удаляем URL, если он есть в других выбранных элементах
-                    }
-                }
-
-                // Теперь удаляем только те URL, которые больше нигде не выбраны
-                for (int i = from - 1; i < to; i++) {
-                    model.setValueAt(false, i, 3);
-                    PurchaseItem item = statusForm.allItems.get(i);
-                    if (urlsInRange.contains(item.getUrl())) {
-                        statusForm.selectedUrls.remove(item.getUrl());
-                    }
-                }
-
-                System.out.println("Элементы с " + from + " по " + to + " сняты.");
-                System.out.println("Уникальных элементов осталось: " + statusForm.selectedUrls.size());
-            } else {
-                int addedCount = 0;
-                for (int i = from - 1; i < to; i++) {
-                    model.setValueAt(true, i, 3);
-                    PurchaseItem item = statusForm.allItems.get(i);
-                    if (!statusForm.selectedUrls.contains(item.getUrl())) {
-                        statusForm.selectedUrls.add(item.getUrl());
-                        addedCount++;
-                    }
-                }
-                System.out.println("Выбраны элементы с " + from + " по " + to +
-                        ". Добавлено уникальных элементов: " + addedCount);
-                System.out.println("Всего уникальных элементов: " + statusForm.selectedUrls.size());
-                System.out.println("Список: " + statusForm.selectedUrls);
             }
-        } catch (NumberFormatException e) {
-            System.out.println("Ошибка: введите корректные числовые значения");
+
+            System.out.println("Выбраны элементы с " + from + " по " + to +
+                    ". Добавлено уникальных элементов: " + added);
+            System.out.println("Всего уникальных элементов: " + selectedUrls.size());
+            System.out.println("Список: " + selectedUrls);
         }
     }
+
     private void togglePauseParser() {
         if (listParser != null) {
             PurchasesParserHead parser = (PurchasesParserHead) listParser;
@@ -3604,7 +3496,7 @@ public class mainForm extends JFrame {
             StopParser.setEnabled(false);
             PauseParser.setEnabled(false);
             StatusLabel.setText("Статус: парсинг остановлен");
-            statusForm.selectedUrls.clear();
+
         }
     }
 

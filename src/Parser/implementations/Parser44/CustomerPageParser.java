@@ -194,55 +194,72 @@ public class CustomerPageParser {
             WebElement searchResultElement = driver.findElement(By.cssSelector(".search-registry-entry-block"));
             try {
                 // Парсинг полного наименования
-                WebElement nameElement = null;
                 try {
-                    nameElement = searchResultElement.findElement(By.cssSelector(".registry-entry__header-mid__number a"));
-                    customer.setFullName(nameElement.getText().trim());
+                    WebElement nameElement = searchResultElement.findElement(By.cssSelector(".registry-entry__header-mid__number a"));
+                    String fullNameText = nameElement.getText().trim();
+                    if (fullNameText.isEmpty()) {
+                        customer.setFullName(allData.getOrDefault("Полное наименование", null));
+                    } else {
+                        customer.setFullName(fullNameText);
+                    }
                 } catch (NoSuchElementException e) {
-                    customer.setFullName(null);
                     System.out.println("Элемент полного наименования не найден");
+                    customer.setFullName(allData.getOrDefault("Полное наименование", null));
                 }
 
-                // Парсинг местонахождения
+// Парсинг местонахождения
                 try {
                     WebElement locationElement = searchResultElement.findElement(
                             By.xpath(".//div[contains(@class, 'registry-entry__body-title') and contains(text(), 'Местонахождение')]/following-sibling::div"));
                     customer.setLocation(locationElement.getText().trim());
+
                 } catch (NoSuchElementException e) {
-                    customer.setLocation(null);
                     System.out.println("Элемент местонахождения не найден");
+                    customer.setLocation(allData.getOrDefault("Место нахождения", null));
                 }
 
-                // Парсинг ОГРН, ИНН, КПП
-                List<WebElement> infoBlocks = Collections.emptyList();
-                try {
-                    infoBlocks = searchResultElement.findElements(By.cssSelector(".registry-entry__body-block .row .col-md-auto"));
-                } catch (NoSuchElementException e) {
-                    System.out.println("Информационные блоки не найдены");
-                }
 
-                for (WebElement block : infoBlocks) {
+                // Проверяем, есть ли уже данные в allData
+                boolean needToParseInfoBlocks =
+                        allData.get("ИНН") == null ||
+                                allData.get("КПП") == null ||
+                                allData.get("ОГРН") == null;
+
+                if (needToParseInfoBlocks) {
+                    List<WebElement> infoBlocks = Collections.emptyList();
                     try {
-                        String title = block.findElement(By.cssSelector(".registry-entry__body-title")).getText().trim();
-                        String value = block.findElement(By.cssSelector(".registry-entry__body-value")).getText().trim();
-
-                        switch (title) {
-                            case "ОГРН":
-                                customer.setOgrn(value);
-                                break;
-                            case "ИНН":
-                                customer.setInn(value);
-                                break;
-                            case "КПП":
-                                customer.setKpp(value);
-                                break;
-                        }
+                        infoBlocks = searchResultElement.findElements(By.cssSelector(".registry-entry__body-block .row .col-md-auto"));
                     } catch (NoSuchElementException e) {
-                        System.out.println("Не удалось извлечь данные из информационного блока");
+                        System.out.println("Информационные блоки не найдены");
+                    }
+
+                    for (WebElement block : infoBlocks) {
+                        try {
+                            String title = block.findElement(By.cssSelector(".registry-entry__body-title")).getText().trim();
+                            String value = block.findElement(By.cssSelector(".registry-entry__body-value")).getText().trim();
+
+                            switch (title) {
+                                case "ОГРН":
+                                    if (customer.getOgrn() == null) customer.setOgrn(value);
+                                    break;
+                                case "ИНН":
+                                    if (customer.getInn() == null) customer.setInn(value);
+                                    break;
+                                case "КПП":
+                                    if (customer.getKpp() == null) customer.setKpp(value);
+                                    break;
+                            }
+                        } catch (NoSuchElementException e) {
+                            System.out.println("Не удалось извлечь данные из информационного блока");
+                        }
                     }
                 }
+                else {
 
-                customer.setLastUpdated(LocalDateTime.now());
+                    customer.setInn(allData.getOrDefault("ИНН", null));
+                    customer.setKpp(allData.getOrDefault("КПП", null));
+                    customer.setOgrn(allData.getOrDefault("ОГРН", null));
+                }
 
             } catch (Exception e) {
                 System.out.println("Ошибка при парсинге элемента поиска: " + e.getMessage());
@@ -250,10 +267,8 @@ public class CustomerPageParser {
             }
 
 //            // Остальные поля...
-//            customer.setInn(allData.getOrDefault("ИНН", null));
-//            customer.setKpp(allData.getOrDefault("КПП", null));
-//            customer.setOgrn(allData.getOrDefault("ОГРН", null));
-            customer.setOktmo(allData.getOrDefault("ОКТМО", null));
+
+            customer.setOktmo(allData.getOrDefault("Код по ОКТМО", null));
 //            customer.setLocation(allData.getOrDefault("Место нахождения", null));
 
 
