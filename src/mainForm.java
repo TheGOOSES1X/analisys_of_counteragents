@@ -214,6 +214,7 @@ public class mainForm extends JFrame {
     private volatile PurchaseListParser listParser;
     private volatile PurchaseDetailsParser detailsParser;
 
+
     private JComboBox comboBoxRoleCriterier;
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("dd-MM-yyyy");
     private DatabaseManager dbExtractor;
@@ -2459,11 +2460,30 @@ public class mainForm extends JFrame {
             model.addColumn("Репутация контрагента");
             model.addColumn("Вес. репутация контрагента");
             model.addColumn("Итоговый рейтинг");
-            model.addColumn("Категория"); // 13-я колонка
+            model.addColumn("Категория");      // индекс 12
+            model.addColumn("Кластеризация");        
+
+            // обучаем k-means один раз на всём наборе (важно!)
+            fitNNClusters(rowsCGOws);
 
             for (rowContrasGoodsOrdersWithWeights row : rowsCGOws) {
                 double rating = row.getRatingComplete();
-                String category = getRatingCategoryByNN(row);
+
+                // категория из твоего метода (он уже использует кластеры)
+                String category = getRatingCategoryByNN(row, rowsCGOws);
+
+                // вычислим ИД ближайшего кластера (0..k-1)
+                int clusterId = -1;
+                double[] feat = nn.embed(row.getDeliveryTimeFinalWeight());
+                double bestDist = Double.POSITIVE_INFINITY;
+                for (int c = 0; c < nnCluster.centroids.length; c++) {
+                    double dist = 0.0;
+                    for (int j = 0; j < feat.length; j++) {
+                        double diff = feat[j] - nnCluster.centroids[c][j];
+                        dist += diff * diff;
+                    }
+                    if (dist < bestDist) { bestDist = dist; clusterId = c; }
+                }
 
                 model.addRow(new Object[]{
                         row.getOrderName(),
@@ -2478,14 +2498,16 @@ public class mainForm extends JFrame {
                         formatValue(row.getContrasReputation()),
                         formatValue(row.getContrasReputationFinalWeight()),
                         formatValue(rating),
-                        category
+                        category,                     // кол. 12
+                        "Кл-" + clusterId             // кол. 13 (можно оставить просто clusterId)
                 });
             }
 
             tableRating.setModel(model);
 
+            // сортировка по числовым колонкам — индексы те же (0-баз.)
             try {
-                enableSortingForTable(tableRating, 3, 4, 5, 6, 7, 8, 9, 10, 11); // сортировка по числовым колонкам
+                enableSortingForTable(tableRating, 3, 4, 5, 6, 7, 8, 9, 10, 11);
             } catch (Exception e) {
                 System.err.println("Ошибка при применении сортировки: " + e.getMessage());
             }
@@ -2493,26 +2515,97 @@ public class mainForm extends JFrame {
             System.out.println("Ошибка: tableRating не инициализирована.");
         }
     }
-
+    private Map<Integer, String> clusterLabels = new HashMap<>();
     private NeuralNetwork nn;
-    private String getRatingCategoryByNN(rowContrasGoodsOrdersWithWeights row) {
-        if (nn == null) {
-            nn = new NeuralNetwork(4, 5);
+    private KMeans.Result nnCluster;
+    private int kCluster=4;
+    private String getRatingCategoryByNN(rowContrasGoodsOrdersWithWeights row,
+                                         List<rowContrasGoodsOrdersWithWeights> allRows) {
+        if (nn == null) nn = new NeuralNetwork();
 
+        // обучаем KMeans один раз на всём наборе (если ещё не обучен)
+        if (nnCluster == null) {
+            fitNNClusters(allRows);
         }
 
-        double[] input = new double[] {
-                row.getDeliveryTimeFinalWeight(),
-                row.getMinVolumeFinalWeight(),
-                row.getGoodQualityFinalWeight(),
-                row.getContrasReputationFinalWeight()
+        // строим/обновляем метки кластеров на основе всех данных
+        clusterLabels = buildClusterLabels(allRows);
+
+        // эмбеддинг текущей строки (скрытый слой из 4 признаков)
+        double[] feat = nn.embed(row.getDeliveryTimeFinalWeight());
+
+        // ищем ближайший центроид
+        int best = -1;
+        double bestDist = Double.POSITIVE_INFINITY;
+        for (int c = 0; c < nnCluster.centroids.length; c++) {
+            double dist = 0.0;
+            for (int j = 0; j < feat.length; j++) {
+                double diff = feat[j] - nnCluster.centroids[c][j];
+                dist += diff * diff;
+            }
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = c;
+            }
+        }
+
+        // используем автоматически назначенные метки
+        return clusterLabels.getOrDefault(best, "Неизвестно");
+    }
+    private Map<Integer, String> buildClusterLabels(List<rowContrasGoodsOrdersWithWeights> rows) {
+        if (nnCluster == null) return Collections.emptyMap();
+
+        int[] counts = new int[kCluster];
+        double[] sum = new double[kCluster];
+
+        // собираем статистику по каждому кластеру
+        for (int i = 0; i < nnCluster.labels.length; i++) {
+            int c = nnCluster.labels[i];
+            counts[c]++;
+            sum[c] += rows.get(i).getRatingComplete();
+        }
+
+        // вычисляем средний рейтинг по кластерам
+        double[][] clusterStats = new double[kCluster][2]; // [кластер][средний рейтинг, индекс]
+        for (int c = 0; c < kCluster; c++) {
+            double avg = counts[c] > 0 ? sum[c] / counts[c] : 0.0;
+            clusterStats[c][0] = avg;
+            clusterStats[c][1] = c;
+        }
+
+        // сортируем по среднему рейтингу (от низкого к высокому)
+        Arrays.sort(clusterStats, Comparator.comparingDouble(a -> a[0]));
+
+        // готовим названия в порядке возрастания рейтинга
+        String[] names = {
+                "Ненадёжный поставщик",
+                "Допустимый поставщик",
+                "Хороший поставщик",
+                "Надёжный поставщик"
         };
 
-        double value = nn.predict(input); // исправлено с feedforward на predict
+        // формируем словарь: кластер → название
+        Map<Integer, String> clusterLabels = new HashMap<>();
+        for (int i = 0; i < clusterStats.length && i < names.length; i++) {
+            int clusterId = (int) clusterStats[i][1];
+            clusterLabels.put(clusterId, names[i]);
+        }
 
-        if (value >= 0.7) return "Надёжный поставщик";
-        else if (value >= 0.4) return "Допустимый поставщик";
-        else return "Ненадёжный поставщик";
+        System.out.println("Автопереназначение кластеров:");
+        for (var e : clusterLabels.entrySet()) {
+            // Ищем средний рейтинг для данного кластера
+            double avgRating = 0.0;
+            for (int j = 0; j < clusterStats.length; j++) {
+                if ((int) clusterStats[j][1] == e.getKey()) {
+                    avgRating = clusterStats[j][0];
+                    break;
+                }
+            }
+            System.out.printf("Кластер %d → %s (ср. рейтинг %.3f)%n",
+                    e.getKey(), e.getValue(), avgRating);
+        }
+
+        return clusterLabels;
     }
 
     // В конструкторе или при объявлении поля:
@@ -2527,7 +2620,19 @@ public class mainForm extends JFrame {
         // Принудительно заменяем запятую на точку
         return formattedValue.replace(",", ".");
     }
+    private void fitNNClusters(List<rowContrasGoodsOrdersWithWeights> rows) {
+        if (nn == null) nn = new NeuralNetwork();
+        if (rows == null || rows.isEmpty()) { nnCluster = null; return; }
 
+        // собираем эмбеддинги скрытого слоя (4 признака)
+        double[][] X = new double[rows.size()][4];
+        for (int i = 0; i < rows.size(); i++) {
+            double in = rows.get(i).getDeliveryTimeFinalWeight();
+            X[i] = nn.embed(in);
+        }
+        // обучаем KMeans
+        nnCluster = KMeans.fit(X, kCluster, 100, 42L);
+    }
 
 
 
