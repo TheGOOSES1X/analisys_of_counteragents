@@ -1,7 +1,7 @@
 {
-  "URL" : "//10.210.12.212:5432",
+  "URL" : "//192.168.234.237:5432",
   "USER" : "postgres",
-  "PASSWORD" : "postgres",
-  "DB_Global_Marine" : "gm1",
-  "DB_Global_Module" : "global_module"
+  "PASSWORD" : "globalA17P14",
+  "DB_Global_Marine" : "globaldb",
+  "DB_Global_Module" : "global_module_238"
 }
