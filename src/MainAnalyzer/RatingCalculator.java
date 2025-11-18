@@ -20,19 +20,20 @@ public class RatingCalculator {
             String contrasFilter, String goodFilter, String orderFilter,
             String dateFilter, String minVolumeFilter, String okpd2) {
 
-        // 1. Получаем данные и кэшируем веса
         List<rowContrasGoodsOrdersWithWeights> rows = dbExtractor.getCGOwesAsUserCrit(
                 false, contrasFilter, goodFilter, orderFilter, dateFilter, minVolumeFilter, okpd2);
 
         if (rows.isEmpty()) return Collections.emptyList();
 
         cacheCriteriaData();
-
-        // 2. Параллельная обработка строк
         rows.parallelStream().forEach(this::processRow);
+
+        // После расчёта рейтингов — запускаем SOM
+        applyKohonenClustering(rows);
 
         return rows;
     }
+
 
     private void cacheCriteriaData() {
         dbExtractor.getAllCriteriaIds(false).forEach(critId -> {
@@ -189,4 +190,115 @@ public class RatingCalculator {
         }
         return 0.0;
     }
+    public void applyKohonenClustering(List<rowContrasGoodsOrdersWithWeights> rows) {
+        if (rows == null || rows.isEmpty()) return;
+
+        // 1. Оставляем только строки с ненулевым сроком, остальным сразу помечаем "нет данных"
+        List<rowContrasGoodsOrdersWithWeights> validRows = new ArrayList<>();
+        for (rowContrasGoodsOrdersWithWeights r : rows) {
+            if (r.getDeliveryTime() != 0) {
+                validRows.add(r);
+            } else {
+                r.setKohonenCluster(-1);
+                r.setKohonenClusterName("Нет данных по сроку");
+            }
+        }
+
+        if (validRows.isEmpty()) {
+            System.out.println("Kohonen: нет строк с данными по сроку поставки");
+            return;
+        }
+
+        int n = validRows.size();
+        double[][] data = new double[n][4];
+
+        for (int i = 0; i < n; i++) {
+            rowContrasGoodsOrdersWithWeights r = validRows.get(i);
+
+            double rating = safe(r.getRatingComplete());
+            double dt     = safe(r.getDeliveryTimeFinalWeight());
+            double qual   = safe(r.getGoodQualityFinalWeight());
+            double rep    = safe(r.getContrasReputationFinalWeight());
+
+            data[i][0] = rating;
+            data[i][1] = dt;
+            data[i][2] = qual;
+            data[i][3] = rep;
+        }
+
+        // 2. Обучаем SOM
+        KohonenSOM som = new KohonenSOM(20, 4);
+        som.train(data);
+
+        int clusterCount = som.getClusterCount();
+        System.out.println("Kohonen: найдено кластеров = " + clusterCount);
+
+        // 3. Назначаем кластеры и собираем рейтинги по кластерам
+        Map<Integer, List<Double>> clusterRatings = new HashMap<>();
+
+        for (int i = 0; i < n; i++) {
+            int clusterId = som.getCluster(data[i]);
+            rowContrasGoodsOrdersWithWeights r = validRows.get(i);
+
+            r.setKohonenCluster(clusterId);
+
+            clusterRatings
+                    .computeIfAbsent(clusterId, k -> new ArrayList<>())
+                    .add(r.getRatingComplete());
+        }
+
+        // 4. Средний рейтинг по каждому кластеру
+        Map<Integer, Double> clusterAvg = new HashMap<>();
+        for (Map.Entry<Integer, List<Double>> e : clusterRatings.entrySet()) {
+            double avg = e.getValue().stream()
+                    .mapToDouble(Double::doubleValue)
+                    .average()
+                    .orElse(0.0);
+            clusterAvg.put(e.getKey(), avg);
+        }
+
+        // 5. Сортируем кластеры по среднему рейтингу (от худшего к лучшему)
+        List<Map.Entry<Integer, Double>> sorted = new ArrayList<>(clusterAvg.entrySet());
+        sorted.sort(Map.Entry.comparingByValue());
+
+        // 6. Присваиваем названия
+        String[] clusterNames = new String[clusterCount];
+
+        for (int i = 0; i < sorted.size(); i++) {
+            int id = sorted.get(i).getKey();
+            String name;
+            if (i == 0) {
+                name = " Рискованные поставщики";
+            } else if (i == sorted.size() - 1) {
+                name = " Надёжные поставщики";
+            } else {
+                name = " Средние поставщики";
+            }
+            clusterNames[id] = name;
+        }
+
+        // 7. Сохраняем имена в строках
+        for (rowContrasGoodsOrdersWithWeights r : validRows) {
+            int id = r.getKohonenCluster();
+            if (id >= 0 && id < clusterNames.length && clusterNames[id] != null) {
+                r.setKohonenClusterName(clusterNames[id]);
+            } else {
+                r.setKohonenClusterName("Кластер без названия");
+            }
+        }
+        System.out.println("=== Кластеры Kohonen ===");
+        for (Map.Entry<Integer, List<Double>> e : clusterRatings.entrySet()) {
+            int cid = e.getKey();
+            double avg = clusterAvg.get(cid);
+            System.out.println("Кластер " + cid +
+                    " (" + avg + "): " + e.getValue().size() + " поставщиков");
+        }
+
+    }
+
+    private double safe(double v) {
+        if (Double.isNaN(v) || Double.isInfinite(v)) return 0.0;
+        return v;
+    }
+
 }

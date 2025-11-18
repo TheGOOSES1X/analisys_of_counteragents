@@ -1084,13 +1084,25 @@ public class mainForm extends JFrame {
 
         DefaultTableModel modelCGOws = new DefaultTableModel(
                 new Object[][]{},
-                new String[]{"Наименование заказа", "Наименование поставщика", "Наименование ТМЦ", "Срок поставки, день", "Минимальная партия поставки, ед.", "Уровень качества ТМЦ по жалобам", "Деловая репутация", "Рейтинг", "Категория"}
+                new String[]{
+                        "Наименование заказа",
+                        "Наименование поставщика",
+                        "Наименование ТМЦ",
+                        "Срок поставки, день",
+                        "Минимальная партия поставки, ед.",
+                        "Уровень качества ТМЦ по жалобам",
+                        "Деловая репутация",
+                        "Рейтинг",
+                        "Категория",
+                        "Кластер "
+                }
         ) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return false; // Все ячейки нередактируемы
             }
         };
+
 
         DefaultTableModel modelCGOwsBest = new DefaultTableModel(
                 new Object[][]{},
@@ -2465,6 +2477,8 @@ public class mainForm extends JFrame {
         return 0;
     }
 
+
+
     private void updateTableContrasGoodsOrdersWes(List<rowContrasGoodsOrdersWithWeights> rowsCGOws) {
         if (tableRating != null) {
             // Очищаем таблицу перед обновлением данных
@@ -2483,8 +2497,13 @@ public class mainForm extends JFrame {
                         formatValue(rowCGOw.getGoodQuality()),
                         formatValue(rowCGOw.getContrasReputation()),
                         formatValue(rowCGOw.getRatingComplete()),
-                        category
+                        category,                           // категория по существующей NN
+                        rowCGOw.getKohonenCluster() == -1
+                                ? "Нет данных по сроку"
+                                : (rowCGOw.getKohonenCluster() + " - " + rowCGOw.getKohonenClusterName())
+
                 });
+
             }
 
             // Включаем сортировку после обновления данных
@@ -2498,6 +2517,8 @@ public class mainForm extends JFrame {
         }
     }
 
+
+
     private NeuralNetwork nn;
 
     private String getRatingCategoryByNN(rowContrasGoodsOrdersWithWeights row) {
@@ -2505,7 +2526,19 @@ public class mainForm extends JFrame {
             nn = new NeuralNetwork();
         }
 
+        // 1. Если срок поставки не задан (0) — реально нет данных
+        if (row.getDeliveryTime() == 0) {
+            return "Нет данных по сроку";
+        }
+
         double input = row.getDeliveryTimeFinalWeight();
+
+        // 2. Нет данных только если совсем некорректное значение
+        if (Double.isNaN(input) || Double.isInfinite(input)) {
+            return "Нет данных по сроку";
+        }
+
+        // 3. Используем нейросеть для любого валидного значения (включая 0 и отрицательные)
         double[] output = nn.predict(input);
 
         int classIndex = 0;
@@ -2525,6 +2558,8 @@ public class mainForm extends JFrame {
             default: return "Неизвестно";
         }
     }
+
+
 
 
 
