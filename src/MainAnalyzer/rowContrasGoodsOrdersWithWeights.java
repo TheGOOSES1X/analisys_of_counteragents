@@ -24,6 +24,7 @@ public class rowContrasGoodsOrdersWithWeights {
     private Map<Long, Double> userCritValues = new HashMap<>(); // Хранит значения пользовательских критериев
     private Map<Long, Double> userCritWeights = new HashMap<>(); // Хранит веса пользовательских критериев
 
+
     public rowContrasGoodsOrdersWithWeights(long idContras, String contrasName, long idGood, String goodName, long idOrder, String orderName, int deliveryTime, double deliveryTimeFinalWeight, double minVolume, double minVolumeFinalWeight, double goodQuality, double goodQualityFinalWeight, double contrasReputation, double contrasReputationFinalWeight, List<Pair> userCrits, double ratingComplete) {
         this.idContras = idContras;
         this.contrasName = contrasName;
@@ -42,6 +43,27 @@ public class rowContrasGoodsOrdersWithWeights {
         this.userCrits = userCrits;
         this.ratingComplete = ratingComplete;
     }
+
+    // === Кластер Кохонена ===
+    private int kohonenCluster = -1;
+
+    public int getKohonenCluster() {
+        return kohonenCluster;
+    }
+
+    public void setKohonenCluster(int kohonenCluster) {
+        this.kohonenCluster = kohonenCluster;
+    }
+    private String kohonenClusterName = "Нет данных";
+
+    public String getKohonenClusterName() {
+        return kohonenClusterName;
+    }
+
+    public void setKohonenClusterName(String kohonenClusterName) {
+        this.kohonenClusterName = kohonenClusterName;
+    }
+
 
     public long getIdContras() {
         return idContras;
