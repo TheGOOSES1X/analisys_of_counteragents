@@ -1,5 +1,6 @@
 package Parser.implementations;
 import Parser.interfaces.DriverSetup;
+import Parser.utils.ChromeDriverLocator;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -14,10 +15,23 @@ public class ChromeDriverSetup implements DriverSetup {
 
     @Override
     public WebDriver setupDriver() {
+        System.out.println("[ChromeDriver] ========== Инициализация ChromeDriver ==========");
+        System.out.println("[ChromeDriver] Рабочая директория: " + System.getProperty("user.dir"));
+
         System.setProperty("webdriver.chrome.silentOutput", "true");
-        WebDriverManager.chromedriver().setup();
+
+        String driverPath = ChromeDriverLocator.findDriverPath();
+        System.setProperty("webdriver.chrome.driver", driverPath);
+        System.out.println("[ChromeDriver] webdriver.chrome.driver → " + driverPath);
 
         ChromeOptions options = new ChromeOptions();
+
+        String chromeBinary = ChromeDriverLocator.findChromeBinaryPath();
+        if (chromeBinary != null) {
+            options.setBinary(chromeBinary);
+            System.out.println("[ChromeDriver] Бинарник Chrome → " + chromeBinary);
+        }
+
         options.addArguments("--disable-blink-features=AutomationControlled");
         options.addArguments("--disable-infobars");
         options.addArguments("--disable-dev-shm-usage");
@@ -26,16 +40,20 @@ public class ChromeDriverSetup implements DriverSetup {
         options.addArguments("--disable-gpu");
         options.addArguments("--headless");
         options.addArguments("--window-size=1920,1080");
-        options.setExperimentalOption("detach", false); // Закрывать браузер при завершении
+        options.setExperimentalOption("detach", false);
 
-        // Добавляем динамически заданный user-agent
         if (userAgent != null && !userAgent.isEmpty()) {
             options.addArguments("user-agent=" + userAgent);
+            System.out.println("[ChromeDriver] User-Agent → " + userAgent);
         }
 
         options.setExperimentalOption("excludeSwitches", new String[]{"enable-automation"});
-        return new ChromeDriver(options);
+
+        System.out.println("[ChromeDriver] Запускаю браузер...");
+        WebDriver driver = new ChromeDriver(options);
+        System.out.println("[ChromeDriver] ✔ Браузер успешно запущен");
+        System.out.println("[ChromeDriver] ================================================");
+
+        return driver;
     }
-
-
 }
