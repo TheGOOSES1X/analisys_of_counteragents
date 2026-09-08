@@ -39,6 +39,10 @@ public class ChromeDriverSetup implements DriverSetup {
         options.addArguments("--remote-allow-origins=*");
         options.addArguments("--disable-gpu");
         options.addArguments("--headless");
+        options.setAcceptInsecureCerts(true);
+        options.addArguments("--ignore-certificate-errors");
+        options.addArguments("--ignore-ssl-errors");
+        options.addArguments("--allow-insecure-localhost");
         options.addArguments("--window-size=1920,1080");
         options.setExperimentalOption("detach", false);
 
