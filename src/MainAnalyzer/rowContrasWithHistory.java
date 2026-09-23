@@ -46,7 +46,7 @@ public class rowContrasWithHistory {
     }
 
     public double getPercentFailed() {
-        return percentFailed;
+        return Math.round(percentFailed);
     }
 
     public String getContrasCode() {

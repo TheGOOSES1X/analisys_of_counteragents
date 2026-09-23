@@ -1431,6 +1431,98 @@ public class DatabaseManager {
             var27.printStackTrace();
         }
 
+
+        // ===== Синхронизация истории поставок из Глобал -> module_contrashistory =====
+        String histMainQuery =
+                "SELECT s.scaption AS supplier_name, " +
+                        "       COUNT(*) AS total_cnt, " +
+                        "       COUNT(CASE WHEN cc.DDATESUPPLY < sai.DDOCEXEC AND cc.DDATESUPPLY IS NOT NULL THEN 1 END) AS overdue_cnt " +
+                        "FROM Stm_ActIn sai " +
+                        "JOIN bs_settler s ON s.gidref = sai.gidsettler " +
+                        "LEFT JOIN cnt_contract cc ON cc.id = sai.IDCONTRACTSTAGE " +
+                        "WHERE sai.idStateMC >= 300 " +
+                        "GROUP BY s.scaption";
+
+        // нормализованное имя -> {всего, в срок}
+        java.util.Map<String, long[]> histStats = new java.util.HashMap<>();
+        try {
+            ResultSet histRs = this.executeQuery(db_main, histMainQuery);
+            try {
+                while (histRs.next()) {
+                    String hName = histRs.getString("supplier_name");
+                    if (hName == null) continue;
+                    hName = hName.replace("\"", "").replace("«", "").replace("»", "")
+                            .replaceAll("\\s+", " ").trim().toLowerCase();
+                    if (hName.isEmpty()) continue;
+
+                    long hTotal = histRs.getLong("total_cnt");
+                    long hOverdue = histRs.getLong("overdue_cnt");
+
+                    long[] acc = histStats.computeIfAbsent(hName, k -> new long[2]);
+                    acc[0] += hTotal;               // всего поставок
+                    acc[1] += hTotal - hOverdue;    // выполнено в срок
+                }
+            } finally {
+                if (histRs != null) histRs.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+
+        // Контрагенты нашей БД (только из Глобал, без внешних)
+        java.util.Map<String, List<Long>> histIdsByName = new java.util.HashMap<>();
+        try {
+            ResultSet histCs = this.executeQuery(db_module,
+                    "SELECT id, scaption FROM public.bs_contras WHERE id < 10000000");
+            try {
+                while (histCs.next()) {
+                    String hName = histCs.getString("scaption");
+                    if (hName == null) continue;
+                    hName = hName.replace("\"", "").replace("«", "").replace("»", "")
+                            .replaceAll("\\s+", " ").trim().toLowerCase();
+                    if (hName.isEmpty()) continue;
+                    histIdsByName.computeIfAbsent(hName, k -> new ArrayList<>()).add(histCs.getLong("id"));
+                }
+            } finally {
+                if (histCs != null) histCs.close();
+            }
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+
+        // Сопоставляем по названию и готовим строки для апсерта
+        List<rowContrasWithHistory> histRows = new ArrayList<>();
+        for (java.util.Map.Entry<String, long[]> he : histStats.entrySet()) {
+            List<Long> hIds = histIdsByName.get(he.getKey());
+            if (hIds == null) continue;   // такого контрагента у нас нет
+
+            long hTotal = he.getValue()[0];
+            long hCompleted = he.getValue()[1];
+            long hFailed = hTotal - hCompleted;
+            double hFailedPercent = hTotal == 0 ? 0.0 : 100.0 * hFailed / hTotal;
+
+            for (Long hId : hIds) {
+                histRows.add(new rowContrasWithHistory(hId, "", 0.0, "",
+                        (int) hCompleted, (int) hFailed, 0.0, hFailedPercent));
+            }
+        }
+
+        // Апсерт в module_contrashistory
+        String histUpsert =
+                "INSERT INTO public.module_contrashistory " +
+                        "(id_contras, ncompleted_number, nfailed_number, ncontrasdelay, nfailed_percent) " +
+                        "VALUES (?, ?, ?, ?, ?) " +
+                        "ON CONFLICT (id_contras) DO UPDATE SET " +
+                        "ncompleted_number = EXCLUDED.ncompleted_number, " +
+                        "nfailed_number = EXCLUDED.nfailed_number, " +
+                        "nfailed_percent = EXCLUDED.nfailed_percent";
+
+        try {
+            this.executeQueryBatchCH(db_module, histUpsert, histRows);
+        } catch (SQLException ex) {
+            ex.printStackTrace();
+        }
+
     }
 
     public int getContrasNum(boolean db_main) {

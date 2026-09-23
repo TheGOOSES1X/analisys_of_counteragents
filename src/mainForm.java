@@ -351,8 +351,25 @@ public class mainForm extends JFrame {
                             (e.getModifiersEx() & KeyEvent.SHIFT_DOWN_MASK) != 0 &&
                             e.getKeyCode() == KeyEvent.VK_E) {
 
-                        String password = JOptionPane.showInputDialog("Введите пароль для эксперта:");
-                        if ("1234".equals(password)) {
+                        JPasswordField passwordField = new JPasswordField();
+                        JOptionPane pane = new JOptionPane(passwordField, JOptionPane.PLAIN_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
+                        JDialog dialog = pane.createDialog(null, "Введите пароль для эксперта:");
+                        dialog.addWindowFocusListener(new java.awt.event.WindowAdapter() {
+                            @Override
+                            public void windowGainedFocus(java.awt.event.WindowEvent e) {
+                                passwordField.requestFocusInWindow();
+                            }
+                        });
+                        dialog.setVisible(true);
+
+                        Object value = pane.getValue();
+                        if (value == null || !Integer.valueOf(JOptionPane.OK_OPTION).equals(value)) {
+                            return false;
+                        }
+
+                        String password = new String(passwordField.getPassword());
+
+                        if ("OSSZAdmin".equals(password)) {
                             JOptionPane.showMessageDialog(null, "Режим эксперта активирован");
                             setRole(Role.EXPERT);
                             setTitle("Система (Роль: ЭКСПЕРТ)");
@@ -3878,7 +3895,7 @@ public class mainForm extends JFrame {
 
         // Запускаем интерфейс
         SwingUtilities.invokeLater(() -> {
-            mainForm form = new mainForm(Role.EXPERT); // ← по умолчанию роль USER
+            mainForm form = new mainForm(Role.USER); // ← по умолчанию роль USER
             form.setContentPane(form.MainPanel);
             form.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             form.pack();
